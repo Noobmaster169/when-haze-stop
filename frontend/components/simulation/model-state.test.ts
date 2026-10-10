@@ -17,7 +17,7 @@ const BASE: ModelSkill = {
   gain: 0.14,
   gainRequired: 0.1,
   passed: false,
-  leads: [lead("doe", 1, 12.4, 14.4), lead("doe", 2, 20.1, 21), lead("nea", 1, null, null, 0), lead("nea", 2, null, null, 0)],
+  leads: [lead("doe", 1, 12.4, 14.4), lead("doe", 2, 20.1, 21)],
 };
 
 describe("what the page says about the learned model", () => {
