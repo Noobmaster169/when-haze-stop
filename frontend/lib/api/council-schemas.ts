@@ -24,7 +24,7 @@ export type Assignment = z.infer<typeof Assignment>;
 
 export const Violation = z.object({
   assignment: z.number().int().nullable(),
-  rule: z.enum(["capacity", "mandate", "consent", "reach", "days", "unknown_complex", "asset_place"]),
+  rule: z.enum(["capacity", "mandate", "consent", "reach", "days", "unknown_complex", "asset_place", "budget"]),
   message: z.string(),
 });
 export type Violation = z.infer<typeof Violation>;
@@ -54,7 +54,7 @@ const event = <K extends string, P extends z.ZodTypeAny>(kind: K, payload: P) =>
   z.object({ seq: z.number().int(), at: z.string(), actor: z.string(), kind: z.literal(kind), payload });
 
 export const CouncilEvent = z.discriminatedUnion("kind", [
-  event("run_started", z.object({ target: z.string(), targetName: z.string(), asOf: z.string(), dayOne: z.string(), daysInTheatre: z.number().int() })),
+  event("run_started", z.object({ target: z.string(), targetName: z.string(), asOf: z.string(), dayOne: z.string(), daysInTheatre: z.number().int(), budgetRm: z.number().optional() })),
   event("stage", z.object({ stage: StageId, title: z.string(), index: z.number().int(), of: z.number().int() })),
   event("agent_joined", z.object({ agent: z.string(), kind: AgentKind, title: z.string(), institution: z.string(), parent: z.string().nullable() })),
   event("thinking", z.object({ agent: z.string(), gist: z.string() })),
@@ -143,7 +143,8 @@ export const Verdict = z.object({
   baselines: z.array(z.object({ planId: z.string(), title: z.string(), score: ScoreSummary })),
   series: z.object({ baseline: z.array(z.number()), withPlan: z.array(z.number()) }),
   maps: VerdictMaps.nullable().default(null),
-  budgetLimited: z.boolean(),
+  /** What the plan costs Malaysia against the money set aside, ringgit. Null on runs made before budgets. */
+  cost: z.object({ total: z.number(), budget: z.number(), lines: z.array(z.object({ label: z.string(), rm: z.number() })) }).nullable().default(null),
 });
 export type Verdict = z.infer<typeof Verdict>;
 
@@ -153,6 +154,7 @@ export type RunStatus = z.infer<typeof RunStatus>;
 export const CouncilRun = z.object({
   id: z.number().int(),
   target: z.string(),
+  budgetRm: z.number().nullable().default(null),
   status: RunStatus,
   asOf: z.string().nullable(),
   createdAt: z.string(),
@@ -171,6 +173,11 @@ export type CouncilRunList = z.infer<typeof CouncilRunList>;
 
 export const CouncilEventPage = z.object({ events: z.array(CouncilEvent), status: RunStatus });
 export type CouncilEventPage = z.infer<typeof CouncilEventPage>;
+
+/** The budgets a run can be given, ringgit; mirrors BudgetChoice in the backend contract. */
+export const BUDGET_CHOICES = [4_000_000, 8_000_000, 12_000_000] as const;
+export const DEFAULT_BUDGET_RM = 8_000_000;
+export const BudgetChoice = z.union([z.literal(4_000_000), z.literal(8_000_000), z.literal(12_000_000)]);
 
 /** What the start route answers: the run to follow, either new or the one already going. */
 export const CouncilStart = z.object({ run: CouncilRunSummary, attached: z.boolean() });

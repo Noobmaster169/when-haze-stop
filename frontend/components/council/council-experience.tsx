@@ -41,11 +41,11 @@ export function CouncilExperience({ runs, run, events, initialView }: { runs: Co
     remember(runId, next);
   };
 
-  const convene = async () => {
+  const convene = async (budgetRm: number) => {
     setBusy(true);
     setError(null);
     try {
-      const response = await fetch("/api/council/runs", { method: "POST" });
+      const response = await fetch("/api/council/runs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ budgetRm }) });
       const body: unknown = await response.json().catch(() => null);
       const parsed = CouncilStart.safeParse(body);
       if (!response.ok || !parsed.success) {

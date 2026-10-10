@@ -31,10 +31,10 @@ export function captionFor(event: CouncilEvent | null, agents: Agent[]): string 
       const message = event.payload;
       const from = name(message.from);
       const to = listNames(message.to.map(name), agents.length);
-      const plan = message.planId ? `plan ${message.planId}` : to;
+      const plan = message.planId ? `${to}'s plan` : to;
       switch (message.act) {
         case "propose":
-          return `${from} proposes ${message.planId ? `plan ${message.planId}` : "a plan"}.`;
+          return `${from} puts forward a plan.`;
         case "challenge":
           return `${from} challenges ${plan}.`;
         case "support":
@@ -42,7 +42,7 @@ export function captionFor(event: CouncilEvent | null, agents: Agent[]): string 
         case "concede":
           return `${from} concedes to ${to}.`;
         case "revise":
-          return `${from} revises ${message.planId ? `into plan ${message.planId}` : "its plan"}.`;
+          return `${from} changes its plan after the questions.`;
         case "decide":
           return `${from} announces the decision.`;
         case "question":
@@ -56,13 +56,13 @@ export function captionFor(event: CouncilEvent | null, agents: Agent[]): string 
       }
     }
     case "candidate":
-      return event.payload.baseline ? `Code tables a plan to beat: ${event.payload.title}.` : `${name(event.payload.by)} tables plan ${event.payload.planId}.`;
+      return event.payload.baseline ? `The computer puts forward a simple plan to beat: ${event.payload.title}.` : `${name(event.payload.by)} puts a plan on the table.`;
     case "simulation":
-      return `The engine scores plan ${event.payload.planId}: ${percent(event.payload.score.expected)} of the ceiling expected.`;
+      return `The smoke model tests a plan: it would clear about ${percent(event.payload.score.expected)} of the smoke that could be cleared.`;
     case "vote":
       return `${name(event.payload.agent)} rates the plans.`;
     case "verdict":
-      return `The council chooses plan ${event.payload.planId}.`;
+      return "The committee chooses its plan.";
     case "run_finished":
       return `The council rises after ${event.payload.calls} model calls.`;
     case "run_failed":

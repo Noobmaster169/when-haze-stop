@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 
-import type { CouncilRunSummary } from "@/lib/api/council-schemas";
+import { BUDGET_CHOICES, type CouncilRunSummary, DEFAULT_BUDGET_RM } from "@/lib/api/council-schemas";
 import { malaysiaWhen } from "@/lib/malaysia-time";
 
 import { DOC_LINKS, PACKAGE_LINES, TARGETS } from "./package";
@@ -47,8 +48,9 @@ function recent(runs: CouncilRunSummary[]): { run: CouncilRunSummary; label: str
   ];
 }
 
-export function StartPanel({ runs, busy, error, onConvene }: { runs: CouncilRunSummary[]; busy: boolean; error: string | null; onConvene(): void }) {
+export function StartPanel({ runs, busy, error, onConvene }: { runs: CouncilRunSummary[]; busy: boolean; error: string | null; onConvene(budgetRm: number): void }) {
   const shown = recent(runs);
+  const [budget, setBudget] = useState<number>(DEFAULT_BUDGET_RM);
   return (
     <div className="min-h-0 grow overflow-y-auto px-6 pt-20 pb-12 md:px-10">
       <div className="mx-auto grid max-w-[980px] gap-10 md:grid-cols-[minmax(0,1fr)_260px] md:items-center">
@@ -70,8 +72,22 @@ export function StartPanel({ runs, busy, error, onConvene }: { runs: CouncilRunS
             </select>
           </div>
 
+          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-body text-ink">
+            <label htmlFor="council-budget">With a budget of</label>
+            <select id="council-budget" value={budget} onChange={(event) => setBudget(Number(event.target.value))} className="rounded-md border border-hairline-strong bg-surface px-2.5 py-1.5 text-body text-ink">
+              {BUDGET_CHOICES.map((choice) => (
+                <option key={choice} value={choice}>
+                  RM {choice / 1_000_000} million
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="mt-1.5 max-w-[62ch] text-caption text-ink-tertiary">
+            The government&apos;s real figure is not public, so this is your choice for the run. Every plan must fit inside it: aircraft cost about RM 100,000 to RM 450,000 a day each, a Bomba firefighter about RM 250.
+          </p>
+
           <div className="mt-5">
-            <div className="text-caption text-ink-tertiary">With</div>
+            <div className="text-caption text-ink-tertiary">What Malaysia can send</div>
             <ul className="mt-1.5 flex flex-wrap gap-1.5">
               {PACKAGE_LINES.map((line) => (
                 <li
@@ -95,7 +111,7 @@ export function StartPanel({ runs, busy, error, onConvene }: { runs: CouncilRunS
           <div className="mt-8">
             <button
               type="button"
-              onClick={onConvene}
+              onClick={() => onConvene(budget)}
               disabled={busy}
               className="rounded-full bg-ink px-6 py-3 text-title font-medium text-ink-inverse shadow-overlay transition-[transform,opacity] duration-200 ease-[var(--ease-island)] hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60"
             >

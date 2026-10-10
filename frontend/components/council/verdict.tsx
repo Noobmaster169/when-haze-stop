@@ -4,6 +4,7 @@ import type { CouncilEvent, CouncilRun, Verdict } from "@/lib/api/council-schema
 import { malaysiaWhen } from "@/lib/malaysia-time";
 
 import { VerdictChart } from "./verdict-chart";
+import { ringgit, VerdictCost } from "./verdict-cost";
 import { VerdictCompare } from "./verdict-compare";
 import { VerdictMap } from "./verdict-map";
 import { VerdictNotes } from "./verdict-notes";
@@ -16,10 +17,44 @@ import { VerdictStrikes } from "./verdict-strikes";
  */
 
 const TRACKS: { key: "actNow" | "ask" | "share"; label: string; hint: string }[] = [
-  { key: "actNow", label: "Act now", hint: "What Malaysia does today with what it controls" },
-  { key: "ask", label: "Ask", hint: "The requests to Indonesia worth making" },
-  { key: "share", label: "Share", hint: "The targeting picture for Indonesia's own crews" },
+  { key: "actNow", label: "Do now", hint: "What Malaysia can do today on its own" },
+  { key: "ask", label: "Ask Indonesia for", hint: "Help that needs Indonesia to say yes" },
+  { key: "share", label: "Tell Indonesia", hint: "What we know that helps their own crews" },
 ];
+
+function Fact({ label, value, note }: { label: string; value: string; note: string }) {
+  return (
+    <div className="rounded-lg border border-hairline bg-surface p-4">
+      <div className="text-caption text-ink-tertiary">{label}</div>
+      <div className="mt-1 font-display text-[24px] leading-[30px] text-ink">{value}</div>
+      <div className="mt-1 text-caption text-ink-secondary">{note}</div>
+    </div>
+  );
+}
+
+/** The plain answer in three numbers: how much cleaner KL gets, what it costs, whether it waits on Indonesia. */
+function Facts({ verdict }: { verdict: Verdict }) {
+  const waiting = [...new Set(verdict.strikeList.filter((line) => line.waitsOn).map((line) => `${line.place.replace(/^near /, "")}, ${line.province}`))];
+  return (
+    <div className="mt-8 grid gap-3 sm:grid-cols-3">
+      <Fact
+        label="Cleaner air for KL"
+        value={`${Math.round(100 * verdict.score.expected)}% of what is possible`}
+        note={`About ${verdict.score.meanRemoved.toFixed(1)} ug/m3 less PM2.5 on average over two weeks, if every fire out would give ${verdict.ceiling.toFixed(1)}.`}
+      />
+      {verdict.cost ? (
+        <Fact label="Cost" value={ringgit(verdict.cost.total)} note={`Of the ${ringgit(verdict.cost.budget)} the government set aside.`} />
+      ) : (
+        <Fact label="Cost" value="Not worked out" note="This meeting was held before budgets were part of the plan." />
+      )}
+      <Fact
+        label="Needs Indonesia to agree"
+        value={waiting.length ? "Partly" : "No"}
+        note={waiting.length ? `For the work near ${waiting.join(" and ")}. The rest goes ahead without asking.` : "Everything in the plan can start without a new request."}
+      />
+    </div>
+  );
+}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -31,8 +66,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export function VerdictView({ run, verdict, events, onReplay, onStart }: { run: CouncilRun; verdict: Verdict; events: CouncilEvent[]; onReplay(): void; onStart(): void }) {
-  const finished = events.find((event) => event.kind === "run_finished");
-  const calls = finished?.kind === "run_finished" ? finished.payload.calls : null;
   const asOf = run.asOf ?? events.find((event) => event.kind === "run_started")?.at ?? null;
 
   return (
@@ -52,11 +85,11 @@ export function VerdictView({ run, verdict, events, onReplay, onStart }: { run: 
 
           <h1 className="mt-6 max-w-[36ch] font-display text-[28px] leading-[36px] text-ink md:text-[32px] md:leading-[40px]">{verdict.headline}</h1>
           <p className="mt-3 text-small text-ink-tertiary">
-            Plan {verdict.planId}, {verdict.title}. Decided {run.finishedAt ? `${malaysiaWhen(run.finishedAt)} MYT` : ""}
-            {asOf ? ` on data as of ${malaysiaWhen(asOf)} MYT` : ""}
-            {calls !== null ? `, after ${calls} model calls` : ""}. The council is role-played by AI.
+            Decided {run.finishedAt ? `${malaysiaWhen(run.finishedAt)} MYT` : ""}
+            {asOf ? `, using the fires, wind and air as of ${malaysiaWhen(asOf)} MYT` : ""}. The committee members are played by AI.
           </p>
-          {verdict.budgetLimited ? <p className="mt-2 text-small text-differ">The meeting hit its budget of model calls before the ranking settled; the verdict is budget-limited.</p> : null}
+
+          <Facts verdict={verdict} />
 
           <dl className="mt-8 divide-y divide-hairline border-y border-hairline">
             {TRACKS.map((track) => (
@@ -70,11 +103,11 @@ export function VerdictView({ run, verdict, events, onReplay, onStart }: { run: 
             ))}
           </dl>
 
-          <Section title={verdict.maps ? "Before and after" : "Where the plan strikes"}>
+          <Section title={verdict.maps ? "Before and after" : "Where the help goes"}>
             <VerdictMap verdict={verdict} />
           </Section>
 
-          <Section title="The strike list">
+          <Section title="Which fires, in what order">
             <VerdictStrikes lines={verdict.strikeList} />
           </Section>
 
@@ -88,12 +121,18 @@ export function VerdictView({ run, verdict, events, onReplay, onStart }: { run: 
             </div>
           </Section>
 
+          {verdict.cost ? (
+            <Section title="What it costs">
+              <VerdictCost cost={verdict.cost} />
+            </Section>
+          ) : null}
+
           <Section title="What could go wrong">
             <VerdictNotes verdict={verdict} />
           </Section>
 
           <p className="mt-12 border-t border-hairline pt-4 text-caption text-ink-tertiary">
-            The verdict rests on the smoke model.{" "}
+            Every number comes from the smoke model and the stored data.{" "}
             <Link href="/simulation" className="text-ink-secondary underline underline-offset-2 hover:text-accent">
               How the engine was checked
             </Link>

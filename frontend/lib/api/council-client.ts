@@ -37,8 +37,8 @@ export async function getCouncilEvents(id: number, after: number): Promise<Counc
  * already queued or running, the answer is that run, marked as attached, so a
  * second press follows the meeting already under way instead of failing.
  */
-export async function startCouncilRun(): Promise<CouncilOutcome<CouncilStart>> {
-  const response = await request("/council/runs", { method: "POST", body: JSON.stringify({ target: "klang-valley" }) });
+export async function startCouncilRun(budgetRm: number): Promise<CouncilOutcome<CouncilStart>> {
+  const response = await request("/council/runs", { method: "POST", body: JSON.stringify({ target: "klang-valley", budgetRm }) });
   if (response.status === 409) {
     const message = await refusalMessage(response);
     const going = (await getCouncilRuns()).find((run) => run.status === "queued" || run.status === "running");

@@ -22,7 +22,7 @@ interface Row {
 
 export function VerdictCompare({ verdict }: { verdict: Verdict }) {
   const rows: Row[] = [
-    { key: verdict.planId, title: `${verdict.planId}, ${verdict.title}`, chosen: true, score: verdict.score },
+    { key: verdict.planId, title: "The committee's plan", chosen: true, score: verdict.score },
     ...verdict.baselines.map((baseline) => ({ key: baseline.planId, title: baseline.title, chosen: false, score: baseline.score })),
   ];
   const span = Math.max(1e-9, ...rows.flatMap((row) => [row.score.optimistic, row.score.pessimistic, row.score.expected]));
@@ -30,9 +30,9 @@ export function VerdictCompare({ verdict }: { verdict: Verdict }) {
 
   return (
     <figure>
-      <figcaption className="text-small font-medium text-ink">Against the plans made by code</figcaption>
+      <figcaption className="text-small font-medium text-ink">Against simple rules worked out by computer</figcaption>
       <p className="mt-0.5 text-caption text-ink-tertiary">
-        Share of the ceiling: every fire out from day 1 would remove {verdict.ceiling.toFixed(2)} ug/m3 of KL&apos;s PM2.5 on average over the horizon. Dot: expected; line: pessimistic to optimistic.
+        How much of the smoke that could be cleared from KL each plan clears (if every fire went out, KL&apos;s air would be {verdict.ceiling.toFixed(1)} ug/m3 cleaner on average). The dot is the likeliest result; the line runs from a bad case to a good one.
       </p>
       <ul className="mt-4 space-y-4">
         {rows.map((row) => {
@@ -52,7 +52,7 @@ export function VerdictCompare({ verdict }: { verdict: Verdict }) {
               <div className="text-caption text-ink-secondary tabular-nums sm:text-right">
                 <span className="font-medium text-ink">{percent(row.score.expected)}</span> ({percent(low)} to {percent(high)})
                 <span className="block text-ink-tertiary">
-                  {row.score.meanRemoved.toFixed(2)} ug/m3, {hoursText(row.score.hoursOver100Avoided)} over API 100 avoided
+                  {row.score.meanRemoved.toFixed(1)} ug/m3 cleaner, {hoursText(row.score.hoursOver100Avoided)} fewer above API 100
                 </span>
               </div>
             </li>
