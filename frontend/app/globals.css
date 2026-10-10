@@ -1,0 +1,171 @@
+@import "tailwindcss";
+
+/*
+ * A white ground with hairlines, ink at four weights, and five hues that mean
+ * something. Nothing else in the frontend declares a colour; every screen is
+ * built from these tokens. Rebrand here.
+ */
+:root {
+  color-scheme: light;
+
+  /* surfaces */
+  --shell: #f6f9fd;
+  --canvas: #ffffff;
+  --surface: #fcfcfd;
+  --surface-sunken: #f6f8fa;
+  --surface-active: #f3f4f6;
+  --scrim: rgb(17 24 39 / 0.32);
+
+  /* lines */
+  --hairline: #eceff3;
+  --hairline-strong: #dde3ea;
+  --hairline-faint: #f3f4f6;
+
+  /* ink. --ink-faint is never allowed to carry a fact. */
+  --ink: #111827;
+  --ink-secondary: #4b5563;
+  --ink-tertiary: #6b7280;
+  --ink-faint: #9ca3af;
+  --ink-inverse: #ffffff;
+
+  /* verdict hues: strong for text and rules, tint for chips and washes */
+  --verdict-match: #067647;
+  --verdict-match-tint: #ecfdf3;
+  --verdict-match-line: #abefc6;
+  --verdict-differ: #b54708;
+  --verdict-differ-tint: #fffaeb;
+  --verdict-differ-mark: #fef0c7;
+  --verdict-differ-ink: #7a3e06;
+  --verdict-differ-line: #f5d9ae;
+  --verdict-review: #6941c6;
+  --verdict-review-tint: #f4f3ff;
+  --verdict-review-line: #e9d7fe;
+  --verdict-fault: #b42318;
+  --verdict-fault-tint: #fef3f2;
+  --verdict-fault-line: #fecdca;
+  --signal: #175cd3;
+  --signal-tint: #eff4ff;
+  --signal-line: #bbd2f5;
+
+  /* the accent: interactive and active states */
+  --accent: #175cd3;
+  --accent-tint: #eff4ff;
+  --accent-line: #bbd2f5;
+
+  /* the one shadow in the product, and the focus ring */
+  --shadow-overlay: 0 8px 24px -8px rgb(17 24 39 / 0.18), 0 1px 2px rgb(17 24 39 / 0.06);
+  --focus-ring: 0 0 0 2px var(--canvas), 0 0 0 4px var(--accent);
+
+  /* radius */
+  --r-xs: 5px;
+  --r-sm: 6px;
+  --r-md: 7px;
+  --r-lg: 9px;
+  --r-xl: 10px;
+}
+
+@theme inline {
+  --color-shell: var(--shell);
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-sunken: var(--surface-sunken);
+  --color-active: var(--surface-active);
+
+  --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+  --color-hairline-faint: var(--hairline-faint);
+
+  --color-ink: var(--ink);
+  --color-ink-secondary: var(--ink-secondary);
+  --color-ink-tertiary: var(--ink-tertiary);
+  --color-ink-faint: var(--ink-faint);
+  --color-ink-inverse: var(--ink-inverse);
+
+  --color-match: var(--verdict-match);
+  --color-match-tint: var(--verdict-match-tint);
+  --color-match-line: var(--verdict-match-line);
+  --color-differ: var(--verdict-differ);
+  --color-differ-tint: var(--verdict-differ-tint);
+  --color-differ-mark: var(--verdict-differ-mark);
+  --color-differ-ink: var(--verdict-differ-ink);
+  --color-differ-line: var(--verdict-differ-line);
+  --color-review: var(--verdict-review);
+  --color-review-tint: var(--verdict-review-tint);
+  --color-review-line: var(--verdict-review-line);
+  --color-fault: var(--verdict-fault);
+  --color-fault-tint: var(--verdict-fault-tint);
+  --color-fault-line: var(--verdict-fault-line);
+  --color-signal: var(--signal);
+  --color-signal-tint: var(--signal-tint);
+  --color-signal-line: var(--signal-line);
+  --color-accent: var(--accent);
+  --color-accent-tint: var(--accent-tint);
+  --color-accent-line: var(--accent-line);
+
+  --font-display: var(--font-newsreader), Georgia, serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-xs: var(--r-xs);
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-xl: var(--r-xl);
+
+  --shadow-overlay: var(--shadow-overlay);
+
+  /* the scale. Sizes are exact, not snapped to Tailwind's defaults. */
+  --text-display: 30px;
+  --text-display--line-height: 36px;
+  --text-display-lg: 38px;
+  --text-display-lg--line-height: 44px;
+  --text-title: 15px;
+  --text-title--line-height: 22px;
+  --text-heading: 13.5px;
+  --text-heading--line-height: 20px;
+  --text-body: 13.5px;
+  --text-body--line-height: 21px;
+  --text-strong: 13px;
+  --text-strong--line-height: 20px;
+  --text-small: 12.5px;
+  --text-small--line-height: 18px;
+  --text-caption: 11.5px;
+  --text-caption--line-height: 17px;
+  --text-micro: 11px;
+  --text-micro--line-height: 16px;
+  --text-mono: 13px;
+  --text-mono--line-height: 20px;
+  --text-mono-sm: 11.5px;
+  --text-mono-sm--line-height: 18px;
+  --text-mono-xs: 10.5px;
+  --text-mono-xs--line-height: 16px;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* an offset ring, never an outline that shifts layout. */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--r-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
