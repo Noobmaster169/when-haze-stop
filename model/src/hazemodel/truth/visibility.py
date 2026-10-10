@@ -16,6 +16,7 @@ CAP_M = 10000
 CENSOR_UGM3 = 35.0
 WET = ("RA", "SH", "TS", "DZ", "BR", "FG")
 MIN_REPORTS_IN_MEAN = 12
+MIN_VISIBILITY_M = 50
 MIN_HOURS_FOR_OWN_FIT = 100
 
 
@@ -30,14 +31,18 @@ def extinction(visibility_m) -> float:
 
 
 def _hourly_extinction(reports: pd.DataFrame) -> pd.DataFrame:
-    dry = reports[reports["visibility_m"].notna() & reports["weather"].map(is_dry)].copy()
+    # A zero or tiny visibility is a sensor glitch or a code for nil; it would make extinction infinite.
+    usable = reports["visibility_m"].notna() & (reports["visibility_m"] >= MIN_VISIBILITY_M)
+    dry = reports[usable & reports["weather"].map(is_dry)].copy()
     dry["extinction"] = extinction(dry["visibility_m"].clip(upper=CAP_M))
     dry["capped"] = dry["visibility_m"] >= CAP_M
     hourly = dry.set_index("observed_at").sort_index()
     mean = hourly["extinction"].rolling("24h", min_periods=MIN_REPORTS_IN_MEAN).mean()
     all_capped = hourly["capped"].rolling("24h", min_periods=MIN_REPORTS_IN_MEAN).min().astype(bool)
     out = pd.DataFrame({"extinction_24h": mean, "censored": all_capped}).dropna(subset=["extinction_24h"])
-    return out.resample("1h").last().dropna(subset=["extinction_24h"])
+    hourly_out = out.resample("1h").last().dropna(subset=["extinction_24h"])
+    hourly_out["censored"] = hourly_out["censored"].astype(bool)
+    return hourly_out
 
 
 def airport_series(data: SourceData, series: pd.DataFrame, table: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -59,7 +64,7 @@ def airport_series(data: SourceData, series: pd.DataFrame, table: pd.DataFrame) 
         own = fit_line(hourly["extinction_24h"], ref)
         intercept, slope, correlation, hours = own if own[3] >= MIN_HOURS_FOR_OWN_FIT else pooled
         use_pooled = own[3] < MIN_HOURS_FOR_OWN_FIT
-        pm25 = intercept + slope * hourly["extinction_24h"]
+        pm25 = np.maximum(intercept + slope * hourly["extinction_24h"], 0.0)
         pm25 = np.where(hourly["censored"], np.minimum(pm25, CENSOR_UGM3), pm25)
         rows.append(
             pd.DataFrame(

@@ -21,6 +21,7 @@ def test_an_accepted_sensor_moves_toward_its_reference(data):
     series = reference_series(data)
     table = instruments(data)
     corrected, decisions = correct_sensors(series, table)
+    assert decisions["accepted"].any()
     for _, row in decisions[decisions["accepted"]].iterrows():
         raw = series[series["instrument_id"] == row["instrument_id"]].set_index("observed_at")["pm25_24h"]
         fixed = corrected[corrected["instrument_id"] == row["instrument_id"]].set_index("observed_at")["pm25_24h"]
@@ -34,10 +35,13 @@ def test_an_accepted_sensor_moves_toward_its_reference(data):
 def test_a_short_overlap_is_not_accepted(data):
     series = reference_series(data)
     table = instruments(data)
-    sensor = table[table["kind"] == "openaq"]["instrument_id"].iloc[0]
+    _, full = correct_sensors(series, table)
+    sensor = full[full["accepted"]]["instrument_id"].iloc[0]
     cut = series[(series["instrument_id"] != sensor) | (series.groupby("instrument_id").cumcount() < ACCEPT_HOURS - 1)]
     _, decisions = correct_sensors(cut, table)
-    assert not decisions.set_index("instrument_id").loc[sensor, "accepted"]
+    row = decisions.set_index("instrument_id").loc[sensor]
+    assert row["hours"] < ACCEPT_HOURS
+    assert not row["accepted"]
 
 
 def test_reference_is_chosen_among_those_sharing_hours(data):
