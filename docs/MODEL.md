@@ -105,6 +105,10 @@ not a clean one.
 
 Each builder writes its fit coefficients and every accept or drop decision into the run's report.
 
+The sensor and airport corrections are fitted on the whole loaded window, including hours after a
+training row's issue time; this is accepted as a static calibration, not a leak of the target, and
+the fitted decisions are frozen into each artifact so that serving applies them unchanged.
+
 ## 4. How it is trained
 
 ### 4.1 Rows and weights

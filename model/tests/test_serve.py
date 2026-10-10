@@ -11,7 +11,9 @@ from hazemodel.artifacts import Artifact, load_artifact, save_artifact, set_live
 from hazemodel.features.build import build_rows
 from hazemodel.predict import predict_rows
 from hazemodel.region import region_from_env
-from hazemodel.serve import create_app, serve_window
+from hazemodel import serve
+from hazemodel.features.air import STALE_HOURS
+from hazemodel.serve import create_app, parse_as_of, serve_window
 from hazemodel.store import SourceData
 
 ISSUE = pd.Timestamp("2026-10-08T00:00:00Z")
@@ -87,7 +89,7 @@ def test_predict_with_live_artifact(app_env, data):
     assert np.isfinite(first["p50"])
 
 
-@pytest.mark.parametrize("as_of", ["not-a-date", ""])
+@pytest.mark.parametrize("as_of", ["not-a-date", "", "now", "today"])
 def test_malformed_as_of_is_422(app_env, data, as_of):
     artifact = fit_on_fixture(data)
     save_artifact(app_env, artifact)
@@ -128,3 +130,34 @@ def test_the_serve_window_keeps_all_48_weather_hours(data):
     cut = type(data)(**{**data.__dict__, "weather_hours": short})
     frame_short, _ = build_rows(cut, region_from_env(), pd.DatetimeIndex([ISSUE]), with_targets=False)
     assert (frame_short["hours_present"] == 47).all()
+
+
+def test_as_of_accepts_z_and_offsets_and_naive_as_utc():
+    assert parse_as_of("2026-10-08T00:00:00Z") == ISSUE
+    assert parse_as_of("2026-10-08T08:00:00+08:00") == ISSUE
+    assert parse_as_of("2026-10-08T00:00:00") == ISSUE
+    assert parse_as_of("now") is None
+
+
+def test_health_reads_only_the_meta(app_env, data):
+    artifact = fit_on_fixture(data)
+    folder = save_artifact(app_env, artifact)
+    set_live(app_env, artifact.version)
+    # Test vector: a booster file that cannot be parsed, which /health must never open.
+    (folder / "d1_q10.txt").write_text("not a model")
+    health = TestClient(create_app()).get("/health").json()
+    assert health == {"status": "ok", "modelVersion": artifact.version, "trainedAt": artifact.trained_at.isoformat()}
+
+
+def test_no_fresh_level_answers_an_empty_list(app_env, data, monkeypatch):
+    artifact = fit_on_fixture(data)
+    save_artifact(app_env, artifact)
+    set_live(app_env, artifact.version)
+    # Test vector: every observation cut to before the issue by more than the staleness limit.
+    before = ISSUE - pd.Timedelta(hours=STALE_HOURS + 6)
+    names = ("readings", "nea_hours", "openaq_hours", "metar_obs")
+    cut = {name: getattr(data, name)[getattr(data, name)["observed_at"] < before] for name in names}
+    monkeypatch.setattr(serve, "_source", lambda as_of: type(data)(**{**data.__dict__, **cut}))
+    answer = TestClient(create_app()).post("/predict", json={"asOf": ISSUE.isoformat()})
+    assert answer.status_code == 200
+    assert answer.json() == {"modelVersion": artifact.version, "asOf": ISSUE.isoformat(), "forecasts": []}

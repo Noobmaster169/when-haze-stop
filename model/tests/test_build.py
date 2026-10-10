@@ -55,6 +55,11 @@ def test_write_parquet_names_the_file_by_content(tmp_path, data):
     assert path.name.startswith("features-2026-10-07-2026-10-08-")
     back = pd.read_parquet(path)
     assert len(back) == len(frame)
+    assert write_parquet(frame, tmp_path, "2026-10-07", "2026-10-08") == path
+    # Test vector: the same shape and columns with one value changed must get its own name.
+    changed = frame.copy()
+    changed.iloc[0, changed.columns.get_loc("level")] += 1.0
+    assert write_parquet(changed, tmp_path, "2026-10-07", "2026-10-08") != path
 
 
 def _day_series(instrument: str, day: str, level: float, censored: bool = False) -> pd.DataFrame:

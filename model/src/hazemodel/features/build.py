@@ -77,7 +77,9 @@ def build_rows(
 
 
 def write_parquet(frame: pd.DataFrame, directory: pathlib.Path, start: str, end: str) -> pathlib.Path:
-    digest = hashlib.sha1(f"{sorted(frame.columns)}:{len(frame)}".encode()).hexdigest()[:8]
+    # Named by content, so two builds of the same shape but different values never share a file name.
+    content = int(pd.util.hash_pandas_object(frame).sum())
+    digest = hashlib.sha1(f"{sorted(frame.columns)}:{content}".encode()).hexdigest()[:8]
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / f"features-{start}-{end}-{digest}.parquet"
     frame.reset_index().to_parquet(path, index=False)

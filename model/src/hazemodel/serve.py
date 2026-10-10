@@ -1,5 +1,6 @@
 """The forecast service: /health and /predict for the jobs process. Features are computed here and nowhere else."""
 
+import datetime as dt
 import os
 import pathlib
 
@@ -8,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from hazemodel.artifacts import artifacts_dir, live_version, load_artifact
+from hazemodel.artifacts import artifacts_dir, live_version, load_artifact, read_meta
 from hazemodel.features.air import HISTORY_DAYS
 from hazemodel.features.build import build_rows
 from hazemodel.predict import predict_rows
@@ -39,6 +40,16 @@ def _source(as_of: pd.Timestamp):
         return load_source_data(conn, start, end, os.environ.get("HINDCAST_MODEL", "v2-analysis"))
 
 
+def parse_as_of(text: str) -> pd.Timestamp | None:
+    """A strict ISO 8601 timestamp in UTC, or None; pandas alone would also take words such as "now"."""
+    try:
+        parsed = dt.datetime.fromisoformat(text[:-1] + "+00:00" if text.endswith("Z") else text)
+    except ValueError:
+        return None
+    as_of = pd.Timestamp(parsed)
+    return as_of.tz_convert("UTC") if as_of.tzinfo else as_of.tz_localize("UTC")
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="haze-model")
     directory = artifacts_dir()
@@ -50,22 +61,19 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     def health():
-        artifact = live()
+        version = live_version(directory)
+        meta = read_meta(directory, version) if version else None
         return {
             "status": "ok",
-            "modelVersion": artifact.version if artifact else None,
-            "trainedAt": artifact.trained_at.isoformat() if artifact else None,
+            "modelVersion": meta["version"] if meta else None,
+            "trainedAt": meta["trained_at"] if meta else None,
         }
 
     @app.post("/predict")
     def predict(body: PredictBody):
-        try:
-            as_of = pd.Timestamp(body.asOf)
-        except ValueError:
-            as_of = pd.NaT
-        if pd.isna(as_of):
+        as_of = parse_as_of(body.asOf)
+        if as_of is None:
             return JSONResponse(status_code=422, content={"error": "asOf must be an ISO 8601 timestamp"})
-        as_of = as_of.tz_convert("UTC") if as_of.tzinfo else as_of.tz_localize("UTC")
         artifact = live()
         if artifact is None:
             return JSONResponse(status_code=503, content={"error": "no live model"})
@@ -78,6 +86,9 @@ def create_app() -> FastAPI:
             from_forecast=1,
             decisions=artifact.decisions,
         )
+        if "level" not in frame.columns:
+            # No instrument had a fresh level at the ask, so there is nothing to forecast from: an answer, not a fault.
+            return {"modelVersion": artifact.version, "asOf": as_of.isoformat(), "forecasts": []}
         out = predict_rows(artifact, frame)
         forecasts = [
             {

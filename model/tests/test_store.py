@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 
+from hazemodel import store
 from hazemodel.store import SourceData, load_source_data, read_frame
 
 
@@ -105,3 +106,14 @@ def test_load_source_data_passes_span_and_hindcast_model():
     assert str(by_table["fire_cells"][1]) == "2026-10-10"
     load_source_data(conn, start, end, "m1")
     assert conn.log[-1][1][0] == "m1"
+
+
+def test_connect_opens_a_read_only_session(monkeypatch):
+    class FakeConnection:
+        read_only = False
+
+    # The fake stands in for psycopg so no test reaches Postgres.
+    monkeypatch.setattr(store.psycopg, "connect", lambda **kwargs: FakeConnection())
+    for name, value in {"PG_DATABASE": "haze", "PG_USER": "u", "PG_PASSWORD": "p"}.items():
+        monkeypatch.setenv(name, value)
+    assert store.connect().read_only is True

@@ -29,13 +29,16 @@ class SourceData:
 
 def connect() -> psycopg.Connection:
     env = os.environ
-    return psycopg.connect(
+    conn = psycopg.connect(
         host=env.get("PG_HOST", "127.0.0.1"),
         port=int(env.get("PG_PORT", 5432)),
         dbname=env["PG_DATABASE"],
         user=env["PG_USER"],
         password=env["PG_PASSWORD"],
     )
+    # The package only reads; the server refuses any write in a read-only transaction, whatever the SQL says.
+    conn.read_only = True
+    return conn
 
 
 def _utc(frame: pd.DataFrame) -> pd.DataFrame:

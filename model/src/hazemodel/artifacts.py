@@ -51,9 +51,14 @@ def _read_decisions(folder: pathlib.Path) -> dict[str, pd.DataFrame] | None:
     return found or None
 
 
+def read_meta(directory: pathlib.Path, version: str) -> dict:
+    """A version's meta.json alone, for callers that must not pay for deserialising the boosters."""
+    return json.loads((directory / version / "meta.json").read_text())
+
+
 def load_artifact(directory: pathlib.Path, version: str) -> Artifact:
     folder = directory / version
-    meta = json.loads((folder / "meta.json").read_text())
+    meta = read_meta(directory, version)
     boosters = {
         key: lgb.Booster(model_file=str(folder / f"{key}.txt")) for key in KEYS if (folder / f"{key}.txt").exists()
     }
