@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { correctToPoints, sampleAt } from "../../src/haze/field";
+import { sampleAt } from "../../src/haze/field";
+import { correctToPoints, mergeByCell } from "../../src/haze/field-points";
 import { cellCentre, distanceKm, FIELD, FIELD_CELLS } from "../../src/haze/grid";
+import { RECORDED_ISSUE } from "../fixtures/recorded-model-issue";
+import { STATIONS } from "../fixtures/recorded";
 
 /** A flat field, so any change is the correction's alone. */
 const LEVEL = 40;
@@ -44,6 +47,44 @@ describe("correcting the field to points", () => {
   it("returns the field as it is with no points", () => {
     const field = flat();
     expect(correctToPoints(field, [])).toEqual(field);
+  });
+
+  it("reads back every target of a cluster of real instruments with very different values, and leaves 400 km alone", () => {
+    // The recorded issue's instruments for 11 October, at their stored positions: Petaling Jaya, Seremban and KLIA
+    // lie 20 to 60 km apart in the Klang Valley, Singapore Central and the Tambulaung sensor in Sabah far off.
+    const positions = new Map<string, { lat: number; lon: number }>([
+      ...STATIONS.map((station) => [station.id, { lat: station.lat, lon: station.lon }] as const),
+      ["SGCENTRAL", { lat: 1.35735, lon: 103.82 }],
+      ["WMKK", { lat: 2.747, lon: 101.714 }],
+      ["openaq:12488751", { lat: 6.226897, lon: 116.451696 }],
+    ]);
+    const points = RECORDED_ISSUE.filter((row) => row.day === "2026-10-11").flatMap((row) => {
+      const at = positions.get(row.instrumentId);
+      return at ? [{ ...at, pm25: row.p50 }] : [];
+    });
+    expect(points).toHaveLength(5);
+    const targets = points.map((point) => point.pm25);
+    expect(Math.max(...targets) - Math.min(...targets)).toBeGreaterThan(60);
+    const corrected = correctToPoints(flat(), points);
+    for (const point of points) expect(Math.abs(sampleAt(corrected, point.lat, point.lon) - point.pm25)).toBeLessThan(1);
+    const far = [...Array(FIELD_CELLS).keys()].find((cell) => {
+      const at = cellCentre(cell);
+      const nearest = Math.min(...points.map((point) => distanceKm(at.lat, at.lon, point.lat, point.lon)));
+      return nearest > 400 && nearest < 420;
+    });
+    if (far === undefined) throw new Error("no cell 400 km from every point");
+    expect(Math.abs(corrected[far] - LEVEL)).toBeLessThan(1);
+  });
+
+  it("merges points that share a cell into one at their mean", () => {
+    const merged = mergeByCell([
+      { lat: centre.lat, lon: centre.lon, pm25: 50 },
+      { lat: centre.lat + 0.01, lon: centre.lon + 0.01, pm25: 70 },
+      { lat: centre.lat + 1, lon: centre.lon, pm25: 10 },
+    ]);
+    expect(merged).toHaveLength(2);
+    expect(merged[0]).toMatchObject({ pm25: 60 });
+    expect(merged[0].lat).toBeCloseTo(centre.lat + 0.005, 6);
   });
 
   it("skips a point outside the region and does not throw", () => {

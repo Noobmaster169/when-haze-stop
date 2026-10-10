@@ -1,4 +1,4 @@
-import { correctToPoints, type Target } from "./field";
+import { correctToPoints, type Target } from "./field-points";
 import { addHours } from "./grid";
 import { localDay, type ModelDay } from "./outlook";
 

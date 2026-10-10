@@ -1,6 +1,6 @@
 import { pm25ToApi } from "./api-index";
 import { type Calibration, toPm25 } from "./calibrate";
-import { cellCentre, distanceKm, DOMAIN, FIELD, FIELD_CELLS, inDomain } from "./grid";
+import { cellCentre, distanceKm, DOMAIN, FIELD, FIELD_CELLS } from "./grid";
 
 /**
  * The map: API over the whole grid at one hour, worked out in PM2.5.
@@ -29,6 +29,16 @@ const NEAR_KM = 15;
 /** Past this distance from every station the readings say nothing and the model stands alone. */
 const FADE_KM = 200;
 
+/** How hard an anchor this far away pulls a cell. */
+export function pullAt(km: number): number {
+  return 1 / (km * km + NEAR_KM * NEAR_KM);
+}
+
+/** How much of the anchors' pull is left at a cell whose nearest anchor is this far away. */
+export function fadeAt(nearestKm: number): number {
+  return Math.exp(-((nearestKm / FADE_KM) ** 2));
+}
+
 /** Reading minus model, spread over the grid and faded to nothing far from every station. */
 export function spreadErrors(anchors: Anchor[]): Float32Array {
   const spread = new Float32Array(FIELD_CELLS);
@@ -41,11 +51,11 @@ export function spreadErrors(anchors: Anchor[]): Float32Array {
     for (const anchor of anchors) {
       const km = distanceKm(centre.lat, centre.lon, anchor.lat, anchor.lon);
       if (km < nearest) nearest = km;
-      const pull = 1 / (km * km + NEAR_KM * NEAR_KM);
+      const pull = pullAt(km);
       weighted += pull * anchor.error;
       weight += pull;
     }
-    spread[cell] = Math.exp(-((nearest / FADE_KM) ** 2)) * (weighted / weight);
+    spread[cell] = fadeAt(nearest) * (weighted / weight);
   }
   return spread;
 }
@@ -107,8 +117,8 @@ export function forecastFrame(input: ForecastFrameInput): Uint8Array {
   return encode(forecastPm25(input));
 }
 
-/** The field's value at a point, bilinear between the four cell centres around it; at the rim the edge cells stand in. */
-export function sampleAt(field: Float32Array, lat: number, lon: number): number {
+/** The four cells a point's bilinear sample reads, with their weights; at the rim the edge cells stand in. */
+export function bilinearWeights(lat: number, lon: number): { cell: number; weight: number }[] {
   const x = (lon - DOMAIN.lon0) / FIELD.step - 0.5;
   const y = (lat - DOMAIN.lat0) / FIELD.step - 0.5;
   const x0 = Math.max(0, Math.min(FIELD.nx - 1, Math.floor(x)));
@@ -117,29 +127,17 @@ export function sampleAt(field: Float32Array, lat: number, lon: number): number 
   const y1 = Math.min(FIELD.ny - 1, y0 + 1);
   const tx = Math.max(0, Math.min(1, x - x0));
   const ty = Math.max(0, Math.min(1, y - y0));
-  const south = field[y0 * FIELD.nx + x0] * (1 - tx) + field[y0 * FIELD.nx + x1] * tx;
-  const north = field[y1 * FIELD.nx + x0] * (1 - tx) + field[y1 * FIELD.nx + x1] * tx;
-  return south * (1 - ty) + north * ty;
+  return [
+    { cell: y0 * FIELD.nx + x0, weight: (1 - tx) * (1 - ty) },
+    { cell: y0 * FIELD.nx + x1, weight: tx * (1 - ty) },
+    { cell: y1 * FIELD.nx + x0, weight: (1 - tx) * ty },
+    { cell: y1 * FIELD.nx + x1, weight: tx * ty },
+  ];
 }
 
-/** A place with the PM2.5 the field should show there. */
-export interface Target {
-  lat: number;
-  lon: number;
-  pm25: number;
-}
-
-/**
- * The field pulled to given values at given points, the way an observed frame
- * is pulled to the stations' readings: the difference at each point is spread
- * with the same weights. A point outside the region is skipped; with none left
- * the field is returned as it is.
- */
-export function correctToPoints(pm25: Float32Array, points: Target[]): Float32Array {
-  const anchors: Anchor[] = points.filter((point) => inDomain(point.lat, point.lon)).map((point) => ({ lat: point.lat, lon: point.lon, error: point.pm25 - sampleAt(pm25, point.lat, point.lon) }));
-  if (anchors.length === 0) return pm25;
-  const spread = spreadErrors(anchors);
-  const corrected = new Float32Array(pm25.length);
-  for (let cell = 0; cell < pm25.length; cell++) corrected[cell] = pm25[cell] + spread[cell];
-  return corrected;
+/** The field's value at a point, bilinear between the four cell centres around it. */
+export function sampleAt(field: Float32Array, lat: number, lon: number): number {
+  let value = 0;
+  for (const { cell, weight } of bilinearWeights(lat, lon)) value += field[cell] * weight;
+  return value;
 }

@@ -2,14 +2,17 @@ import { createHash } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
-import { pm25ToApi } from "../../src/haze/api-index";
-import { FIRST_FIT } from "../../src/haze/calibrate";
+import { apiToPm25, pm25ToApi } from "../../src/haze/api-index";
+import { FIRST_FIT, toPm25 } from "../../src/haze/calibrate";
+import { ensembleMean } from "../../src/haze/ensemble";
+import { sampleAt } from "../../src/haze/field";
 import { chanceAbove, firstHindcast } from "../../src/haze/chance";
 import { emissionsFor, type FireCellDay } from "../../src/haze/fires";
-import { addHours, DOMAIN, FIELD, FIELD_CELLS, hoursBetween } from "../../src/haze/grid";
-import { type LearnedInstrument, shaped } from "../../src/haze/learned-frames";
+import { addHours, cellsWithin, DOMAIN, FIELD, FIELD_CELLS, hoursBetween } from "../../src/haze/grid";
+import { type LearnedInstrument, learnedTargets, shaped } from "../../src/haze/learned-frames";
 import { localDay, type ModelDay } from "../../src/haze/outlook";
-import { runModel, type RunInput, type RunStation } from "../../src/haze/run";
+import { HORIZON_HOURS, runModel, type RunInput, type RunStation } from "../../src/haze/run";
+import { REACH_KM, smokeFrom } from "../../src/haze/smoke";
 import { spearman } from "../../src/haze/stats";
 import { CENTRAL, simulate } from "../../src/haze/transport";
 import { parseMetars } from "../../src/sources/metar";
@@ -136,14 +139,15 @@ describe("a model run", () => {
 });
 
 describe("a run on the learned forecast", () => {
-  // The recorded issue's instruments the fixtures can place: two DOE stations, Singapore Central and KLIA.
-  // The OpenAQ sensor has no recorded position, so it is left out, as the job leaves out an instrument nothing stored.
+  // The recorded issue's instruments at their stored positions: two DOE stations, Singapore Central, KLIA and
+  // the Tambulaung sensor in Sabah (openaq_sensors in db/seed).
   const klia = parseMetars(METAR_JSON).find((report) => report.icao === "WMKK");
   const central = NEA_STATIONS.find((station) => station.id === "SGCENTRAL");
   const positions = new Map<string, { lat: number; lon: number }>([
     ...STATIONS.map((station) => [station.id, { lat: station.lat, lon: station.lon }] as const),
     ["SGCENTRAL", { lat: central?.lat ?? NaN, lon: central?.lon ?? NaN }],
     ["WMKK", { lat: klia?.lat ?? NaN, lon: klia?.lon ?? NaN }],
+    ["openaq:12488751", { lat: 6.226897, lon: 116.451696 }],
   ]);
   const instruments: LearnedInstrument[] = [...positions].flatMap(([id, at]) => {
     const days = new Map<string, ModelDay>(RECORDED_ISSUE.filter((row) => row.instrumentId === id).map((row) => [row.day, { p10: row.p10, p50: row.p50, p90: row.p90 }]));
@@ -156,9 +160,30 @@ describe("a run on the learned forecast", () => {
   const cellOf = (at: { lat: number; lon: number }): number => Math.floor((at.lat - DOMAIN.lat0) / FIELD.step) * FIELD.nx + Math.floor((at.lon - DOMAIN.lon0) / FIELD.step);
   const apiAt = (frame: Uint8Array, at: { lat: number; lon: number }): number => frame[cellOf(at)] * 2;
 
-  it("covers the four placed instruments and names the issue", () => {
-    expect(instruments.map((instrument) => instrument.id).sort()).toEqual(["CA19B", "CA24N", "SGCENTRAL", "WMKK"]);
+  it("covers the five placed instruments and names the issue", () => {
+    expect(instruments.map((instrument) => instrument.id).sort()).toEqual(["CA19B", "CA24N", "SGCENTRAL", "WMKK", "openaq:12488751"]);
     expect(learned.learnedVersion).toBe(ISSUE_VERSION);
+  });
+
+  it("reads back rule 2 at every instrument in every frame past today, to the frame's resolution", () => {
+    // The run's own calibrated smoke at any place, rebuilt here from the same pure pieces so the targets are independent.
+    const smoke = smokeFrom(ensembleMean(emissionsFor(FIRE_CELLS, START, LAST_HOUR, HOURS), RUN_INPUT.weather), HOURS);
+    const physicsAt = (lat: number, lon: number, hour: number): number => toPm25(learned.calibration, smoke.near(cellsWithin(lat, lon, REACH_KM), hour));
+    const now = hoursBetween(START, LAST_HOUR);
+    const seremban = learned.forecasts.find((forecast) => forecast.stationId === "CA24N");
+    expect(physicsAt(positions.get("CA24N")?.lat ?? NaN, positions.get("CA24N")?.lon ?? NaN, now + 1)).toBeCloseTo(seremban?.physics[0] ?? NaN, 4);
+    const later = learned.frames.filter((frame) => localDay(frame.validAt) > localDay(LAST_HOUR));
+    expect(later.length).toBeGreaterThan(20);
+    let checked = 0;
+    for (const frame of later) {
+      const hour = hoursBetween(START, frame.validAt);
+      const pm25 = Float32Array.from(frame.field, (byte) => apiToPm25(byte * 2));
+      for (const target of learnedTargets(START, hour, instruments, physicsAt, now + HORIZON_HOURS)) {
+        expect(Math.abs(pm25ToApi(sampleAt(pm25, target.lat, target.lon)) - pm25ToApi(target.pm25))).toBeLessThanOrEqual(2);
+        checked += 1;
+      }
+    }
+    expect(checked).toBe(later.length * 5);
   });
 
   it("shows rule 2 at Seremban in a frame on the next Malaysian day, to the frame's resolution", () => {
