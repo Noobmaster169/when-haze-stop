@@ -126,8 +126,9 @@ export function drawMarks(context: CanvasRenderingContext2D, scene: Scene, marks
       context.arc(x, y, chosen ? 7 : 4.2, 0, Math.PI * 2);
       context.fillStyle = css(colourAt(theme.stops, apiAt(marks.data, marks.at, station.lon, station.lat)));
       context.fill();
-      context.strokeStyle = chosen ? theme.ink : theme.halo;
-      context.lineWidth = chosen ? 2 : 1.2;
+      // A light ring reads on every colour of the field, the darkest haze included.
+      context.strokeStyle = theme.label;
+      context.lineWidth = chosen ? 2.6 : 1.4;
       context.stroke();
     }
   }
