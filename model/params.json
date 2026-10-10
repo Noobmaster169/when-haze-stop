@@ -1,0 +1,13 @@
+{
+  "objective": "quantile",
+  "num_leaves": 31,
+  "learning_rate": 0.05,
+  "min_data_in_leaf": 100,
+  "feature_fraction": 0.8,
+  "bagging_fraction": 0.8,
+  "bagging_freq": 1,
+  "lambda_l2": 1.0,
+  "num_boost_round": 600,
+  "verbose": -1,
+  "seed": 7
+}
