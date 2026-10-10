@@ -45,8 +45,14 @@ export async function runCycle(deps: IngestDeps, now: Date, options: CycleOption
 }
 
 const BACKFILL_EVERY_HOURS = 6;
-/** A run this close to the first stored reading has no spin-up behind it and nothing to be scored against ahead. */
-const BACKFILL_MARGIN_HOURS = 72;
+/**
+ * A run draws the map from 24 hours before its own hour and pulls each frame
+ * to the readings of that hour. One day after the first reading is therefore
+ * the earliest run whose every frame has readings under it, and it has a day
+ * of them to fit smoke against. The smoke's own spin-up comes from the fires
+ * and wind stored for the months before, not from waiting here.
+ */
+const BACKFILL_MARGIN_HOURS = 24;
 
 /**
  * Replays the model at earlier hours, each run seeing only what was known

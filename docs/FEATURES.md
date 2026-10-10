@@ -343,7 +343,8 @@ and to the reading the run started from. It reports the mean absolute error of t
 "no change" (persistence), and the error percentiles used for the chances. Nothing is
 precomputed: the page always reflects what is in the database.
 
-`pnpm haze:backfill` replays the model every 6 hours over the stored week, each run seeing only
+`pnpm haze:backfill` replays the model every 6 hours from one day after the first stored reading
+(so the haze field starts at the first reading, 3 October 2026 07:00 UTC), each run seeing only
 the fires and readings known at its hour, and stores them as `backfill` runs. This gives the
 Track record page checked forecasts on day one. Backfilled runs use analysed wind, not the wind
 that was forecast at the time, so they flatter the model slightly.
