@@ -17,7 +17,8 @@
     "haze:history": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts history",
     "haze:loop": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts loop",
     "haze:coverage": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts coverage",
-    "haze:evaluate": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts evaluate"
+    "haze:evaluate": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts evaluate",
+    "haze:hindcast": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts hindcast"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

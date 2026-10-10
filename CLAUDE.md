@@ -38,6 +38,7 @@ pnpm haze:backfill                  # replay the model over the stored week
 pnpm haze:loop                      # haze:once now, then every hour
 pnpm haze:history                   # fires, wind, airport visibility and PM2.5 back to HISTORY_FROM (2025-01-01); name parts to run only those
 pnpm haze:coverage                  # what is stored of those four, month by month; writes nothing
+pnpm haze:hindcast                  # replay the smoke model at 00:00 UTC of each stored day into smoke_hindcasts; name a first and last day to limit it
 
 # frontend, inside frontend/
 pnpm dev                            # :3000
