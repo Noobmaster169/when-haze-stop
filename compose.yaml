@@ -168,11 +168,17 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # Weekly retraining: features, train with backtest, promote by rule. Shares
-  # the artifacts volume with the model service, which re-reads `live` on
-  # every /predict, so a promotion needs no restart.
+  # Retraining on request: features, train with backtest, promote by rule. It
+  # takes 15 to 40 minutes, so it sits behind the `train` profile and `up`
+  # never starts it; run it as
+  #   docker compose --profile train run --rm --user "$(id -u):$(id -g)" model-train
+  # (the user, so the reports land in the bind mount owned by you). It skips
+  # when a report is under a week old; append `--force` to retrain anyway.
+  # Shares the artifacts volume with the model service, which re-reads `live`
+  # on every /predict, so a promotion needs no restart.
   model-train:
     build: ./model
+    profiles: ["train"]
     environment:
       PG_HOST: postgres
       PG_PORT: 5432
@@ -183,11 +189,10 @@ services:
     volumes:
       - model-artifacts:/app/artifacts
       - ./model/reports:/app/reports
-    command: ["hazemodel", "retrain", "--from", "2025-06-07", "--loop"]
+    entrypoint: ["hazemodel", "retrain", "--from", "2025-06-07"]
     depends_on:
       postgres:
         condition: service_healthy
-    restart: unless-stopped
 
 volumes:
   pgdata:

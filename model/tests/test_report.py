@@ -1,8 +1,9 @@
+import datetime as dt
 import json
 
 import numpy as np
 
-from hazemodel.report import write_report
+from hazemodel.report import newest_report_age, write_report
 
 
 def _cell(mae, hazy):
@@ -81,3 +82,14 @@ def test_reports_dir_follows_model_reports(monkeypatch, tmp_path):
     assert reports_dir() == REPORTS_PATH
     monkeypatch.setenv("MODEL_REPORTS", str(tmp_path))
     assert reports_dir() == tmp_path
+
+
+def test_newest_report_age_reads_trained_at_and_falls_back_to_mtime(tmp_path):
+    now = dt.datetime(2026, 10, 11, tzinfo=dt.timezone.utc)
+    assert newest_report_age(tmp_path, now) is None
+    (tmp_path / "a").mkdir()
+    (tmp_path / "a" / "scores.json").write_text(json.dumps({"trained_at": "2026-10-01T00:00:00+00:00"}))
+    assert newest_report_age(tmp_path, now) == dt.timedelta(days=10)
+    (tmp_path / "b").mkdir()
+    (tmp_path / "b" / "scores.json").write_text("{}")
+    assert newest_report_age(tmp_path, dt.datetime.now(dt.timezone.utc)) < dt.timedelta(minutes=5)

@@ -16,6 +16,8 @@ def test_recursive_day2_has_sorted_quantiles(frame):
 def test_choose_day2_rule():
     assert choose_day2({"hazy_mae": 10.0}, {"hazy_mae": 10.4})["serves_d2"] == "recursive"
     assert choose_day2({"hazy_mae": 10.0}, {"hazy_mae": 10.6})["serves_d2"] == "direct"
+    assert choose_day2({"hazy_mae": 10.0}, {"hazy_mae": float("nan")})["serves_d2"] == "direct"
+    assert choose_day2({"hazy_mae": float("nan")}, {"hazy_mae": 10.0})["serves_d2"] == "recursive"
 
 
 def test_direct_or_recursive_without_d2(frame):

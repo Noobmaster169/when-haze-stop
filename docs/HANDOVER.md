@@ -91,7 +91,32 @@ database's `PG_*` variables set:
 .venv/bin/hazemodel promote <version>   # moves `live` only if not worse than the live score
 ```
 
-The `model-train` compose service runs `hazemodel retrain --loop` weekly. The live version is
+Under compose, retraining runs on request, never from `up`, because it takes 15 to 40 minutes. From
+the repository root:
+
+```sh
+docker compose --profile train run --rm --user "$(id -u):$(id -g)" model-train           # skips if a report is under a week old
+docker compose --profile train run --rm --user "$(id -u):$(id -g)" model-train --force   # retrains anyway
+```
+
+The `model-artifacts` volume starts empty, so `/predict` has no live model under compose until a
+model is in it. Copy the host's published version and its `live` file in once, before any retrain:
+
+```sh
+docker compose --profile train run --rm --no-deps -v "$PWD/model/artifacts:/seed:ro" \
+  --entrypoint sh model-train -c 'cp -R /seed/. /app/artifacts/'
+```
+
+Without that step the first retrain becomes live unconditionally, because there is no live score to
+compare against. Hyperparameters: c88cac5a was trained with the then-committed defaults (31 leaves,
+learning rate 0.05, 100 rows per leaf, feature fraction 0.8, 600 rounds). `params.json` now holds
+the searched values (28 leaves, learning rate 0.0298, 125 rows per leaf, feature fraction 0.604, 299
+rounds), chosen with the all-day fallback criterion and never backtested; the draws table of that
+search was not kept. The next retrain evaluates them under the promotion rule. Day +2: the rule
+chose recursive (21.18 against 21.48, on the reference rows including DOE's week), but c88cac5a
+serves direct because the choice was not wired when it was saved; later artifacts carry it.
+
+The `model-train` compose job retrains on request, as above. The live version is
 `2026-10-11-c88cac5a` (reference hazy-day MAE 15.48 at day +1), promoted into the local
 `model/artifacts/`, which is not committed. It missed the 24 hour target (15% below persistence's
 17.53) and its band is too narrow. The shadow rule stands: the model forecasts every cycle and

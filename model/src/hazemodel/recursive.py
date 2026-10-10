@@ -26,7 +26,14 @@ def recursive_day2(artifact: Artifact, test: pd.DataFrame) -> pd.DataFrame:
 
 def choose_day2(direct: dict, recursive: dict) -> dict:
     x, y = direct.get("hazy_mae", np.nan), recursive.get("hazy_mae", np.nan)
-    serves = "recursive" if (np.isnan(x) or y <= TOLERANCE * x) else "direct"
+    if np.isnan(x):
+        # no direct score means no direct model to serve
+        serves = "recursive"
+    elif np.isnan(y):
+        # a direct score and no recursive one is no evidence for recursion: keep direct
+        serves = "direct"
+    else:
+        serves = "recursive" if y <= TOLERANCE * x else "direct"
     return {"serves_d2": serves, "direct_hazy_mae": x, "recursive_hazy_mae": y, "rule": RULE}
 
 

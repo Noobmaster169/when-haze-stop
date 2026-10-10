@@ -127,22 +127,28 @@ can cross.
 
 Searched once on the first six training months only, never on test months: leaves 15 to 63,
 learning rate 0.02 to 0.1, minimum rows per leaf 50 to 200, feature fraction 0.6 to 0.9, early
-stopping on the following month. The chosen values are committed as `model/params.json` so a
-retrain reproduces.
+stopping on each scored block within those six months. The criterion is the reference hazy-day MAE,
+or the reference all-day MAE when those months hold no hazy reference day. The chosen values are
+committed as `model/params.json` so a retrain reproduces, and each search writes its draws table
+and criterion to `model/reports/search-<date>.json`.
 
 ### 4.4 Day +2: direct against recursive
 
 Direct: a separate model with target `peak_d2`. Recursive: the day +1 median is written into the
 level and lag columns and the day +1 model runs again. Both are trained and scored. Recursive
 serves day +2 only if its error is within 5% of direct's; otherwise direct serves day +2 and
-recursive serves day +3 and beyond, labelled as such.
+recursive serves day +3 and beyond, labelled as such. The choice is saved in the artifact's
+`meta.json` as `serves_d2` and serving follows it; an artifact without it serves direct.
 
 ### 4.5 Retraining and promotion
 
-Weekly, on everything stored, triggered by the jobs process. Each training writes an artifact named
+On request, on everything stored, as the `model-train` compose job (`hazemodel retrain`), which
+skips when a report is under a week old unless given `--force`. Each training writes an artifact named
 by date and data hash under `model/artifacts/` and a report under `model/reports/<version>/`.
 `promote.py` moves the `live` pointer only if the new walk-forward score is not worse than the live
-one's. The rule is code.
+one's. The rule is code. It compares each version's walk-forward score over its own test months, and a
+later version has more of them, so the comparison is not on identical months and a calm stretch can let
+a weaker model pass. Rescoring both versions on one shared parquet is the proper fix, still to come.
 
 ### 4.6 Compute
 
@@ -219,8 +225,9 @@ two copied numbers.
 Built from `features-2025-06-07-2026-10-08-8f571bda.parquet`: 27,544 rows by 119 columns, issue
 days 2025-06-07 to 2026-10-08, built in 116 seconds with `--hindcast-model v2-analysis`. Every row
 has `has_physics = 1` (DOE 340, NEA 2,440, OpenAQ 11,054, airports 13,710), because the smoke
-hindcast covers every issue day of the span. Trained with the committed `model/params.json`
-unchanged (section 6.1.11 says why). The backtest with ablation ran in 23 minutes 15 seconds; `train --with-backtest`, which repeats
+hindcast covers every issue day of the span. Trained with the then-committed default
+hyperparameters (31 leaves, learning rate 0.05, 100 rows per leaf, feature fraction 0.8, 600
+rounds), not the searched values now in `model/params.json` (section 6.1.11 says why). The backtest with ablation ran in 23 minutes 15 seconds; `train --with-backtest`, which repeats
 the backtest without the ablation and fits the final artifact on every row, in 12 minutes 51 seconds.
 
 **The phases merged.** The design ran phase 1 without the physics group and phase 2 with it once
@@ -354,8 +361,11 @@ a day on average.
 
 #### 6.1.6 Day +2
 
-Recursive serves day +2: hazy-day MAE 21.18 against direct's 21.48 on the reference rows, inside
-the 5% rule (and slightly better). The day +2 numbers in 6.1.2 are the direct model's.
+The rule chose recursive for day +2: hazy-day MAE 21.18 against direct's 21.48, inside the 5% rule
+(and slightly better). These two are scored on the reference rows including DOE's week, not on the
+common rows of 6.1.1 to 6.1.3. The live artifact c88cac5a nevertheless serves day +2 direct, because
+the choice was not yet wired into the artifact when it was saved; later artifacts carry the choice
+in `meta.json`. The day +2 numbers in 6.1.2 are the direct model's.
 
 #### 6.1.7 Scenarios
 
@@ -385,7 +395,9 @@ The verdict should be confirmed on identical rows in the next version.
 #### 6.1.9 Ablation
 
 Reference hazy-day MAE at day +1 with all groups: 17.09. This is scored on reference rows including
-DOE, which is why it differs from the 15.48 of 6.1.2.
+DOE, which is why it differs from the 15.48 of 6.1.2. DOE's one October week supplies 251 of the
+419 hazy rows the ablation was scored on, so the physics and calendar verdicts below rest mostly on
+one week at instruments no walk-forward model trained on.
 
 | Group | Columns | Hazy MAE without | Change | Keep under the 1% rule |
 | --- | --- | --- | --- | --- |
@@ -415,14 +427,18 @@ therefore 14.90 or less (derived). The model scored 15.48, which is 11.7% below 
 against persistence's 20.61. Both rest on 168 and 173 hazy rows from five Singapore regions over
 August to October 2026.
 
-#### 6.1.11 The hyperparameter search was void
+#### 6.1.11 Hyperparameters: the defaults served, the searched values are untested
 
-`hazemodel search --months 6 --draws 20` chooses by reference hazy-day MAE on the first six
-months. The reference instruments had no hazy day before August 2026, so all 20 draws scored
-"n/a" and the code took the first draw by default. That choice would have been noise, so
-`params.json` was left as committed (31 leaves, learning rate 0.05, 100 rows per leaf, feature
-fraction 0.8, 600 rounds). The search needs a criterion that is defined on the early months before
-it can be run.
+`hazemodel search --months 6 --draws 20` chose by reference hazy-day MAE on the first six months.
+The reference instruments had no hazy day before August 2026, so all 20 draws scored "n/a" and the
+code took the first draw by default. That choice would have been noise, so this version was trained
+with the then-committed defaults (31 leaves, learning rate 0.05, 100 rows per leaf, feature fraction
+0.8, 600 rounds). The criterion now falls back to the reference all-day MAE when no hazy reference
+day exists (commit 02ae096). The search was rerun with it and `params.json` holds the searched values
+(28 leaves, learning rate 0.0298, 125 rows per leaf, feature fraction 0.604, 299 rounds; commit
+f984551). Those values were never backtested: the rerun of the backtest was stopped, and the draws
+table of that search was not kept. The next retrain evaluates them under the promotion rule; every
+search from now on writes its draws to `model/reports/search-<date>.json`.
 
 #### 6.1.12 What this version says
 

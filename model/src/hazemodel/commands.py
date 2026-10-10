@@ -16,13 +16,14 @@ from hazemodel.hyperparams import search, write_params
 from hazemodel.leaks import run_leak_tests
 from hazemodel.promote import promote
 from hazemodel.recursive import run_recursive_comparison
-from hazemodel.report import reports_dir, write_report
+from hazemodel.report import newest_report_age, reports_dir, write_report, write_search
 from hazemodel.scenarios import run_scenarios, unseen_instruments
 from hazemodel.splits import walk_forward
 from hazemodel.train import load_params, predict_frame, train_artifact
 
 log = logging.getLogger(__name__)
 WEEK_SECONDS = 7 * 24 * 3600
+FRESH = dt.timedelta(days=7)
 DAYS = (1, 2)
 
 
@@ -90,6 +91,12 @@ def evaluate(
     return payload, artifact
 
 
+def carry_day2(artifact: Artifact, day2: dict) -> None:
+    """The artifact serves day +2 the way the backtest chose; anything but an explicit "recursive" stays direct."""
+    artifact.serves_d2 = "recursive" if day2.get("serves_d2") == "recursive" else "direct"
+    print(f"{artifact.version}: day +2 served {artifact.serves_d2}")
+
+
 def backtest_command(args) -> None:
     frame = _load(args.parquet)
     payload, _ = evaluate(frame, load_params(), args.parquet, args.freq, args.min_train_blocks, args.ablation)
@@ -102,9 +109,11 @@ def train_command(args) -> None:
     params = load_params()
     if args.with_backtest:
         payload, artifact = evaluate(frame, params, args.parquet, args.freq, args.min_train_blocks, False)
+        carry_day2(artifact, payload["day2"])
     else:
         artifact, info = train_artifact(frame, params)
         payload = {**_header(artifact, info, frame, params, args.parquet), "backtest": {}}
+        print(f"{artifact.version}: no backtest, so no day +2 choice; day +2 served direct")
     _attach_decisions(artifact, args.parquet)
     save_artifact(artifacts_dir(), artifact)
     scored = reports_dir() / artifact.version / "scores.json"
@@ -123,6 +132,7 @@ def search_command(args) -> None:
     out = search(_load(args.parquet), freq=args.freq, months=args.months, draws=args.draws)
     print(f"criterion: {out['criterion']}")
     print(pd.DataFrame(out["draws"]).sort_values(out["criterion"]).to_string())
+    print(f"draws written to {write_search(reports_dir(), out, dt.date.today())}")
     if args.write:
         write_params(out["params"])
         print("written to params.json")
@@ -131,11 +141,16 @@ def search_command(args) -> None:
 def retrain_command(args) -> None:
     from hazemodel.cli import features_command  # cli imports this module
 
+    age = newest_report_age(reports_dir(), dt.datetime.now(dt.timezone.utc))
+    if age is not None and age < FRESH and not args.force:
+        print(f"skipped: the newest report is {age} old, under {FRESH.days} days; pass --force to retrain anyway")
+        return
     while True:
         end = (dt.date.today() - dt.timedelta(days=1)).isoformat()
         built = SimpleNamespace(start=args.start, end=end, hindcast_model=args.hindcast_model, out=args.out)
         parquet = str(features_command(built))
         payload, artifact = evaluate(_load(parquet), load_params(), parquet, "M", 1, False)
+        carry_day2(artifact, payload["day2"])
         _attach_decisions(artifact, parquet)
         save_artifact(artifacts_dir(), artifact)
         write_report(reports_dir(), artifact.version, payload)
