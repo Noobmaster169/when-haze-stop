@@ -4,9 +4,9 @@ import { burningCells } from "../haze/burning";
 import { FIXED_MIN_DAYS, fixedMask } from "../haze/fixed-sources";
 import { addHours, WEATHER_POINTS } from "../haze/grid";
 import { childLogger } from "../lib/logger";
-import { fires, fixedSources, readings, stations, weather } from "../repositories";
+import { fires, fixedSources, readings, stations, weather, weatherForecasts } from "../repositories";
 import type { LlmClient } from "../agents";
-import type { DoeClient, FiresClient, MetarClient, NeaClient, OpenAqClient, PushSender, StatementsClient, WeatherClient } from "../sources";
+import type { DoeClient, FiresClient, MetarClient, ModelClient, NeaClient, OpenAqClient, PushSender, StatementsClient, WeatherClient } from "../sources";
 import { recordFetch } from "./record-fetch";
 
 /** Fetch what the sources have and store it. Each function is one source, so one being down does not stop the others. */
@@ -26,6 +26,8 @@ export interface IngestDeps {
   statements?: { channels: StatementsClient[]; llm: LlmClient };
   /** Sends alerts to devices. Null or absent when no VAPID keys are set. */
   push?: PushSender | null;
+  /** The model service. Null or absent while MODEL_MODE is off, and the cycle never asks it. */
+  model?: ModelClient | null;
 }
 
 /** DOE serves the 24 hours before an instant, as far back as about a week. */
@@ -92,13 +94,16 @@ export async function ingestFires(deps: IngestDeps): Promise<number> {
   return detail.cellDays;
 }
 
-export async function ingestWeather(deps: IngestDeps): Promise<number> {
+export async function ingestWeather(deps: IngestDeps, now: Date = new Date()): Promise<number> {
   const detail = await recordFetch(deps.pool, "open-meteo", async () => {
     const grid = await deps.weather.grid(WEATHER_PAST_DAYS, WEATHER_FORECAST_DAYS);
     await weather.upsertGrid(deps.pool, grid);
+    // The hours still ahead are kept under this fetch, so a later score knows what the forecast said before the hour came.
+    const forecastHours = await weatherForecasts.insertForecastHours(deps.pool, grid, now);
     return {
       points: WEATHER_POINTS,
       hours: grid.hours,
+      forecastHours,
       from: grid.start.toISOString(),
       to: addHours(grid.start, grid.hours - 1).toISOString(),
     };

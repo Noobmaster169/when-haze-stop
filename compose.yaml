@@ -49,6 +49,29 @@ services:
       - "127.0.0.1:4001:4000"
     restart: unless-stopped
 
+  # The learned forecast (model/): reads the stored history, serves a forecast
+  # of each instrument's peak PM2.5 for the next three days. Without a
+  # promoted artifact it answers 503 and the cycle logs it and goes on.
+  model:
+    build: ./model
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: postgres
+      PG_USER: postgres
+      PG_PASSWORD: localdev
+      MODEL_ARTIFACTS: /app/artifacts
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    # 4002 on the host; 4000 and 4001 are the proxies'.
+    ports:
+      - "127.0.0.1:4002:4002"
+    volumes:
+      - model-artifacts:/app/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
   migrate:
     build: ./backend
     environment: &backend-env
@@ -59,6 +82,11 @@ services:
       PG_PASSWORD: localdev
       LLM_PROXY_URL: http://llm-proxy:4000
       LLM_MODEL_CHAT: ${LLM_MODEL_CHAT:-}
+      MODEL_URL: http://model:4002
+      # off, shadow or live. shadow asks the model each cycle and scores it on
+      # the Simulation page; live makes its forecast the outlook's. Set live by
+      # hand once the shadow rule on that page has passed.
+      MODEL_MODE: ${MODEL_MODE:-shadow}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       # Web Push, so alerts reach a device with the tab closed. Empty: in-app only.
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
@@ -125,6 +153,8 @@ services:
         condition: service_completed_successfully
       llm-proxy:
         condition: service_started
+      model:
+        condition: service_started
     restart: unless-stopped
 
   frontend:
@@ -140,3 +170,4 @@ services:
 
 volumes:
   pgdata:
+  model-artifacts:

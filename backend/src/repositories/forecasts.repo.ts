@@ -24,10 +24,10 @@ export async function exists(db: Queryable, asOf: Date, kind: RunKind): Promise<
   return (rowCount ?? 0) > 0;
 }
 
-export async function insertRun(db: Queryable, asOf: Date, kind: RunKind, calibration: Calibration): Promise<number> {
+export async function insertRun(db: Queryable, asOf: Date, kind: RunKind, calibration: Calibration, grid: string = GRID_KEY): Promise<number> {
   const { rows } = await db.query<{ id: string }>(
     "insert into forecast_runs (as_of, kind, intercept, slope, fit, grid, model) values ($1, $2, $3, $4, $5, $6, $7) returning id",
-    [asOf, kind, calibration.intercept, calibration.slope, JSON.stringify({ rankCorrelation: calibration.rankCorrelation, pairs: calibration.pairs, fallback: calibration.fallback }), GRID_KEY, MODEL_VERSION],
+    [asOf, kind, calibration.intercept, calibration.slope, JSON.stringify({ rankCorrelation: calibration.rankCorrelation, pairs: calibration.pairs, fallback: calibration.fallback }), grid, MODEL_VERSION],
   );
   return Number(rows[0].id);
 }

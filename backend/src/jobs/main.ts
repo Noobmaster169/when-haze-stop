@@ -9,6 +9,7 @@ import {
   firmsClient,
   metarArchiveClient,
   metarClient,
+  modelClient,
   moeStatementsClient,
   neaClient,
   newsStatementsClient,
@@ -61,7 +62,7 @@ async function loop(deps: IngestDeps): Promise<void> {
     });
   }
   for (let turn = 0; !stopping; turn++) {
-    await runCycle(deps, new Date(), { fires: turn % FIRES_EVERY_HOURS === 0 });
+    await runCycle(deps, new Date(), { fires: turn % FIRES_EVERY_HOURS === 0, model: config.MODEL_MODE !== "off" });
     // After a start the stored week may have hours no run covers. Backfill skips the ones that have a run, so this is cheap after the first time.
     if (turn === 0 && !stopping) await backfill(deps);
     if (stopping) break;
@@ -99,9 +100,10 @@ async function main(): Promise<void> {
     openaq: config.OPENAQ_API_KEY ? openAqClient(config.OPENAQ_API_KEY) : null,
     statements: { channels: [moeStatementsClient(), doeStatementsClient(), newsStatementsClient()], llm: proxyLlmClient({ maxConcurrency: config.LLM_MAX_CONCURRENCY }) },
     push: pushSender(),
+    model: config.MODEL_MODE === "off" ? null : modelClient(config.MODEL_URL),
   };
   try {
-    if (command === "once") await runCycle(deps, new Date(), { fires: true });
+    if (command === "once") await runCycle(deps, new Date(), { fires: true, model: config.MODEL_MODE !== "off" });
     else if (command === "backfill") await backfill(deps);
     else if (command === "loop") await loop(deps);
     else if (command === "history") {

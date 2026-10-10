@@ -7,6 +7,7 @@ import { Contents, SCROLL_ID } from "@/components/simulation/contents";
 import { DayChart } from "@/components/simulation/day-chart";
 import { GuidelineTable } from "@/components/simulation/guideline-table";
 import { IndexChart } from "@/components/simulation/index-chart";
+import { ModelTable } from "@/components/simulation/model-table";
 import { Pipeline } from "@/components/simulation/pipeline";
 import { ScoreTable } from "@/components/simulation/score-table";
 import { SkillChart } from "@/components/simulation/skill-chart";
@@ -142,6 +143,12 @@ export default async function SimulationPage() {
               ) : (
                 <p className="mt-1 text-small text-ink-secondary">Scored here once a day has passed since they were made.</p>
               )}
+              <h3 className="mt-6 text-small font-medium text-ink">The learned model</h3>
+              {sim ? (
+                <div className="mt-2">
+                  <ModelTable model={sim.model} />
+                </div>
+              ) : null}
             </Chapter>
 
             <Chapter id="lines">

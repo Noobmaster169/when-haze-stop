@@ -48,3 +48,22 @@ export function chanceAbove(forecast: number, line: number, quantiles: Quantiles
   const chance = 1 - share(line - forecast, quantiles);
   return Math.round(Math.min(0.99, Math.max(0.01, chance)) * 100) / 100;
 }
+
+/** A forecast's own 10th, 50th and 90th percentile, in ug/m3, lowest first. */
+export type Band = [number, number, number];
+
+const BAND_LEVELS = [0.1, 0.5, 0.9];
+
+/** The share of the band at or below `value`: a straight line between its points and on past them, so a value outside it still moves the chance. */
+function bandShare(value: number, band: Band): number {
+  const k = value <= band[1] ? 0 : 1;
+  const span = band[k + 1] - band[k];
+  if (span <= 0) return value < band[k] ? BAND_LEVELS[k] : BAND_LEVELS[k + 1];
+  return BAND_LEVELS[k] + ((value - band[k]) / span) * (BAND_LEVELS[k + 1] - BAND_LEVELS[k]);
+}
+
+/** The chance a forecast with this band passes `line`; both are in ug/m3. Never 0 or 1: three quantiles cannot rule anything out. */
+export function chanceAboveBand(line: number, band: Band): number {
+  const chance = 1 - bandShare(line, band);
+  return Math.round(Math.min(0.99, Math.max(0.01, chance)) * 100) / 100;
+}

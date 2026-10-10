@@ -138,6 +138,10 @@ This needs Node 24 and pnpm 11. Without Docker, the proxy also runs on the host 
   `loop.ts`.
 - **The model.** Set `LLM_MODEL_CHAT` in `backend/.env` to `sonnet`, `opus` or `haiku`. The
   aliases are in `proxy/proxy.yaml`.
+- **The learned model.** `MODEL_URL` in `backend/.env` is the `model` service (the learned
+  forecast, port 4002). `MODEL_MODE` is `off`, `shadow` or `live`: `off` by default for a host
+  process, `shadow` in compose, where it is scored on the Simulation page without being shown;
+  `live` makes its forecast the outlook's, set by hand once the shadow rule has passed.
 - **A page.** Add it under `frontend/app/(app)/` and a line in `frontend/components/shell/nav.ts`.
 - **An endpoint.** Schema in `backend/src/contracts.ts`, SQL in `backend/src/repositories/`,
   router in `backend/src/routes/`, then mirror the schema in `frontend/lib/api/`.
