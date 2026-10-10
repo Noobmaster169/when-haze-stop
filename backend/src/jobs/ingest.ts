@@ -6,7 +6,7 @@ import { addHours, WEATHER_POINTS } from "../haze/grid";
 import { childLogger } from "../lib/logger";
 import { fires, fixedSources, readings, stations, weather } from "../repositories";
 import type { LlmClient } from "../agents";
-import type { DoeClient, FiresClient, MetarClient, NeaClient, PushSender, StatementsClient, WeatherClient } from "../sources";
+import type { DoeClient, FiresClient, MetarClient, NeaClient, OpenAqClient, PushSender, StatementsClient, WeatherClient } from "../sources";
 import { recordFetch } from "./record-fetch";
 
 /** Fetch what the sources have and store it. Each function is one source, so one being down does not stop the others. */
@@ -20,6 +20,8 @@ export interface IngestDeps {
   weather: WeatherClient;
   metar: MetarClient;
   nea: NeaClient;
+  /** OpenAQ's sensors. Null or absent without a key, and the cycle skips them. */
+  openaq?: OpenAqClient | null;
   /** The statement channels and the model that reads them. Without them the cycle reads no statements. */
   statements?: { channels: StatementsClient[]; llm: LlmClient };
   /** Sends alerts to devices. Null or absent when no VAPID keys are set. */

@@ -51,27 +51,29 @@ function dayAfter(day: string, days: number): string {
   return new Date(Date.parse(`${day}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
 }
 
-/** Answers the way the area endpoint does: what one satellite recorded in the days asked for. */
+/** Answers the way the area endpoint does: what one satellite recorded in the days asked for, in the feed asked for. */
 export class FakeFireArchiveClient implements FireArchiveClient {
-  readonly asked: { satellite: Satellite; labelled: boolean; from: string; days: number }[] = [];
+  readonly asked: { what: "fires" | "fixed"; satellite: Satellite; labelled: boolean; from: string; days: number }[] = [];
 
   constructor(
     private readonly available: ArchiveSpan[],
     private readonly live: Detection[],
     private readonly labelled: Partial<Record<Satellite, LabelledSource[]>>,
+    /** The fires of the standard product, for the days before the live feed starts. */
+    private readonly standard: Detection[] = [],
   ) {}
 
   async spans(): Promise<ArchiveSpan[]> {
     return this.available;
   }
 
-  async detections(satellite: Satellite, from: string, days: number): Promise<Detection[]> {
-    this.asked.push({ satellite, labelled: false, from, days });
-    return this.live.filter((hit) => hit.satellite === satellite && hit.day >= from && hit.day < dayAfter(from, days));
+  async detections(satellite: Satellite, from: string, days: number, labelled: boolean): Promise<Detection[]> {
+    this.asked.push({ what: "fires", satellite, labelled, from, days });
+    return (labelled ? this.standard : this.live).filter((hit) => hit.satellite === satellite && hit.day >= from && hit.day < dayAfter(from, days));
   }
 
   async fixedSources(satellite: Satellite, from: string, days: number): Promise<LabelledSource[]> {
-    this.asked.push({ satellite, labelled: true, from, days });
+    this.asked.push({ what: "fixed", satellite, labelled: true, from, days });
     return (this.labelled[satellite] ?? []).filter((seen) => seen.day >= from && seen.day < dayAfter(from, days));
   }
 }

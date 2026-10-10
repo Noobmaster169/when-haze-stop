@@ -3,7 +3,7 @@ import type { FetchDetail, SourceFetch } from "@/lib/api/source-schemas";
 import { malaysiaClock, malaysiaDate } from "@/lib/malaysia-time";
 
 /**
- * The four kinds of data the hourly job fetches, as a person would name them,
+ * The kinds of data the hourly job fetches, as a person would name them,
  * each with the numbers worth showing from its newest fetch. A dataset can be
  * more than one fetch (air quality is the station list and the readings); its
  * history pages through the one that carries the data.
@@ -17,7 +17,7 @@ export interface Stat {
 
 export interface Dataset {
   /** Also the query parameter that pages its history. */
-  key: "air" | "fires" | "weather" | "statements";
+  key: "air" | "fires" | "weather" | "visibility" | "pm25" | "statements";
   title: string;
   icon: IconName;
   what: string;
@@ -106,6 +106,42 @@ export const DATASETS: readonly Dataset[] = [
       ];
     },
     summary: (detail) => `${count(detail, "hours")} hours`,
+  },
+  {
+    key: "visibility",
+    title: "Airport visibility",
+    icon: "map",
+    what: "How far the observer at each airport could see, and whether they called it haze or smoke.",
+    members: ["metar"],
+    history: "metar",
+    stats: (detailOf) => {
+      const detail = detailOf("metar");
+      const newest = text(detail, "newestReport");
+      return [
+        { icon: "pin", value: count(detail, "airports"), label: "airports reporting" },
+        { icon: "chart", value: count(detail, "reports"), label: "reports received" },
+        { icon: "clock", value: newest ? malaysiaClock(newest) : "n/a", label: newest ? `newest report, ${malaysiaDate(newest)}` : "newest report" },
+      ];
+    },
+    summary: (detail) => `${count(detail, "added")} new of ${count(detail, "reports")} reports`,
+  },
+  {
+    key: "pm25",
+    title: "Measured PM2.5",
+    icon: "chart",
+    what: "The concentration itself, from Singapore's regions and from the sensors OpenAQ gathers. DOE publishes an index only.",
+    members: ["nea", "openaq"],
+    history: "nea",
+    stats: (detailOf) => {
+      const newest = text(detailOf("nea"), "newestReading");
+      return [
+        { icon: "pin", value: count(detailOf("nea"), "stations"), label: "Singapore regions" },
+        { icon: "grid", value: count(detailOf("openaq"), "sensors"), label: "OpenAQ sensors reporting" },
+        { icon: "chart", value: count(detailOf("openaq"), "added"), label: "sensor hours added" },
+        { icon: "clock", value: newest ? malaysiaClock(newest) : "n/a", label: newest ? `newest hour, ${malaysiaDate(newest)}` : "newest hour" },
+      ];
+    },
+    summary: (detail) => `${count(detail, "added")} new of ${count(detail, "hours")} hours`,
   },
   {
     key: "statements",

@@ -93,10 +93,35 @@ was tried the same day and dropped as a model rather than a measurement; its emp
 `cams_hours` from migration `005` remains. Prompt `v4.md` and version 3 of the `haze-decision`
 skill describe the two sources.
 
+The history was added last (10 October 2026, evening). `pnpm haze:history` now fills four kinds of
+data back to 1 January 2025: fires (the standard FIRMS product before the live feed's first day),
+wind, the 29 airports' weather reports from Iowa State's METAR archive, and measured PM2.5 from
+Singapore's past days and from OpenAQ's sensors (migration `007_openaq.sql`, key `OPENAQ_API_KEY`).
+OpenAQ is also fetched in the hourly cycle. The History strip under the map shows every day with
+one mark for each of the four, and a past day draws its airports and its PM2.5 instruments, with a
+panel for each instrument. `pnpm haze:coverage` prints what is stored by month. The model does not
+read any of it yet: `docs/FEATURES.md` section 3.4 says what the data is and what to know before
+training on it. What that leaves to do:
+
+1. Fit visibility to PM2.5 on the hours airports and DOE stations share, so the forecast can be
+   scored against visibility for the months with no readings.
+2. Correct each low-cost sensor against its nearest DOE station.
+3. Extend `haze:backfill` and `haze:evaluate` to replay the model over 2025 and score it against
+   those two, separately. The past PSI of Singapore was kept out of `readings` on purpose, because
+   `backfill` starts at the oldest reading and would otherwise replay 650 days on five stations.
+4. Export the seed again (`pnpm db:export-seed`) once the stations file carries `network`: today a
+   Singapore region loaded from the seed would arrive as a DOE station until the first cycle.
+
 ## Things that will surprise you
 
 - **Two backend processes.** `pnpm dev` only serves. `pnpm haze:loop` is what fetches and runs the
   model. With only the first, the map says "No forecast has been made yet".
+- **The wind history is slow on purpose.** Open-Meteo allows one address 5,000 calls an hour and
+  counts each row of the grid as 25, so a first `pnpm haze:history wind` takes about five hours.
+  Going faster gets the hourly fetch refused too, and then the live map has no wind.
+- **A slow link fails every source at once.** Node gives each address of a host a quarter of a
+  second to connect. `sources/http.ts` raises that to five seconds; without it every fetch dies
+  in under a second with a timeout that the request's own timeout never explains.
 - **Readings cannot be refetched.** DOE serves about 7 days. Do not drop or reset the dev database
   casually; the stored history is the backtest.
 - **`weather_hours` is overwritten by design.** It is the one exception to the no overwrite rule.

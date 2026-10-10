@@ -1,4 +1,4 @@
-import type { Station } from "@/lib/api/haze-schemas";
+import type { AirMonitor, Station } from "@/lib/api/haze-schemas";
 
 /** What the map canvas offers the page around it: the layers it can show, what a tap picks, and how the page can move it. */
 
@@ -24,4 +24,6 @@ export interface Pick {
   lon: number;
   lat: number;
   station: Station | null;
+  /** An instrument of a past day, where the map is looking back. */
+  monitor: AirMonitor | null;
 }

@@ -95,7 +95,8 @@ services:
     restart: unless-stopped
 
   # The hourly fetch, statement reading, model run and alert pass: one cycle
-  # now so the map has data, the history of the months before, then the loop,
+  # now so the map has data, the history back to HISTORY_FROM (hours on a first
+  # start, a minute after that: it asks only for what is missing), then the loop,
   # which backfills the stored week (it skips hours already run, so a restart
   # costs little) and runs a cycle at 20 past every hour.
   # The proxy reads the new official statements each cycle.
@@ -104,8 +105,14 @@ services:
     environment:
       <<: *backend-env
       # Optional. With it `history` replays the fire archive; without it the
-      # fires before the first run come from the seed and only the wind is fetched.
+      # fires before the first run come from the seed.
       FIRMS_MAP_KEY: ${FIRMS_MAP_KEY:-}
+      # Optional. With it the PM2.5 of OpenAQ's sensors is stored each hour and
+      # for the past; without it that one source is skipped.
+      OPENAQ_API_KEY: ${OPENAQ_API_KEY:-}
+      # The first day `history` fills back to, for fires, wind, airport
+      # visibility and measured PM2.5 alike.
+      HISTORY_FROM: ${HISTORY_FROM:-2025-01-01}
     command:
       - sh
       - -c

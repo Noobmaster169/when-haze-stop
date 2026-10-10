@@ -21,9 +21,9 @@ export function packWind(u: number[], v: number[]): string {
   return Buffer.from(bytes.buffer).toString("base64");
 }
 
-/** Every airport with its reports over the week before `until`, so the layer can follow the timeline. */
-async function airportsUntil(db: Queryable, until: Date): Promise<Airport[]> {
-  const reports = await metar.hourly(db, addHours(until, -24 * HISTORY_DAYS));
+/** Every airport with its reports from an instant to another, or to the newest without one, so the visibility layer can follow the timeline. */
+export async function airportsBetween(db: Queryable, from: Date, until: Date | null): Promise<Airport[]> {
+  const reports = await metar.hourly(db, from, until);
   return (await metar.airports(db)).map((airport) => ({
     ...airport,
     reports: reports
@@ -37,7 +37,7 @@ export async function hazeMap(db: Queryable): Promise<HazeMap> {
   const grid = { lon0: DOMAIN.lon0, lat0: DOMAIN.lat0, nx: FIELD.nx, ny: FIELD.ny, step: FIELD.step };
   const windGrid = { lon0: DOMAIN.lon0, lat0: DOMAIN.lat0, nx: WEATHER.nx, ny: WEATHER.ny, step: WEATHER.step };
   const all = await stations.list(db);
-  if (!run) return { run: null, grid, windGrid, stations: all, frames: [], wind: [], fires: [], airports: await airportsUntil(db, new Date()) };
+  if (!run) return { run: null, grid, windGrid, stations: all, frames: [], wind: [], fires: [], airports: await airportsBetween(db, addHours(new Date(), -24 * HISTORY_DAYS), null) };
 
   const asOf = new Date(run.asOf);
   const stored = await forecasts.timeline(db, addHours(asOf, -24 * HISTORY_DAYS), addHours(asOf, HORIZON_HOURS));
@@ -52,6 +52,6 @@ export async function hazeMap(db: Queryable): Promise<HazeMap> {
     frames: stored.map((frame) => ({ validAt: frame.validAt.toISOString(), observed: frame.validAt <= asOf, field: frame.field.toString("base64") })),
     wind: winds.map((hour) => ({ validAt: hour.validAt.toISOString(), uv: packWind(hour.u, hour.v) })),
     fires: await fires.strongest(db, fireFrom, FIRE_LIMIT),
-    airports: await airportsUntil(db, asOf),
+    airports: await airportsBetween(db, addHours(asOf, -24 * HISTORY_DAYS), null),
   };
 }

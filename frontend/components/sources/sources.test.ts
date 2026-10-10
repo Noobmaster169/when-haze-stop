@@ -92,6 +92,14 @@ describe("a dataset as a whole", () => {
     expect(span("2026-09-28T00:00:00.000Z", "2026-10-03T00:00:00.000Z")).toBe("28 Sep to 3 Oct");
   });
 
+  it("counts measured PM2.5 from both of its sources, and says n/a for OpenAQ where no key is set", () => {
+    const pm25 = DATASETS.find((dataset) => dataset.key === "pm25");
+    const nea = { stations: 5, hours: 210, added: 5, newestReading: "2026-10-10T11:00:00.000Z" };
+    expect(pm25?.stats((id) => (id === "nea" ? nea : { sensors: 62, added: 118 })).map((stat) => stat.value)).toEqual(["5", "62", "118", "19:00"]);
+    expect(pm25?.stats((id) => (id === "nea" ? nea : null)).map((stat) => stat.value)).toEqual(["5", "n/a", "n/a", "19:00"]);
+    expect(pm25?.summary(nea)).toBe("5 new of 210 hours");
+  });
+
   it("says n/a for a number an older fetch did not record", () => {
     const fires = DATASETS[1];
     expect(fires.stats(() => ({ detections: 267264, cellDays: 8544 })).map((stat) => stat.value)).toEqual(["267,264", "n/a", "n/a", "8,544"]);

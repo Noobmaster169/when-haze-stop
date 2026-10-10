@@ -59,6 +59,35 @@ To keep teammates in step, whoever has been running longest exports and commits 
 once a week: `cd backend && pnpm db:export-seed`. A NASA key in `FIRMS_MAP_KEY` is optional: with
 it the jobs service also replays the fire archive itself instead of relying on the seed.
 
+### The history: four kinds of data back to 1 January 2025
+
+A forecast is trained and checked on four things: where the fires were, the wind that carried the
+smoke, how far airport observers could see, and the PM2.5 that was measured. `pnpm haze:history`
+(the `jobs` service runs it on every start) fills all four back to `HISTORY_FROM`, by default
+`2025-01-01`, and the History strip under the map shows every one of those days.
+
+| Part | What it stores | From | Key |
+| --- | --- | --- | --- |
+| `fires` | Every day's fires, screened, and NASA's labelled fixed sources | NASA FIRMS | `FIRMS_MAP_KEY`, free |
+| `wind` | Hourly wind and rain on the model's grid | Open-Meteo | none |
+| `visibility` | The weather reports of 29 airports | Iowa State's METAR archive | none |
+| `air` | Singapore's hourly PM2.5, and OpenAQ's sensors | data.gov.sg, OpenAQ | `OPENAQ_API_KEY`, free, for OpenAQ |
+
+```sh
+cd backend
+pnpm haze:history                    # all four
+pnpm haze:history wind               # or only the parts named: fires, wind, visibility, air
+HISTORY_FROM=2024-01-01 pnpm haze:history
+```
+
+A first run is about 2,700 requests. Fires, visibility and PM2.5 take about an hour together; the
+wind takes about five, because Open-Meteo allows one address 5,000 calls an hour and the fetch
+paces itself under that. It can be stopped and started again: every part records what came back in
+`source_fetches` and asks only for what is missing, and a part that fails leaves the others
+running. `pnpm haze:coverage` prints what is stored of each, month by month. Without a key the part that needs
+it is skipped and says so. Put the two keys in the root `.env` for compose, or in `backend/.env`
+for host development.
+
 ### Host development
 
 To run the api, jobs or frontend from source with reload, start only the infrastructure and stop
@@ -74,7 +103,7 @@ pnpm dev                        # http://127.0.0.1:8091
 pnpm haze:once                  # in another terminal: fetch, run the model, raise alerts
 pnpm haze:backfill              # once: replay the stored week for the timeline and the track record
 pnpm haze:loop                  # keep running: refreshes every hour
-pnpm haze:history               # once: wind for the seeded months, and with FIRMS_MAP_KEY the fire archive too
+pnpm haze:history               # once: fires, wind, airport visibility and PM2.5 back to 1 January 2025 (see above)
 
 cd ../frontend
 cp .env.example .env.local

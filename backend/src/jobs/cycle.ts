@@ -6,6 +6,7 @@ import { evaluateAlerts } from "./alerts";
 import { runForecast } from "./forecast";
 import { type IngestDeps, ingestFires, ingestReadings, ingestWeather } from "./ingest";
 import { ingestMetars, ingestSingapore } from "./ingest-context";
+import { ingestOpenAq } from "./ingest-openaq";
 import { ingestStatements } from "./statements";
 
 /**
@@ -38,6 +39,8 @@ export async function runCycle(deps: IngestDeps, now: Date, options: CycleOption
   await attempt("weather", () => ingestWeather(deps));
   await attempt("metar", () => ingestMetars(deps));
   await attempt("nea", () => ingestSingapore(deps, now));
+  const sensors = deps.openaq;
+  if (sensors) await attempt("openaq", () => ingestOpenAq({ pool: deps.pool, openaq: sensors }, now));
   const reading = deps.statements;
   if (reading) await attempt("statements", () => ingestStatements({ pool: deps.pool, ...reading }));
 

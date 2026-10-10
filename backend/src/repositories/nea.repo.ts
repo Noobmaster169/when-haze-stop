@@ -57,3 +57,12 @@ export async function since(db: Queryable, from: Date): Promise<NeaHour[]> {
   );
   return rows.map(toHour);
 }
+
+/** Every region's hours after an instant up to another, oldest first. */
+export async function between(db: Queryable, after: Date, until: Date): Promise<NeaHour[]> {
+  const { rows } = await db.query<NeaRow>(
+    "select region, observed_at, pm25_hourly, pm25_24h, psi_24h from nea_hours where observed_at > $1 and observed_at <= $2 order by observed_at, region",
+    [after, until],
+  );
+  return rows.map(toHour);
+}

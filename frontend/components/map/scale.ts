@@ -37,6 +37,30 @@ export function band(api: number): string {
   return NAMES[bandKey(api)];
 }
 
+/** DOE's bands as [ug/m3, API], the same table as the backend's `haze/api-index.ts`. */
+const PM25_BANDS: readonly (readonly [number, number])[] = [
+  [0, 0],
+  [12.0, 50],
+  [50.4, 100],
+  [55.4, 150],
+  [150.4, 200],
+  [250.4, 300],
+  [350.4, 400],
+  [500.4, 500],
+];
+
+/** The index a PM2.5 concentration would give if it held for 24 hours, which is what a measured value is coloured by. */
+export function pm25ToApi(ugm3: number): number {
+  if (ugm3 <= 0) return 0;
+  for (let index = 1; index < PM25_BANDS.length; index++) {
+    const [toUg, toApi] = PM25_BANDS[index];
+    if (ugm3 > toUg && index < PM25_BANDS.length - 1) continue;
+    const [fromUg, fromApi] = PM25_BANDS[index - 1];
+    return fromApi + ((ugm3 - fromUg) * (toApi - fromApi)) / (toUg - fromUg);
+  }
+  return 0;
+}
+
 export function parseHex(hex: string): Rgb {
   const clean = hex.trim().replace("#", "");
   const full = clean.length === 3 ? [...clean].map((digit) => digit + digit).join("") : clean;

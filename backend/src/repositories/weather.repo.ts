@@ -71,3 +71,13 @@ export async function hoursStored(db: Queryable): Promise<number> {
   const { rows } = await db.query<{ hours: string }>("select count(*) as hours from weather_hours where array_length(u_ms, 1) = $1", [WEATHER_POINTS]);
   return Number(rows[0]?.hours ?? 0);
 }
+
+/** For each UTC day, how many of its hours are stored on the current grid. */
+export async function hoursByDay(db: Queryable): Promise<{ day: string; hours: number }[]> {
+  const { rows } = await db.query<{ day: string; hours: string }>(
+    `select to_char((valid_at at time zone 'UTC')::date, 'YYYY-MM-DD') as day, count(*) as hours
+       from weather_hours where array_length(u_ms, 1) = $1 group by 1 order by 1`,
+    [WEATHER_POINTS],
+  );
+  return rows.map((row) => ({ day: row.day, hours: Number(row.hours) }));
+}

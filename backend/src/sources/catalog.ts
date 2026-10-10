@@ -4,20 +4,12 @@
  * page joins those records to this list.
  */
 
-export const TRACKED_SOURCES = ["doe-stations", "doe-readings", "firms", "open-meteo", "firms-archive", "open-meteo-history", "metar", "nea", "moe-statements", "doe-statements", "news-statements"] as const;
-export type SourceId = (typeof TRACKED_SOURCES)[number];
+import { type SourceEntry, STATIC_SOURCES } from "./catalog-static";
 
-export interface SourceEntry {
-  id: string;
-  name: string;
-  provider: string;
-  what: string;
-  endpoint: string;
-  link: string;
-  cadence: string;
-  everyHours: number | null;
-  tracked: boolean;
-}
+export type { SourceEntry } from "./catalog-static";
+
+export const TRACKED_SOURCES = ["doe-stations", "doe-readings", "firms", "open-meteo", "firms-archive", "open-meteo-history", "metar", "nea", "metar-archive", "nea-history", "openaq", "moe-statements", "doe-statements", "news-statements"] as const;
+export type SourceId = (typeof TRACKED_SOURCES)[number];
 
 export const SOURCE_CATALOG: readonly SourceEntry[] = [
   {
@@ -68,7 +60,7 @@ export const SOURCE_CATALOG: readonly SourceEntry[] = [
     id: "firms-archive",
     name: "Fire archive",
     provider: "NASA FIRMS",
-    what: "Older fire detections, and NASA's own label for the hotspots that are not vegetation burning (gas flares, industry, volcanoes). Those are taken out of the fires the model burns.",
+    what: "The fires of every day back to the first day of the history, from the standard product where the live feed no longer reaches, and NASA's own label for the hotspots that are not vegetation burning (gas flares, industry, volcanoes). Those are taken out of the fires the model burns.",
     endpoint: "https://firms.modaps.eosdis.nasa.gov/api/area/csv/...",
     link: "https://firms.modaps.eosdis.nasa.gov/api/area/",
     cadence: "On demand (pnpm haze:history)",
@@ -79,7 +71,7 @@ export const SOURCE_CATALOG: readonly SourceEntry[] = [
     id: "open-meteo-history",
     name: "Wind and rain history",
     provider: "Open-Meteo",
-    what: "The same wind and rain for the months before this app started, from Open-Meteo's archive of past model runs.",
+    what: "The same wind and rain back to the first day of the history, from Open-Meteo's archive of past model runs.",
     endpoint: "https://historical-forecast-api.open-meteo.com/v1/forecast",
     link: "https://open-meteo.com/en/docs/historical-forecast-api",
     cadence: "On demand (pnpm haze:history)",
@@ -105,6 +97,39 @@ export const SOURCE_CATALOG: readonly SourceEntry[] = [
     endpoint: "https://api.data.gov.sg/v1/environment/pm25 and /psi",
     link: "https://www.haze.gov.sg/",
     cadence: "Every hour, at 20 past",
+    everyHours: 1,
+    tracked: true,
+  },
+  {
+    id: "metar-archive",
+    name: "Airport visibility history",
+    provider: "Iowa Environmental Mesonet, Iowa State University",
+    what: "The same airports' reports for the months before this app started, word for word, from the archive of every METAR issued.",
+    endpoint: "https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?station=...&data=metar",
+    link: "https://mesonet.agron.iastate.edu/request/download.phtml",
+    cadence: "On demand (pnpm haze:history)",
+    everyHours: null,
+    tracked: true,
+  },
+  {
+    id: "nea-history",
+    name: "Singapore readings history",
+    provider: "National Environment Agency Singapore (data.gov.sg)",
+    what: "Singapore's hourly PM2.5 and PSI for the months before this app started, a day at a time.",
+    endpoint: "https://api.data.gov.sg/v1/environment/pm25?date=YYYY-MM-DD and /psi",
+    link: "https://www.haze.gov.sg/",
+    cadence: "On demand (pnpm haze:history)",
+    everyHours: null,
+    tracked: true,
+  },
+  {
+    id: "openaq",
+    name: "Other PM2.5 sensors",
+    provider: "OpenAQ (AirGradient, Clarity, AirNow, Air4Thai and others)",
+    what: "Hourly PM2.5 from every fixed sensor in the region that is not a government's own feed here: an embassy reference monitor and low-cost sensors, most around Kuala Lumpur. Needs OPENAQ_API_KEY.",
+    endpoint: "https://api.openaq.org/v3/locations?bbox=... and /v3/sensors/N/hours",
+    link: "https://explore.openaq.org/",
+    cadence: "Every hour, at 20 past, and the past on demand (pnpm haze:history)",
     everyHours: 1,
     tracked: true,
   },
@@ -141,37 +166,5 @@ export const SOURCE_CATALOG: readonly SourceEntry[] = [
     everyHours: 1,
     tracked: true,
   },
-  {
-    id: "gazetteer",
-    name: "Towns and districts",
-    provider: "GeoNames (CC BY 4.0)",
-    what: "1,706 towns, districts and states of Malaysia, Singapore and Brunei, bundled so a search answers at once.",
-    endpoint: "backend/src/sources/gazetteer-data.ts",
-    link: "https://www.geonames.org/",
-    cadence: "Static, bundled",
-    everyHours: null,
-    tracked: false,
-  },
-  {
-    id: "geocoder",
-    name: "Place search",
-    provider: "Open-Meteo geocoding",
-    what: "Finds the villages the bundled list leaves out. Asked by the api only when the list has few matches, and cached for a day.",
-    endpoint: "https://geocoding-api.open-meteo.com/v1/search",
-    link: "https://open-meteo.com/en/docs/geocoding-api",
-    cadence: "On each search",
-    everyHours: null,
-    tracked: false,
-  },
-  {
-    id: "basemap",
-    name: "Coastlines, borders and towns",
-    provider: "Natural Earth (public domain)",
-    what: "The map's outline, packed once into the frontend.",
-    endpoint: "frontend/public/basemap.json",
-    link: "https://www.naturalearthdata.com/",
-    cadence: "Static",
-    everyHours: null,
-    tracked: false,
-  },
+  ...STATIC_SOURCES,
 ];

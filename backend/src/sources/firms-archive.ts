@@ -1,9 +1,10 @@
 import { z } from "zod";
 
 import type { Detection } from "../haze/fires";
+import { DOMAIN } from "../haze/grid";
 import { TerminalError } from "../lib/errors";
 import { parseFirmsCsv } from "./firms";
-import { fetchText, pause } from "./http";
+import { fetchPatiently, fetchText, pause } from "./http";
 
 /**
  * NASA FIRMS, further back than the rolling seven-day files: any days of the
@@ -11,7 +12,9 @@ import { fetchText, pause } from "./http";
  *
  * The standard product runs months behind and is the one that says what each
  * hotspot is: vegetation fire, volcano, other static land source or offshore.
- * The live feed never carries that label. Needs a free map key.
+ * The live feed never carries that label. Before the live feed's first day the
+ * standard product is also the only record of the fires themselves, in the
+ * same columns. Needs a free map key.
  */
 
 export type Satellite = "snpp" | "noaa20" | "noaa21";
@@ -34,8 +37,8 @@ export interface LabelledSource {
 
 export interface FireArchiveClient {
   spans(): Promise<ArchiveSpan[]>;
-  /** The live feed's detections for `days` days from `from`, low confidence dropped. */
-  detections(satellite: Satellite, from: string, days: number): Promise<Detection[]>;
+  /** One feed's detections for `days` days from `from`, low confidence dropped. `labelled` asks the standard product. */
+  detections(satellite: Satellite, from: string, days: number, labelled: boolean): Promise<Detection[]>;
   /** The standard product's fixed sources for `days` days from `from`. */
   fixedSources(satellite: Satellite, from: string, days: number): Promise<LabelledSource[]>;
 }
@@ -44,8 +47,8 @@ export interface FireArchiveClient {
 export const ARCHIVE_MAX_DAYS = 5;
 
 const BASE = "https://firms.modaps.eosdis.nasa.gov/api";
-/** West, south, east, north: the model's region. */
-const AREA = "96,-6,118,8";
+/** West, south, east, north: the model's region. Part of what a stored span is keyed by, so a wider region is fetched again. */
+export const ARCHIVE_AREA = `${DOMAIN.lon0},${DOMAIN.lat0},${DOMAIN.lon1},${DOMAIN.lat1}`;
 const TIMEOUT_MS = 120_000;
 /** A request for this area costs about 7 of the key's 5,000 transactions per ten minutes. This spacing uses a little over half. */
 const SPACING_MS = 1500;
@@ -105,14 +108,14 @@ export function firmsArchiveClient(mapKey: string): FireArchiveClient {
     const wait = lastAsked + SPACING_MS - Date.now();
     if (wait > 0) await pause(wait);
     lastAsked = Date.now();
-    return csvOrThrow(await fetchText(`${BASE}/area/csv/${mapKey}/${productOf(satellite, labelled)}/${AREA}/${days}/${from}`, what, TIMEOUT_MS), what);
+    return csvOrThrow(await fetchPatiently(`${BASE}/area/csv/${mapKey}/${productOf(satellite, labelled)}/${ARCHIVE_AREA}/${days}/${from}`, what, TIMEOUT_MS), what);
   };
   return {
     async spans() {
       return parseSpans(await fetchText(`${BASE}/data_availability/csv/${mapKey}/ALL`, "FIRMS availability", TIMEOUT_MS));
     },
-    async detections(satellite, from, days) {
-      return parseFirmsCsv(await area(satellite, false, from, days), satellite);
+    async detections(satellite, from, days, labelled) {
+      return parseFirmsCsv(await area(satellite, labelled, from, days), satellite);
     },
     async fixedSources(satellite, from, days) {
       return parseFixedSources(await area(satellite, true, from, days));

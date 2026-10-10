@@ -1,4 +1,4 @@
-import type { FireCell, FireDay } from "../contracts";
+import type { FireCell } from "../contracts";
 import type { Queryable } from "../db";
 import type { FireCellDay, StoredCellDay } from "../haze/fires";
 
@@ -73,7 +73,7 @@ export async function oldestDay(db: Queryable): Promise<string | null> {
 }
 
 /** Every stored day with something burning, oldest first. */
-export async function byDay(db: Queryable): Promise<FireDay[]> {
+export async function byDay(db: Queryable): Promise<{ day: string; cells: number; frpMw: number }[]> {
   const { rows } = await db.query<{ day: string; cells: string; frp_mw: number }>(
     `select to_char(day, 'YYYY-MM-DD') as day, count(*) as cells, sum(${BURNING}) as frp_mw
        from fire_cells where ${BURNING} > 0 group by day order by day`,

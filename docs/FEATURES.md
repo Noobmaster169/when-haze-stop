@@ -80,8 +80,10 @@ Backend folders added for this product (all under `backend/src/`):
 | Station list with coordinates | DOE Malaysia APIMS | `.../publicportalapims/mapcaqm` | Every hour | `sources/doe.ts` |
 | Fire detections | NASA FIRMS, VIIRS on S-NPP, NOAA-20, NOAA-21 | Three 7-day CSV files under `https://firms.modaps.eosdis.nasa.gov/data/active_fire/` | Every 3 hours | `sources/firms.ts` |
 | Wind at 925 and 850 hPa, rain | Open-Meteo forecast API | `https://api.open-meteo.com/v1/forecast` | Every hour | `sources/weather.ts` |
-| Older fires, and NASA's label for hotspots that are not fires | NASA FIRMS area API (needs `FIRMS_MAP_KEY`) | `https://firms.modaps.eosdis.nasa.gov/api/area/csv/<key>/<product>/<area>/<days>/<date>` | By hand, `pnpm haze:history` | `sources/firms-archive.ts` |
-| Wind and rain before the first run | Open-Meteo historical forecast API | `https://historical-forecast-api.open-meteo.com/v1/forecast` | By hand, `pnpm haze:history` | `sources/weather.ts` |
+| The fires of every day back to `HISTORY_FROM`, and NASA's label for hotspots that are not fires | NASA FIRMS area API (needs `FIRMS_MAP_KEY`) | `https://firms.modaps.eosdis.nasa.gov/api/area/csv/<key>/<product>/<area>/<days>/<date>` | `pnpm haze:history` | `sources/firms-archive.ts` |
+| Wind and rain back to `HISTORY_FROM` | Open-Meteo historical forecast API | `https://historical-forecast-api.open-meteo.com/v1/forecast` | `pnpm haze:history` | `sources/weather.ts` |
+| Airport weather reports back to `HISTORY_FROM`, the same 29 airports | Iowa State University's METAR archive (IEM) | `https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?station=...&data=metar` | `pnpm haze:history` | `sources/metar-archive.ts` |
+| Hourly PM2.5 of the region's other fixed sensors: an embassy reference monitor, Thai government stations near the border, low-cost AirGradient and Clarity sensors | OpenAQ v3 (needs `OPENAQ_API_KEY`) | `https://api.openaq.org/v3/locations?bbox=...` and `/v3/sensors/<id>/hours` | Every hour, and the past with `pnpm haze:history` | `sources/openaq.ts` |
 | Singapore's 24-hour PSI and one-hour PM2.5 for five regions, stored as five more stations | NEA Singapore, via data.gov.sg | `https://api.data.gov.sg/v1/environment/pm25` and `/psi` | Every hour | `sources/nea.ts` |
 | Airport weather reports (visibility, haze or smoke) for 29 airports | NOAA Aviation Weather Center | `https://aviationweather.gov/api/data/metar?ids=...&format=json` | Every hour | `sources/metar.ts` |
 | Place names | Open-Meteo geocoder | `https://geocoding-api.open-meteo.com/v1/search` | On search | `sources/geocoder.ts` |
@@ -89,7 +91,8 @@ Backend folders added for this product (all under `backend/src/`):
 | Coastlines, borders, towns | Natural Earth (public domain) | Packed once into `frontend/public/basemap.json` | Static | `frontend/components/map/basemap.ts` |
 | Buildings, parks, water, roads of central KL | OpenStreetMap (ODbL), via the Overpass API | Packed once by `frontend/scripts/bake-city.mjs` into `frontend/public/city/kl.json` | Static, re-bake by hand | `frontend/components/city/city-data.ts` |
 
-Only the FIRMS archive needs a key, and only `pnpm haze:history` uses it.
+Two sources need a free key: the FIRMS archive (`FIRMS_MAP_KEY`, read only by `pnpm haze:history`)
+and OpenAQ (`OPENAQ_API_KEY`). Without a key that source is skipped and the log says so.
 
 Things to know about each source, learned by using them:
 
@@ -122,7 +125,26 @@ Things to know about each source, learned by using them:
   fire, active volcano, other static land source, offshore. It serves 5 days per request, and a
   request for this region costs about 7 of the key's 5,000 transactions per 10 minutes.
 - Open-Meteo's reanalysis archive has no wind at 925 or 850 hPa. Its historical forecast API
-  does, from 2022, so that is the one used for past wind.
+  does, from about mid-2021, so that is the one used for past wind and the reason the history
+  cannot usefully start earlier. It now and then answers 200 with a sentence where the JSON should
+  be; the client asks again.
+- The FIRMS standard product is also the only record of the fires before the live feed's first
+  day (1 July 2026 when this was written). It has the same columns, so `parseFirmsCsv` reads both.
+  For each satellite and day the history takes the live feed where it reaches and the standard
+  product before (`feedsFor` in `jobs/history-fires.ts`): Suomi NPP and NOAA-20 from the standard
+  product, NOAA-21 from its live feed, which goes back to January 2024.
+- The METAR archive serves every listed airport in one request, as CSV with the raw report, so
+  the same `visibilityOf` parser reads the past and the present. It names no airport: one the
+  live feed has not described yet is stored under its code. The end day of a request is left out.
+- OpenAQ has no DOE station. In Malaysia it holds one reference monitor (the US embassy in Kuala
+  Lumpur, November 2022 to October 2024, before the history's first day) and low-cost sensors,
+  most around Kuala Lumpur. Against the nearest DOE station over the week of 3 to 10 October 2026
+  the sensors within 10 km ranked the same hours high and low (0.90 to 0.99) but several read tens
+  of ug/m3 high, so a sensor needs its own correction before its level is trusted. OpenAQ's copy
+  of Singapore's regions stopped in January 2025 and is left out; NEA is read directly.
+- OpenAQ answers 500 for a few sensors every time. When this was written they were the second
+  PM2.5 channel OpenAQ lists for each Thai station, whose first channel answers normally. The job
+  logs the sensor, counts it in `sensorsFailed` and goes on to the rest.
 
 ### 3.1.1 Screening the fires
 
@@ -205,7 +227,8 @@ Migrations `backend/db/migrations/002_haze.sql` and `003_source_fetches.sql`. Ne
 | `source_fetches` | One fetch of a source by the jobs process | Migration `003_source_fetches.sql`. Insert only: when, how long, what came back or why it failed. The Sources page reads it. |
 | `alert_events` | One alert | `open` stays true while its condition holds. A unique index allows only one open alert per station, kind and line; an `order` alert's line is the statement id. |
 | `airports`, `metar_obs` | An airport; one of its weather reports | Migration `005_context_sources.sql`. Insert only. Visibility in metres, 10000 for ten kilometres or more; the present weather codes; the raw report. |
-| `nea_hours` | One Singapore region for one hour | The one-hour PM2.5 and the 24-hour PSI and PM2.5. A null filled in by a later fetch is the only update. The PSI is also a row in `readings`. |
+| `nea_hours` | One Singapore region for one hour | The one-hour PM2.5 and the 24-hour PSI and PM2.5. A null filled in by a later fetch is the only update. The PSI of an hour the cycle fetched is also a row in `readings`; the PSI of the history is not, because `readings` is what the forecast is run and scored from. |
+| `openaq_sensors`, `openaq_hours` | A PM2.5 sensor OpenAQ gathers; its mean over one hour | Migration `007_openaq.sql`. Insert only. `reference` is OpenAQ's word for a regulatory-grade monitor; the rest are low-cost sensors. An hour is stamped with its end, like `readings`. Hours over 2,000 ug/m3 are stored and left out of what is read (`PM25_CEILING`). |
 | `cams_hours` | Empty | Made by migration `005` for a composition forecast that was then dropped from the product. Nothing writes it. |
 | `statements` | One fetched item about the haze, as the model read it | Migration `006_statements.sql`. Insert only, one row per URL, never read twice. Only rows with `is_statement` and `verified` are shown. |
 
@@ -215,6 +238,44 @@ happened, which is the better wind for hindcasts. The trade-off is that the wind
 actually used is not kept, so backfilled runs see better wind than a live run would have. If
 forecast skill is ever to be measured strictly, store weather by fetch time instead (a new table
 in a new migration).
+
+### 3.4 The history as training data
+
+From 1 January 2025 the database holds the two inputs of a smoke forecast and two independent
+measurements of its result. `pnpm haze:coverage` prints what is stored of each, month by month, and
+writes nothing. Check it before training on a span.
+
+| Kind | Role | Table | Key and time | Where |
+| --- | --- | --- | --- | --- |
+| Fires | Input | `fire_cells` | `(day, lat10, lon10)`, a UTC day. Use `coalesce(burning_mw, frp_mw)`, as every read in `fires.repo.ts` does. | 0.1 degree cells over the region |
+| Wind and rain | Input | `weather_hours` | `valid_at`, the hour. Arrays of 375 values, row-major from the south-west corner (`haze/grid.ts`). | 1 degree grid, 96 to 120 E, 6 S to 8 N |
+| Airport visibility | Ground truth | `metar_obs` with `airports` | `(icao, observed_at)`, the report's own time, mostly every 30 or 60 minutes | 29 airports: 19 in Malaysia, Changi, Brunei, 8 in Sumatra and Kalimantan |
+| PM2.5 | Ground truth | `openaq_hours` with `openaq_sensors`; `nea_hours`; `readings` with `stations` | `observed_at`, the end of the hour measured | OpenAQ's sensors, Singapore's 5 regions, DOE's 68 stations |
+
+What to know before fitting anything to it:
+
+- **The two ground truths are not the same quantity.** Visibility says when and where haze
+  arrived and roughly how thick; it stops at "ten kilometres or more" (10000), so it cannot tell
+  one clean day from another, and rain and mist shorten it too. Drop reports whose `weather` has
+  rain, showers, thunder, drizzle, mist or fog (`RA`, `SH`, `TS`, `DZ`, `BR`, `FG`) before reading
+  it as smoke. PM2.5 is the quantity the app forecasts. Score a model against each separately.
+- **Visibility tracks PM2.5 where there is haze.** Over 3 to 10 October 2026, the 24 hour mean of
+  3.912 / visibility in km at 20 airports against the nearest DOE station's 24 hour PM2.5 (all
+  within 22 km) had a rank correlation of 0.84 over 3,413 station-hours: 0.7 to 0.94 at the hazy
+  west-coast airports and none at the clean ones, where the report sat at the ten kilometre cap.
+  That is one week, about seven independent days an airport.
+- **Measured PM2.5 is thin in Malaysia before October 2026.** DOE's readings start on 3 October
+  2026 and are a 24 hour index, turned back into concentration by `apiToPm25`. Before that the
+  country has only OpenAQ's low-cost sensors, most around Kuala Lumpur, plus one each in Perlis
+  and Sabah. Singapore's five regions are reference-grade and complete for the whole span.
+- **A low-cost sensor needs its own correction.** It ranks hours as a reference monitor does but
+  can read tens of ug/m3 high. Fit each against the nearest DOE station on the hours they share.
+- **The wind is what the weather model analysed, not what it forecast.** A model trained on it
+  will look better in hindsight than it would live (see the note on `weather_hours` above).
+- **Fires before July 2026 come from two feeds.** Suomi NPP and NOAA-20 are the standard product
+  and NOAA-21 its live feed, screened by the same rules and the same list of fixed sources. A
+  cell-day is the largest satellite's sum either way.
+- **Nothing here is interpolated or filled.** A day with no row had no data from that source.
 
 ## 4. Feature 1: the haze map and forecast
 
@@ -243,12 +304,35 @@ Page `/map` (also the home page).
 - The page asks for new data every 5 minutes, so a new hourly run appears without a reload. If the
   timeline is on Now, it stays on Now when new data lands.
 
-Looking back. Between the map and the timeline is the History strip: one bar per stored UTC day,
-its height the day's fire power. Pressing a bar puts that day on the map: its fires, its wind, and
-the haze field where one exists. The timeline then spans that one day. Days before the first DOE
-reading (3 October 2026) have fires and wind only, and the timeline says so. Stations are not
-drawn on a past day. Live goes back to now. Files: `history-strip.tsx`, `use-haze-day.ts`,
-`unpackDay` in `map-data.ts`; backend `services/history.ts`.
+Looking back. Between the map and the timeline is the History strip: one column per UTC day from
+the first day of the history (1 January 2025) to today, with four marks, one for each kind of data
+a forecast is trained and checked on:
+
+| Row | Mark | Read from |
+| --- | --- | --- |
+| Fires | A bar, its height the day's fire power (square root) | `fire_cells` |
+| Wind | Dark where all 24 hours are stored, pale where some are, empty where none | `weather_hours` |
+| Visibility | Darker the larger the share of reporting airports whose observer called it haze or smoke | `metar_obs` |
+| PM2.5 | The band of the median of every instrument's mean that day, in the index's colours | `readings`, `nea_hours`, `openaq_hours` |
+
+The strip is a calendar: a day with nothing stored is an empty column, so a gap in any of the four
+shows as a gap. It scrolls, five pixels a day, and opens on the newest days. Month names run along
+the top. Pressing a column puts that day on the map:
+
+- its fires and its wind, as on the live map;
+- the airports that reported, on the Visibility layer, following the timeline through the day;
+- every instrument that measured PM2.5, as a dot in the colour of the index its value would give:
+  DOE stations (the 24 hour mean behind the reading), Singapore's regions and OpenAQ's sensors.
+  A reference monitor is a full dot, a low-cost sensor a smaller one, an instrument silent in that
+  hour an empty ring. The Stations toggle hides them. Pressing a dot opens its panel: the value in
+  the hour the timeline is on, the day's 24 hours as bars, and what kind of instrument it is;
+- the haze field, where one exists. Days before the first DOE reading (3 October 2026) have none,
+  and the timeline says "Past day, as measured".
+
+The timeline then spans that one day. Live goes back to now. Files: `history-strip.tsx`,
+`history-days.ts` (how a day is read, pure), `monitors.ts`, `monitor-panel.tsx`, `pick.ts`,
+`use-haze-day.ts`, `unpackDay` and `pm25At` in `map-data.ts`; backend `services/history.ts` and
+`services/day-air.ts`.
 
 Page `/sources` lists every outside source: what it gives, the endpoint, how often it is asked, and
 its newest good and failed fetch with what came back (stations, readings added, detections, weather
@@ -635,8 +719,8 @@ Change both together.
 | Method | Path | Returns |
 | --- | --- | --- |
 | GET | `/haze/map` | `HazeMap`: latest run, both grids, stations with newest reading, frames for 7 days back and 84 hours ahead, wind at each frame, strongest 1500 fire cells of 2 days |
-| GET | `/haze/days` | `HazeDays`: every stored UTC day with its burning cells and fire power, and the first hour a haze field exists for |
-| GET | `/haze/days/:day` | `HazeDay`: one past day for the map: strongest 1500 fire cells, wind every 3 hours, and the frames of that day (empty before the first readings) |
+| GET | `/haze/days` | `HazeDays`: every UTC day from the first with anything stored to today, each with what it holds of the four kinds of data (burning cells and fire power, hours of wind, airports reporting and reporting haze, PM2.5 instruments and their median), and the first hour a haze field exists for |
+| GET | `/haze/days/:day` | `HazeDay`: one past day for the map: strongest 1500 fire cells, wind every 3 hours, the airports' reports, every PM2.5 instrument's 24 hours, and the frames of that day (empty before the first readings) |
 | GET | `/haze/stations/:id` | `StationOutlook`: station, a week of readings, 84 hours of forecast, the day outlooks |
 | GET | `/haze/accuracy` | `Accuracy`: error by lead for model and persistence, current method's runs |
 | GET | `/haze/simulation` | `Simulation`: newest run's inputs, readings histogram, the readings-only backtest by lead and by day, replayed haze arrivals |
@@ -691,19 +775,41 @@ cd ../frontend && pnpm install && pnpm dev    # http://localhost:3000
 ```
 
 `pnpm haze:history` (`jobs/history.ts`) runs in the compose jobs service on every start, after the
-first cycle. Without `FIRMS_MAP_KEY` it does only step 3, and the fires of the past are what the
-seed loaded. With the key it does all three:
+first cycle. It fills the four kinds of data back to `HISTORY_FROM` (default `2025-01-01`), each
+part in its own file and each able to run alone (`pnpm haze:history wind`, or several names):
 
-1. Stores two years of labelled fixed sources (about 290 requests).
-2. Stores the live feed's fires from its first day (1 July 2026 on the first run) to today,
-   screened, and works out `burning_mw` again for days already stored.
-3. Stores wind and rain from that same day up to the first hour already stored, newest first.
+| Part | Does | File | Needs |
+| --- | --- | --- | --- |
+| `fires` | Stores two years of labelled fixed sources, then every day's fires from the first day to today, screened, and works out `burning_mw` again for days already stored | `jobs/history-fires.ts` | `FIRMS_MAP_KEY`. Without it the fires of the past are what the seed loaded. |
+| `visibility` | Stores the 29 airports' reports, ten days a request | `jobs/history-observations.ts` | |
+| `air` | Stores Singapore's hours a day at a time, then every OpenAQ sensor's hours | `jobs/history-observations.ts`, `jobs/ingest-openaq.ts` | `OPENAQ_API_KEY` for OpenAQ |
+| `wind` | Stores wind and rain from the first day up to the first hour already stored, newest first | `jobs/history-weather.ts` | |
 
-The first run took 16 minutes. Each 30 day span that came back is a row in `source_fetches`, so a
-run that is stopped can be started again and asks only for what is missing, plus the newest days,
-which are still filling in. The map's History strip shows these days (section 4.1). The model does
-not read the fires and wind before the first DOE reading yet: they are there for tuning it once
-there are readings to score it against.
+How each picks up where it stopped:
+
+- Fires, visibility and Singapore record every 30 day span that came back as a row in
+  `source_fetches`. A later run asks only for spans with no such row, plus the newest, which is
+  still filling in. The fire rows also name the screen and the region, so a changed rule, a new
+  list of fixed sources or a wider region is fetched again.
+- Wind goes backward from the oldest stored hour, so the stored hours are always one unbroken run.
+- OpenAQ works from both ends of what is stored for each sensor. The hourly cycle asks forward
+  from the sensor's newest hour (the last three days for a sensor with nothing stored); the
+  history asks backward from its oldest hour to the first day. A sensor whose history reached the
+  first day is recorded as done in `source_fetches`, so the months it measured nothing in are not
+  asked for again.
+
+A part that fails is logged and the others still run; the command then exits non-zero and names
+what to run again. Every request waits and retries through a dropped connection (six tries over
+about five minutes) and through a "too many requests" (65 seconds), in `fetchPatiently`
+(`sources/http.ts`).
+
+A first run from 1 January 2025 is about 2,700 requests: some 400 for the fires and 290 for the
+fixed sources, 65 for the airports, 1,300 for Singapore, a few hundred for OpenAQ and 700 for the
+wind. Fires, visibility and PM2.5 take about an hour together. The wind takes about five: Open-Meteo
+counts two weeks of one 25 point row as 25 calls and allows one address 5,000 an hour, so the
+history spaces its requests to use about 3,750 and leave the rest to the hourly fetch, and waits
+out the limit if it is reached anyway. A run that is stopped can be started again. The model does not read the data before the first DOE reading yet: it is there to train and
+check a forecast against, which section 3.4 describes.
 
 What the loop does each hour (`jobs/cycle.ts`): fetch readings (as many days back as needed to
 join up with what is stored, up to 7), fetch fires on every third turn, fetch weather, run the
@@ -733,7 +839,9 @@ Frontend: `cd frontend && pnpm test`.
 | `test/haze/alert-rules.test.ts` | Each alert rule, including not repeating |
 | `test/haze/fire-confirm.test.ts` | The two-pass or 10 MW rule on recorded detections |
 | `test/haze/fixed-sources.test.ts` | Reading the archive, and the fixed source screen on recorded rows of the Kerteh gas complex |
-| `test/jobs/history.test.ts` | The history job into the database: sites, screened fires, picking up where it stopped, wind with no hole |
+| `test/jobs/history.test.ts` | The fire and wind history into the database: sites, screened fires, the standard product before the live feed, picking up where it stopped, wind with no hole |
+| `test/jobs/history-observations.test.ts` | Reading the METAR archive and OpenAQ; the airport, Singapore and OpenAQ history into the database; a past day served with all four kinds of data |
+| `frontend/components/map/history.test.ts` | How the History strip reads a day, PM2.5 as an index, an instrument's hour |
 | `test/jobs/cycle.test.ts` | One whole cycle into the database, then every haze and alert endpoint |
 | `test/agents/haze-tools.test.ts` | Every assistant tool over that cycle |
 | `frontend/components/map/map.test.ts` | Frame decoding, colour scale, projection, Malaysian time |

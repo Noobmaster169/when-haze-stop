@@ -72,7 +72,7 @@ export default async function SourcesPage({ searchParams }: PageProps<"/sources"
             <header className="pt-20 pb-6">
               <h1 className="font-display text-display text-ink">Sources</h1>
               <p className="mt-2 max-w-[62ch] text-body text-ink-secondary">
-                Four kinds of data feed the map and the alerts, each fetched on a schedule. Times are Malaysian time.
+                Six kinds of data feed the map and the alerts, each fetched on a schedule. The same fires, wind, visibility and PM2.5 are also stored for every day since 1 January 2025, on the History strip under the map. Times are Malaysian time.
               </p>
             </header>
 
@@ -92,7 +92,7 @@ export default async function SourcesPage({ searchParams }: PageProps<"/sources"
                   <h2 id="where" className="font-display text-[22px] leading-7 text-ink">
                     Where it comes from
                   </h2>
-                  <p className="mt-1 mb-4 max-w-[62ch] text-body text-ink-secondary">All public, no key needed.</p>
+                  <p className="mt-1 mb-4 max-w-[62ch] text-body text-ink-secondary">All public. The fire archive and OpenAQ ask for a free key.</p>
                   <WhereTable sources={report.sources} />
                 </section>
               </>

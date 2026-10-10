@@ -81,7 +81,7 @@ export const Airport = z.object({
   name: z.string(),
   lat: z.number(),
   lon: z.number(),
-  /** The last week, oldest first. */
+  /** The map's window, a week live and a day when looking back, oldest first. */
   reports: z.array(VisibilityReport),
 });
 export type Airport = z.infer<typeof Airport>;
@@ -100,22 +100,60 @@ export const HazeMap = z.object({
 });
 export type HazeMap = z.infer<typeof HazeMap>;
 
-/** One stored UTC day of fires, for choosing a day to look back at. */
-export const FireDay = z.object({
+/**
+ * One UTC day and what is stored for it of each of the four kinds of data a
+ * forecast is trained and checked on: fires, wind, airport visibility and
+ * measured PM2.5. A kind with nothing that day is zero, not missing.
+ */
+export const StoredDay = z.object({
   /** UTC calendar day, `YYYY-MM-DD`. */
   day: z.string(),
   /** Burning 0.1 degree cells that day. */
   cells: z.number().int(),
   frpMw: z.number(),
+  /** Hours of the day with wind stored, 0 to 24. */
+  windHours: z.number().int(),
+  /** Airports that reported that day. */
+  airports: z.number().int(),
+  /** Of those, the ones whose observer called it haze or smoke at least once. */
+  hazeAirports: z.number().int(),
+  /** Instruments that measured PM2.5: DOE stations, Singapore regions and OpenAQ sensors. */
+  monitors: z.number().int(),
+  /** The median of those instruments' means over the day, ug/m3. Null with no instrument. */
+  pm25: z.number().nullable(),
 });
-export type FireDay = z.infer<typeof FireDay>;
+export type StoredDay = z.infer<typeof StoredDay>;
 
 export const HazeDays = z.object({
-  days: z.array(FireDay),
-  /** The first hour the haze field exists for, or null before the first run. Earlier days have fires and wind only: DOE serves no readings from before the app first ran. */
+  /** Every day from the first with anything stored to today, oldest first. */
+  days: z.array(StoredDay),
+  /** The first hour the haze field exists for, or null before the first run. Earlier days have no field: DOE serves no readings from before the app first ran. */
   hazeFrom: z.string().nullable(),
 });
 export type HazeDays = z.infer<typeof HazeDays>;
+
+/** Whose instrument measured it: a DOE station, a Singapore region, or a sensor OpenAQ gathers. */
+export const AirSource = z.enum(["doe", "nea", "openaq"]);
+export type AirSource = z.infer<typeof AirSource>;
+
+/** One instrument's PM2.5 over a past day. */
+export const AirMonitor = z.object({
+  /** The source and the instrument's id there: `doe:CA01R`, `nea:east`, `openaq:11760952`. */
+  id: z.string(),
+  name: z.string(),
+  source: AirSource,
+  /** Who runs it: "Department of Environment Malaysia", "AirGradient". */
+  provider: z.string(),
+  /** A regulatory-grade monitor. False for a low-cost sensor, which follows the same rises and falls but can read high. */
+  reference: z.boolean(),
+  /** What each value is a mean over. DOE publishes only the 24 hour mean behind its index; the others measure the hour. */
+  averaging: z.enum(["1h", "24h"]),
+  lat: z.number(),
+  lon: z.number(),
+  /** PM2.5 in ug/m3 for each of the day's 24 hours, the first being the hour that ends at 01:00 UTC. Null where nothing was measured. */
+  pm25: z.array(z.number().nullable()).length(24),
+});
+export type AirMonitor = z.infer<typeof AirMonitor>;
 
 /** One past UTC day as the map draws it. `frames` is empty for a day before the first readings. */
 export const HazeDay = z.object({
@@ -125,6 +163,10 @@ export const HazeDay = z.object({
   frames: z.array(Frame),
   wind: z.array(WindFrame),
   fires: z.array(FireCell),
+  /** The airports that reported, with the day's reports and the three hours before, so the first hour has one to show. */
+  airports: z.array(Airport),
+  /** Every instrument that measured PM2.5 that day. */
+  monitors: z.array(AirMonitor),
 });
 export type HazeDay = z.infer<typeof HazeDay>;
 

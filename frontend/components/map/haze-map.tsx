@@ -10,6 +10,8 @@ import { LocateCard } from "./locate-card";
 import { type Layers, MapCanvas, type MapHandle, type Pick } from "./map-canvas";
 import { Legend, LayerToggles, ZoomButtons } from "./map-controls";
 import { apiAt } from "./map-data";
+import { MonitorPanel } from "./monitor-panel";
+import { Notice } from "./notice";
 import { PlaceSearch } from "./place-search";
 import { PointPanel } from "./point-panel";
 import { nearestStation, type Probe, ProbeTip } from "./probe-tip";
@@ -39,12 +41,15 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
   const [playing, setPlaying] = useState(false);
   const [layers, setLayers] = useState(ALL_LAYERS);
   const [selected, setSelected] = useState<{ id: string; via: string | null } | null>(initialStation ? { id: initialStation, via: null } : null);
+  const [monitorId, setMonitorId] = useState<string | null>(null);
   const [probe, setProbe] = useState<Probe | null>(null);
   const [preview, setPreview] = useState<Place | null>(null);
 
   // Until the timeline is touched it sits on the newest readings, and moves with them when a new run lands.
   const at = chosenAt ?? data?.asOf ?? 0;
   const station = data?.stations.find((item) => item.id === selected?.id) ?? null;
+  // An instrument of a past day. The same sensor on another day keeps its panel; a day it did not report closes it.
+  const monitor = data?.monitors.find((item) => item.id === monitorId) ?? null;
 
   const asOf = data?.asOf;
   const seek = useCallback((moment: number) => setChosenAt(moment === asOf ? null : moment), [asOf]);
@@ -74,6 +79,12 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
   const pick = useCallback(
     (picked: Pick) => {
       handle.current?.reveal(picked.lon, picked.lat);
+      setMonitorId(picked.monitor?.id ?? null);
+      if (picked.monitor) {
+        setSelected(null);
+        setProbe(null);
+        return;
+      }
       if (picked.station) {
         setSelected({ id: picked.station.id, via: null });
         setProbe(null);
@@ -147,7 +158,7 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
     <div className="flex min-h-0 grow flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
       <div className="flex min-w-0 shrink-0 grow flex-col lg:min-h-0 lg:shrink">
         <div className="@container relative h-[54dvh] min-h-[300px] shrink-0 lg:h-auto lg:shrink lg:grow">
-          <MapCanvas handle={handle} data={data} basemap={basemap} at={at} layers={layers} selectedId={station?.id ?? null} pin={probe} preview={preview && (preview.lon !== probe?.lon || preview.lat !== probe?.lat) ? preview : null} onPick={pick} onPaint={followTip} />
+          <MapCanvas handle={handle} data={data} basemap={basemap} at={at} layers={layers} selectedId={monitor?.id ?? station?.id ?? null} pin={probe} preview={preview && (preview.lon !== probe?.lon || preview.lat !== probe?.lat) ? preview : null} onPick={pick} onPaint={followTip} />
           {/* Under the island on a map too narrow to hold both side by side. */}
           <div className="absolute left-3 top-16 z-30 @[900px]:top-3">
             <PlaceSearch onChoose={choosePlace} onPreview={setPreview} />
@@ -160,7 +171,7 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
             <LayerToggles layers={layers} onChange={setLayers} />
           </div>
           <div className="absolute bottom-3 right-3 hidden @[640px]:block">
-            <Legend />
+            <Legend past={history.day !== null} />
           </div>
           {probe && data && hasField ? <ProbeTip anchor={tip} api={apiAt(data, at, probe.lon, probe.lat)} at={at} /> : null}
           {data && location === null ? (
@@ -170,25 +181,15 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
           ) : null}
           {!data ? <p className="absolute inset-x-0 top-1/2 text-center text-small text-ink-tertiary">Loading the map</p> : null}
           {station ? <StationPanel key={station.id} station={station} at={at} via={selected?.via ?? null} onClose={() => setSelected(null)} /> : null}
-          {!station && probe && data && hasField ? <PointPanel data={data} basemap={basemap} probe={probe} at={at} onStation={openStation} onClose={() => setProbe(null)} /> : null}
+          {monitor && data?.dayStart != null ? <MonitorPanel monitor={monitor} dayStart={data.dayStart} at={at} onClose={() => setMonitorId(null)} /> : null}
+          {!station && !monitor && probe && data && hasField ? <PointPanel data={data} basemap={basemap} probe={probe} at={at} onStation={openStation} onClose={() => setProbe(null)} /> : null}
         </div>
         <HistoryStrip days={history.days} day={history.day} onChoose={chooseDay} />
         {data && history.day ? (
-          <Timeline from={data.asOf - 86_400_000} to={data.asOf} now={data.asOf} at={at} playing={playing} caption={hasField ? "Past day" : "Fires and wind only"} onSeek={setChosenAt} onPlaying={setPlaying} />
+          <Timeline from={data.asOf - 86_400_000} to={data.asOf} now={data.asOf} at={at} playing={playing} caption={hasField ? "Past day" : "Past day, as measured"} onSeek={setChosenAt} onPlaying={setPlaying} />
         ) : data ? (
           <Timeline from={data.times[0]} to={data.times[data.times.length - 1]} now={data.asOf} at={at} playing={playing} onSeek={seek} onPlaying={setPlaying} />
         ) : null}
-      </div>
-    </div>
-  );
-}
-
-function Notice({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="flex grow items-center justify-center px-6">
-      <div className="max-w-[46ch] text-center">
-        <p className="font-display text-[21px] text-ink">{title}</p>
-        <p className="mt-2 text-body text-ink-secondary">{body}</p>
       </div>
     </div>
   );

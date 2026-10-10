@@ -60,11 +60,36 @@ export const HazeMap = z.object({
 });
 export type HazeMap = z.infer<typeof HazeMap>;
 
-export const FireDay = z.object({ day: z.string(), cells: z.number().int(), frpMw: z.number() });
-export type FireDay = z.infer<typeof FireDay>;
+export const StoredDay = z.object({
+  day: z.string(),
+  cells: z.number().int(),
+  frpMw: z.number(),
+  windHours: z.number().int(),
+  airports: z.number().int(),
+  hazeAirports: z.number().int(),
+  monitors: z.number().int(),
+  pm25: z.number().nullable(),
+});
+export type StoredDay = z.infer<typeof StoredDay>;
 
-export const HazeDays = z.object({ days: z.array(FireDay), hazeFrom: z.string().nullable() });
+export const HazeDays = z.object({ days: z.array(StoredDay), hazeFrom: z.string().nullable() });
 export type HazeDays = z.infer<typeof HazeDays>;
+
+export const AirSource = z.enum(["doe", "nea", "openaq"]);
+export type AirSource = z.infer<typeof AirSource>;
+
+export const AirMonitor = z.object({
+  id: z.string(),
+  name: z.string(),
+  source: AirSource,
+  provider: z.string(),
+  reference: z.boolean(),
+  averaging: z.enum(["1h", "24h"]),
+  lat: z.number(),
+  lon: z.number(),
+  pm25: z.array(z.number().nullable()).length(24),
+});
+export type AirMonitor = z.infer<typeof AirMonitor>;
 
 export const HazeDay = z.object({
   day: z.string(),
@@ -73,6 +98,8 @@ export const HazeDay = z.object({
   frames: z.array(Frame),
   wind: z.array(WindFrame),
   fires: z.array(FireCell),
+  airports: z.array(Airport),
+  monitors: z.array(AirMonitor),
 });
 export type HazeDay = z.infer<typeof HazeDay>;
 

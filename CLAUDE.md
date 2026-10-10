@@ -36,7 +36,8 @@ pnpm type-check
 pnpm haze:once                      # fetch the sources, run the model, raise alerts
 pnpm haze:backfill                  # replay the model over the stored week
 pnpm haze:loop                      # haze:once now, then every hour
-pnpm haze:history                   # wind for the seeded months; with FIRMS_MAP_KEY the fire archive too
+pnpm haze:history                   # fires, wind, airport visibility and PM2.5 back to HISTORY_FROM (2025-01-01); name parts to run only those
+pnpm haze:coverage                  # what is stored of those four, month by month; writes nothing
 
 # frontend, inside frontend/
 pnpm dev                            # :3000

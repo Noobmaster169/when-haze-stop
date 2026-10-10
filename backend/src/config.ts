@@ -34,6 +34,12 @@ const Env = z.object({
   // The NASA FIRMS archive key, read only by `pnpm haze:history`. Everything
   // else runs without it.
   FIRMS_MAP_KEY: optionalString,
+  // The OpenAQ key, free from https://explore.openaq.org/register. With it the
+  // PM2.5 of the region's other sensors is stored each hour and for the past;
+  // without it that one source is skipped.
+  OPENAQ_API_KEY: optionalString,
+  // The first UTC day `pnpm haze:history` fills back to, for every source.
+  HISTORY_FROM: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).default("2025-01-01"),
 
   // Web Push, so an alert reaches a device with the tab closed. Make a pair
   // with `npx web-push generate-vapid-keys`. Without them alerts still show in

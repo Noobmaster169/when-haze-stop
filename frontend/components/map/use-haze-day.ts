@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 
-import { type FireDay, HazeDay, HazeDays } from "@/lib/api/haze-schemas";
+import { HazeDay, HazeDays, type StoredDay } from "@/lib/api/haze-schemas";
 import { parsedFetcher } from "@/lib/poll";
 
 import { type MapData, unpackDay } from "./map-data";
@@ -18,7 +18,7 @@ const dayFetcher = parsedFetcher(HazeDay);
 const REFRESH_MS = 5 * 60_000;
 
 export interface HazeDayState {
-  days: FireDay[];
+  days: StoredDay[];
   /** The chosen UTC day, or null while the map is live. */
   day: string | null;
   /** Null until the chosen day has loaded. */

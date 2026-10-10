@@ -7,17 +7,20 @@ import {
   doeStatementsClient,
   firmsArchiveClient,
   firmsClient,
+  metarArchiveClient,
   metarClient,
   moeStatementsClient,
   neaClient,
   newsStatementsClient,
+  openAqClient,
   openMeteoClient,
   type PushSender,
   webPushSender,
 } from "../sources";
+import { coverage } from "./coverage";
 import { backfill, runCycle } from "./cycle";
 import { evaluate, formatScores } from "./evaluate";
-import { runHistory } from "./history";
+import { type HistoryPart, HISTORY_PARTS, isHistoryPart, runHistory } from "./history";
 import type { IngestDeps } from "./ingest";
 
 /**
@@ -27,7 +30,10 @@ import type { IngestDeps } from "./ingest";
  *   pnpm haze:once       fetch everything, run the model, raise alerts
  *   pnpm haze:backfill   replay the model over the stored week, for the accuracy page
  *   pnpm haze:loop       once now, then the backfill, then again every hour
- *   pnpm haze:history    the months before the app started: wind always, and with FIRMS_MAP_KEY the fire archive too
+ *   pnpm haze:history    everything back to HISTORY_FROM: fires (needs FIRMS_MAP_KEY), airport visibility,
+ *                        measured PM2.5 (OpenAQ needs OPENAQ_API_KEY) and wind. Name parts to run only those:
+ *                        pnpm haze:history fires visibility air wind
+ *   pnpm haze:coverage   what is stored of those four, month by month; writes nothing
  *   pnpm haze:evaluate   replay the stored week and score it against no change; writes nothing
  *                        (optional: hours between runs, default 6; an ISO instant to score from)
  */
@@ -75,6 +81,12 @@ function pushSender(): PushSender | null {
   return null;
 }
 
+function historyParts(names: string[]): HistoryPart[] {
+  const unknown = names.find((name) => !isHistoryPart(name));
+  if (unknown) throw new Error(`unknown part "${unknown}" of the history. Use any of ${HISTORY_PARTS.join(", ")}.`);
+  return names.filter(isHistoryPart);
+}
+
 async function main(): Promise<void> {
   const command = process.argv[2] ?? "once";
   const deps: IngestDeps = {
@@ -84,6 +96,7 @@ async function main(): Promise<void> {
     weather: openMeteoClient(),
     metar: metarClient(),
     nea: neaClient(),
+    openaq: config.OPENAQ_API_KEY ? openAqClient(config.OPENAQ_API_KEY) : null,
     statements: { channels: [moeStatementsClient(), doeStatementsClient(), newsStatementsClient()], llm: proxyLlmClient({ maxConcurrency: config.LLM_MAX_CONCURRENCY }) },
     push: pushSender(),
   };
@@ -92,12 +105,18 @@ async function main(): Promise<void> {
     else if (command === "backfill") await backfill(deps);
     else if (command === "loop") await loop(deps);
     else if (command === "history") {
-      await runHistory({ pool: deps.pool, archive: config.FIRMS_MAP_KEY ? firmsArchiveClient(config.FIRMS_MAP_KEY) : null, weather: deps.weather }, new Date());
+      await runHistory(
+        { pool: deps.pool, archive: config.FIRMS_MAP_KEY ? firmsArchiveClient(config.FIRMS_MAP_KEY) : null, metarArchive: metarArchiveClient(), nea: deps.nea, openaq: deps.openaq ?? null, weather: deps.weather },
+        { from: config.HISTORY_FROM, parts: historyParts(process.argv.slice(3)) },
+        new Date(),
+      );
+    } else if (command === "coverage") {
+      process.stdout.write(`${await coverage(deps.pool, new Date())}\n`);
     } else if (command === "evaluate") {
       const from = process.argv[4] ? new Date(process.argv[4]) : undefined;
       const rows = await evaluate(deps.pool, { everyHours: Number(process.argv[3] ?? 6), from });
       process.stdout.write(`${formatScores(rows)}\n`);
-    } else throw new Error(`unknown command "${command}". Use once, backfill, loop, history or evaluate.`);
+    } else throw new Error(`unknown command "${command}". Use once, backfill, loop, history, coverage or evaluate.`);
   } finally {
     await closePool();
   }

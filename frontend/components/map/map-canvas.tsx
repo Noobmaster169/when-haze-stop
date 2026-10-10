@@ -2,17 +2,17 @@
 
 import { type RefObject, useCallback, useEffect, useImperativeHandle, useRef } from "react";
 
-import type { Station } from "@/lib/api/haze-schemas";
 import { useScheme } from "@/lib/colour-scheme";
 
 import type { Basemap } from "./basemap";
 import { drawChart, drawMarks, type Scene } from "./draw";
 import { flyTo, reveal } from "./flight";
-import { homeView, type Size, toLat, toLon, toX, toY, zoomAt } from "./geo";
+import { homeView, type Size, toX, toY, zoomAt } from "./geo";
 import { createHeat, type Heat } from "./heat";
 import { drawLabels } from "./labels";
 import type { MapData } from "./map-data";
 import type { Layers, MapHandle, Pick } from "./map-handle";
+import { pickAt } from "./pick";
 import { readTheme, type MapTheme } from "./theme";
 import { type GestureTarget, useGestures } from "./use-gestures";
 import { createWind, type WindLayer } from "./wind-particles";
@@ -42,7 +42,6 @@ interface Props {
   onPaint?(): void;
 }
 
-const PICK_RADIUS_PX = 14;
 const MAX_PIXEL_RATIO = 2;
 
 export function MapCanvas({ handle, data, basemap, at, layers, selectedId, pin, preview, onPick, onPaint }: Props) {
@@ -84,14 +83,7 @@ export function MapCanvas({ handle, data, basemap, at, layers, selectedId, pin, 
   const tapped = useCallback(
     (x: number, y: number) => {
       const { view, size } = target.current;
-      const now = live.current;
-      let station: Station | null = null;
-      let nearest = PICK_RADIUS_PX;
-      for (const candidate of now.layers.stations ? (now.data?.stations ?? []) : []) {
-        const away = Math.hypot(toX(view, size, candidate.lon) - x, toY(view, size, candidate.lat) - y);
-        if (away < nearest) [nearest, station] = [away, candidate];
-      }
-      onPick({ lon: station?.lon ?? toLon(view, size, x), lat: station?.lat ?? toLat(view, size, y), station });
+      onPick(pickAt(live.current.data, live.current.layers.stations, view, size, x, y));
     },
     [onPick],
   );

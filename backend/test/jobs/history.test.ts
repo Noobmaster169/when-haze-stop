@@ -4,26 +4,31 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { HazeDay, HazeDays } from "../../src/contracts";
 import { closePool, getPool } from "../../src/db";
 import { FIXED_MIN_DAYS } from "../../src/haze/fixed-sources";
-import { type HistoryDeps, ingestFireHistory, ingestFixedSources, ingestWeatherHistory } from "../../src/jobs/history";
+import { feedsFor, type FireHistoryDeps, ingestFireHistory, ingestFixedSources } from "../../src/jobs/history-fires";
+import { ingestWeatherHistory } from "../../src/jobs/history-weather";
 import { fires, fixedSources, sourceFetches, weather } from "../../src/repositories";
 import { FakeFireArchiveClient, FakeWeatherClient } from "../../src/sources/__fakes__/fake.sources";
+import type { WeatherClient } from "../../src/sources";
 import { parseFirmsCsv } from "../../src/sources/firms";
 import { type ArchiveSpan, parseFixedSources } from "../../src/sources/firms-archive";
 import { testApp } from "../app";
 import { recordedCycle } from "../fixtures/cycle";
 import { LABELLED_KERTEH, LIVE_FIRE, LIVE_KERTEH } from "../fixtures/recorded-archive";
+import { STANDARD_FIRES } from "../fixtures/recorded-history";
 import { steadyWind } from "../fixtures/steady-wind";
 
 afterAll(closePool);
 
 /** The recorded rows cover these days and nothing else, so the archive is said to hold only them. */
 const SPANS: ArchiveSpan[] = [
-  { satellite: "snpp", labelled: true, from: "2025-12-01", to: "2025-12-05" },
+  { satellite: "snpp", labelled: true, from: "2025-08-01", to: "2025-12-05" },
   { satellite: "snpp", labelled: false, from: "2026-08-01", to: "2026-08-05" },
   { satellite: "noaa20", labelled: false, from: "2026-08-01", to: "2026-08-05" },
   { satellite: "noaa21", labelled: false, from: "2026-08-01", to: "2026-08-05" },
 ];
 const LIVE = [...LIVE_KERTEH, LIVE_FIRE].flatMap((group) => parseFirmsCsv(group.csv, group.satellite));
+/** A day a year before the live feed starts, which only the standard product still has. */
+const STANDARD = parseFirmsCsv(STANDARD_FIRES, "snpp");
 const NOON_5_AUGUST = new Date("2026-08-05T12:00:00Z");
 /** The 0.1 degree cells of the two halves of the Kerteh complex, and of the Kalimantan fire. */
 const KERTEH = [
@@ -33,16 +38,16 @@ const KERTEH = [
 const FIRE = { lat10: -19, lon10: 1101 };
 
 describe("the history job, over what the archive recorded", () => {
-  let deps: HistoryDeps;
+  let deps: FireHistoryDeps & { weather: WeatherClient };
   let archive: FakeFireArchiveClient;
 
   beforeAll(async () => {
     // The week the hourly cycle stores, so the weather history has something to join up with.
     await recordedCycle();
-    archive = new FakeFireArchiveClient(SPANS, LIVE, { snpp: parseFixedSources(LABELLED_KERTEH) });
+    archive = new FakeFireArchiveClient(SPANS, LIVE, { snpp: parseFixedSources(LABELLED_KERTEH) }, STANDARD);
     deps = { pool: getPool(), archive, weather: new FakeWeatherClient(steadyWind(new Date("2026-10-06T00:00:00Z"), 24, 3, 3), (start, hours) => steadyWind(start, hours, 3, 3)) };
     await ingestFixedSources(deps);
-    await ingestFireHistory(deps, NOON_5_AUGUST);
+    await ingestFireHistory(deps, "2025-08-01", NOON_5_AUGUST);
   }, 120_000);
 
   it("keeps the cells NASA labelled on enough days as fixed sources", async () => {
@@ -68,7 +73,7 @@ describe("the history job, over what the archive recorded", () => {
   it("serves the stored days and one of them for the map to draw", async () => {
     const app = testApp();
     const { days, hazeFrom } = HazeDays.parse((await request(app).get("/haze/days").expect(200)).body);
-    expect(days.find((entry) => entry.day === "2026-08-01")).toEqual({ day: "2026-08-01", cells: 2, frpMw: 71 });
+    expect(days.find((entry) => entry.day === "2026-08-01")).toMatchObject({ day: "2026-08-01", cells: 2, frpMw: 71 });
     expect(days.map((entry) => entry.day)).toEqual([...days.map((entry) => entry.day)].sort());
     expect(hazeFrom).not.toBeNull();
 
@@ -85,14 +90,34 @@ describe("the history job, over what the archive recorded", () => {
 
   it("records each span it fetched, and asks only for the unsettled days when run again", async () => {
     const recorded = await sourceFetches.succeeded(deps.pool, "firms-archive");
-    expect(recorded).toContainEqual({ feed: "labelled", satellite: "snpp", from: "2025-12-01", days: 5, fixedSeen: 19, fixedAdded: expect.any(Number) });
-    expect(recorded).toContainEqual(expect.objectContaining({ feed: "live", from: "2026-08-01", days: 5, detections: LIVE.length, fixedDropped: 64 }));
+    expect(recorded).toContainEqual(expect.objectContaining({ feed: "labelled", satellite: "snpp", from: "2025-11-29", days: 7, fixedSeen: 19 }));
+    expect(recorded).toContainEqual(expect.objectContaining({ feed: "fires", from: "2026-07-27", days: 10, detections: LIVE.length, fixedDropped: 64 }));
 
     archive.asked.length = 0;
     await ingestFixedSources(deps);
-    await ingestFireHistory(deps, NOON_5_AUGUST);
-    expect(archive.asked.filter((call) => call.labelled)).toEqual([]);
-    expect(archive.asked.filter((call) => !call.labelled)).toHaveLength(3);
+    await ingestFireHistory(deps, "2025-08-01", NOON_5_AUGUST);
+    // Only the newest span, which is still filling in: the five days the live feed has of it, from each of the three satellites.
+    expect(archive.asked.filter((call) => call.what === "fixed")).toEqual([]);
+    expect(archive.asked.filter((call) => call.what === "fires")).toHaveLength(3);
+  });
+
+  it("takes the days before the live feed from the standard product, and never the same day from both", async () => {
+    // West Kalimantan on 1 August 2025, a year before the live feed's first day.
+    const then = (await fires.since(deps.pool, "2025-08-01")).filter((cell) => cell.day === "2025-08-01");
+    expect(then).toHaveLength(5);
+    expect(then.every((cell) => cell.lon10 >= 1090 && cell.lon10 <= 1110)).toBe(true);
+
+    const real: ArchiveSpan[] = [
+      { satellite: "snpp", labelled: true, from: "2012-01-20", to: "2026-06-30" },
+      { satellite: "snpp", labelled: false, from: "2026-07-01", to: "2026-10-09" },
+      { satellite: "noaa21", labelled: false, from: "2024-01-17", to: "2026-10-10" },
+    ];
+    expect(feedsFor(real, "2026-06-28", 5)).toEqual([
+      { satellite: "snpp", labelled: true, from: "2026-06-28", days: 3 },
+      { satellite: "snpp", labelled: false, from: "2026-07-01", days: 2 },
+      { satellite: "noaa21", labelled: false, from: "2026-06-28", days: 5 },
+    ]);
+    expect(feedsFor(real, "2023-12-30", 5)).toEqual([{ satellite: "snpp", labelled: true, from: "2023-12-30", days: 5 }]);
   });
 
   it("fills the wind back to the day asked for and stops at what is stored", async () => {

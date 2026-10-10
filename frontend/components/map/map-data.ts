@@ -1,4 +1,4 @@
-import type { Airport, FieldGrid, FireCell, HazeDay, HazeMap, Station, VisibilityReport } from "@/lib/api/haze-schemas";
+import type { AirMonitor, Airport, FieldGrid, FireCell, HazeDay, HazeMap, Station, VisibilityReport } from "@/lib/api/haze-schemas";
 
 import { bracket, decodeBytes, sampleField, sampleWind } from "./field";
 
@@ -15,6 +15,10 @@ export interface MapData {
   stations: Station[];
   fires: FireCell[];
   airports: UnpackedAirport[];
+  /** The instruments that measured PM2.5 on a past day. Empty on the live map, where the stations stand for them. */
+  monitors: AirMonitor[];
+  /** The first instant of the past day the monitors' hours count from, or null on the live map. */
+  dayStart: number | null;
 }
 
 /** An airport with its report times parsed once, so the layer can find the report for a moment without parsing dates each frame. */
@@ -34,8 +38,14 @@ export function unpackMap(map: HazeMap): MapData | null {
     winds: map.wind.map((frame) => new Int8Array(decodeBytes(frame.uv).buffer)),
     stations: map.stations,
     fires: map.fires,
-    airports: map.airports.map((airport) => ({ ...airport, times: airport.reports.map((report) => Date.parse(report.at)) })),
+    airports: map.airports.map(unpackAirport),
+    monitors: [],
+    dayStart: null,
   };
+}
+
+function unpackAirport(airport: Airport): UnpackedAirport {
+  return { ...airport, times: airport.reports.map((report) => Date.parse(report.at)) };
 }
 
 /** A report older than this is not what the airport is seeing at a moment. */
@@ -49,22 +59,34 @@ export function visibilityAt(airport: UnpackedAirport, at: number): VisibilityRe
   return airport.reports[found];
 }
 
+const HOUR_MS = 3_600_000;
+
+/** What an instrument measured in the hour a moment falls in, ug/m3, or null where it measured nothing then. */
+export function pm25At(monitor: AirMonitor, dayStart: number, at: number): number | null {
+  const slot = Math.min(monitor.pm25.length - 1, Math.max(0, Math.ceil((at - dayStart) / HOUR_MS) - 1));
+  return monitor.pm25[slot];
+}
+
 /**
  * A past day in the same shape. `fields` is empty for a day before the first
- * readings, and no station is given: a station's value belongs to the live map.
+ * readings, and no station is given: a station's forecast belongs to the live
+ * map. What was measured that day is in `monitors` and `airports`.
  */
 export function unpackDay(day: HazeDay): MapData {
+  const dayStart = Date.parse(`${day.day}T00:00:00Z`);
   return {
     grid: day.grid,
     windGrid: day.windGrid,
-    asOf: Date.parse(`${day.day}T00:00:00Z`) + 86_400_000,
+    asOf: dayStart + 86_400_000,
     times: day.frames.map((frame) => Date.parse(frame.validAt)),
     fields: day.frames.map((frame) => decodeBytes(frame.field)),
     windTimes: day.wind.map((frame) => Date.parse(frame.validAt)),
     winds: day.wind.map((frame) => new Int8Array(decodeBytes(frame.uv).buffer)),
     stations: [],
     fires: day.fires,
-    airports: [],
+    airports: day.airports.map(unpackAirport),
+    monitors: day.monitors,
+    dayStart,
   };
 }
 

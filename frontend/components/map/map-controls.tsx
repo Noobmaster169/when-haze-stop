@@ -54,7 +54,7 @@ const RAMP = "linear-gradient(to right, var(--api-0), var(--api-50), var(--api-1
 const TICKS = STOP_VALUES.filter((value) => value <= 300);
 
 /** The ramp is drawn evenly between its stops, so 300 is at the right edge and 200 is not at two thirds. */
-export function Legend() {
+export function Legend({ past = false }: { past?: boolean }) {
   return (
     <div className={`${CARD} w-[224px] px-3 pb-2 pt-2.5`}>
       <p className="text-caption font-medium text-ink-secondary">Air Pollutant Index (API)</p>
@@ -66,6 +66,7 @@ export function Legend() {
       </div>
       <p className="mt-1.5 text-micro text-ink-tertiary">Above 100 is unhealthy. Schools close above 180.</p>
       <p className="mt-1 text-micro text-ink-tertiary">Squares are airports: darker, the shorter the observer could see. A red ring is reported smoke.</p>
+      {past ? <p className="mt-1 text-micro text-ink-tertiary">Dots are where PM2.5 was measured that day, in the colour of the index it would give. Small dots are low-cost sensors.</p> : null}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { drawAirports } from "./airports";
 import type { Basemap } from "./basemap";
 import { REGION, type Size, toX, toY, type View } from "./geo";
 import { apiAt, type MapData } from "./map-data";
+import { drawMonitors } from "./monitors";
 import { colourAt, css } from "./scale";
 import type { MapTheme } from "./theme";
 
@@ -137,6 +138,8 @@ export function drawMarks(context: CanvasRenderingContext2D, scene: Scene, marks
       context.stroke();
     }
   }
+
+  if (marks.stations && marks.data.dayStart !== null) drawMonitors(context, scene, marks.data.monitors, marks.data.dayStart, marks.at, marks.selectedId);
 
   if (marks.preview) drawPin(context, toX(view, size, marks.preview.lon), toY(view, size, marks.preview.lat), theme.ink, theme.halo, 0.45);
   if (marks.pin) drawPin(context, toX(view, size, marks.pin.lon), toY(view, size, marks.pin.lat), theme.ink, theme.halo, 1);
