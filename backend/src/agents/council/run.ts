@@ -31,6 +31,14 @@ import { meanOf } from "./tools/format";
  */
 
 const log = childLogger({ module: "council.run" });
+/**
+ * The longest one model call may take. Calls usually take 20 s to 3 min; run 7
+ * waited 12 min on a single stalled draft while the other seats sat idle. A
+ * call past this is tried once more; if that stalls too, its seat drops out of
+ * that stage and the stage goes on with the others (each stage has its quorum).
+ */
+const CALL_TIMEOUT_MS = 300_000;
+
 /** Rounds of critique and revision: more run only while the leading plan keeps changing. */
 const MAX_ROUNDS = 2;
 
@@ -73,9 +81,18 @@ export async function runCouncil(deps: CouncilDeps, target: TargetArea, budgetRm
   const ctx = councilContext(attribution, target, budgetRm);
   let calls = 0;
   const llm: LlmClient = {
-    complete(request, signal) {
-      calls += 1;
-      return deps.llm.complete(request, signal);
+    async complete(request, signal) {
+      // A stalled call gets one fresh try: a retry is usually quick, and the Chair's single calls cannot simply be dropped.
+      for (let attempt = 1; ; attempt++) {
+        calls += 1;
+        const timeout = AbortSignal.timeout(CALL_TIMEOUT_MS);
+        try {
+          return await deps.llm.complete(request, signal ? AbortSignal.any([signal, timeout]) : timeout);
+        } catch (error) {
+          if (!timeout.aborted || signal?.aborted || attempt >= 2) throw error;
+          log.warn({ project: request.project, model: request.model, timeoutMs: CALL_TIMEOUT_MS }, "a council call stalled; trying it once more");
+        }
+      }
     },
   };
   const session: Session = {
