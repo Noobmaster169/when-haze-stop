@@ -50,6 +50,7 @@ export function headline(api: number, days: DayOutlook[]): string | null {
 
 /** One day in a line: the highest line already passed or near certain, then the one still in doubt. */
 export function dayLine(day: DayOutlook): string {
+  if (day.observedPeak === null && day.forecastPeak === null) return "No forecast yet: the learned model issues at 08:00.";
   const passed = day.observedPeak !== null ? [...LINES].reverse().find((line) => chanceOf(day, line) >= 0.995) : undefined;
   const sure = passed ?? [...LINES].reverse().find((line) => chanceOf(day, line) >= CERTAIN);
   const doubt = LINES.find((line) => line > (sure ?? 0) && chanceOf(day, line) >= REMOTE && chanceOf(day, line) < CERTAIN);

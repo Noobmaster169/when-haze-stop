@@ -72,8 +72,11 @@ export function dayOutlooks(asOf: Date, readings: Hourly[], forecast: Hourly[], 
     const observedPeak = peak(readings.filter((reading) => localDay(reading.at) === day));
     const forecastPeak = peak(forecast.filter((value) => localDay(value.at) === day));
     const learned = offset > 0 ? (modelDays.get(day) ?? null) : null;
+    // A day after today the issue does not reach has no forecast: the hourly line there is a slope decayed to
+    // nothing, and showing it beside learned days once invented an "easing" no forecast had made.
+    const beyond = offset > 0 && modelDays.size > 0 && learned === null;
     // Today is scored as a one-day forecast: what is left of it is at most that far ahead.
-    const expected = learned ? fromLearned(learned) : forecastPeak === null ? null : fromHourly(forecastPeak, errorsFor(Math.max(24, 24 * offset), hazy));
+    const expected = learned ? fromLearned(learned) : beyond || forecastPeak === null ? null : fromHourly(forecastPeak, errorsFor(Math.max(24, 24 * offset), hazy));
 
     const chance: Record<string, number> = {};
     for (const line of LINES) {

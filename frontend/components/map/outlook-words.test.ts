@@ -32,6 +32,12 @@ describe("a station's outlook in words", () => {
     expect(nilai.map(dayLine)).toEqual(["Passed 180, schools close", "Almost certainly above 100, 56% chance above 150", "27% chance above 100", "58% chance above 100"]);
   });
 
+  it("says a day beyond the learned issue has no forecast yet, and keeps the headline off it", () => {
+    const beyond: DayOutlook = { day: "2026-10-13", observedPeak: null, forecastPeak: null, low: null, high: null, chance: chance(0, 0, 0, 0), source: "hourly", why: null };
+    expect(dayLine(beyond)).toBe("No forecast yet: the learned model issues at 08:00.");
+    expect(headline(168, [nilai[0], { ...nilai[1], chance: chance(0.99, 0.99, 0.01, 0.01) }, beyond])).toBe("Likely to stay above 100 for the next few days.");
+  });
+
   it("gives the change over six hours, and nothing without a reading that far back", () => {
     const readings = [
       { at: "2026-10-10T02:00:00.000Z", api: 181 },

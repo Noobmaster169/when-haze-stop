@@ -57,9 +57,10 @@ describe("the day outlook with a learned forecast", () => {
     expect(days[0].chance["100"]).toBe(1);
   });
 
-  it("falls back to the hourly forecast on a day the learned forecast does not cover", () => {
+  it("has no forecast for a later day the learned issue does not reach, instead of the decayed hourly line", () => {
     const without = dayOutlooks(AS_OF, READINGS, FORECAST, errorsFor);
-    expect(days[2]).toEqual(without[2]);
-    expect(days[2].forecastPeak).toBe(125);
+    expect(without[2].forecastPeak).toBe(125);
+    expect(days[2]).toMatchObject({ day: "2026-10-12", forecastPeak: null, low: null, high: null, source: "hourly" });
+    expect(Object.values(days[2].chance)).toEqual([0, 0, 0, 0]);
   });
 });

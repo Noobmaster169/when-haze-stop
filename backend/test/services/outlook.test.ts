@@ -57,6 +57,18 @@ describe("the station outlook under each model mode", () => {
     }
   });
 
+  it("ends the line with the last learned day and leaves the day after without a forecast", async () => {
+    const live = await seremban("live");
+    const learnedDays = live.days.filter((day) => day.source === "learned").map((day) => day.day);
+    const last = learnedDays.at(-1) ?? "";
+    expect(live.forecast.every((value) => localDay(new Date(value.at)) <= last)).toBe(true);
+    expect(live.forecast.some((value) => localDay(new Date(value.at)) === last)).toBe(true);
+    // The recorded issue reaches every day the outlook shows; a day past it, had there been one, would carry no forecast.
+    const beyond = live.days.filter((day) => day.day > last);
+    for (const day of beyond) expect(day).toMatchObject({ forecastPeak: null, low: null, high: null, why: null });
+    expect(live.days.slice(1).every((day) => day.source === "learned" || day.forecastPeak === null)).toBe(true);
+  });
+
   it("explains each learned day from the simulation, and says so when no run has stored its smoke yet", async () => {
     const live = await seremban("live");
     // Nothing has stored `physics` for the recorded run, so the simulation has nothing to say about the day's shape.

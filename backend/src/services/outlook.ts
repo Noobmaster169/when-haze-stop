@@ -4,7 +4,7 @@ import type { Queryable } from "../db";
 import { apiToPm25, pm25ToApi } from "../haze/api-index";
 import { firstHindcast, leadBucket } from "../haze/chance";
 import { addHours } from "../haze/grid";
-import { dayOutlooks, type ErrorsFor, type Hourly, type ModelDay } from "../haze/outlook";
+import { dayOutlooks, type ErrorsFor, type Hourly, localDay, type ModelDay } from "../haze/outlook";
 import { reshapeToLearned } from "../haze/reshape";
 import { forecasts, modelForecasts, nea, readings, scores, stations } from "../repositories";
 import type { ModelClient } from "../sources/model";
@@ -72,6 +72,13 @@ async function hourlyLine(db: Queryable, station: Station, context: OutlookConte
   return { api: line.map(pm25ToApi), physics };
 }
 
+/** With learned days, an hour on a later day the issue does not reach is not shown: there is no forecast for it. */
+function withinIssue(at: Date, asOf: Date, modelDays: ReadonlyMap<string, ModelDay>): boolean {
+  if (modelDays.size === 0) return true;
+  const day = localDay(at);
+  return day === localDay(asOf) || modelDays.has(day);
+}
+
 export async function outlookFor(db: Queryable, station: Station, context: OutlookContext, forecastApi?: number[] | null): Promise<StationOutlook> {
   const { asOf, runId, errorsFor } = context;
   const stored = await readings.forStation(db, station.id, addHours(asOf, -24 * HISTORY_DAYS), asOf);
@@ -79,7 +86,7 @@ export async function outlookFor(db: Queryable, station: Station, context: Outlo
   const observed: Hourly[] = stored.map((reading) => ({ at: reading.observedAt, api: reading.api }));
   const modelDays = context.learned ? await learnedDays(db, station.id, asOf) : new Map<string, ModelDay>();
   const line = await hourlyLine(db, station, context, api ?? [], modelDays);
-  const ahead: Hourly[] = line.api.map((value, index) => ({ at: addHours(asOf, index + 1), api: value }));
+  const ahead: Hourly[] = line.api.map((value, index) => ({ at: addHours(asOf, index + 1), api: value })).filter((value) => withinIssue(value.at, asOf, modelDays));
   const days = dayOutlooks(asOf, observed, ahead, errorsFor, modelDays);
   return {
     station,

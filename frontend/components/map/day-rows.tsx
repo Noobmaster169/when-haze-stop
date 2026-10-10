@@ -32,7 +32,7 @@ export function DayRows({ days, source }: { days: DayOutlook[]; source: Forecast
           <div className="min-w-0">
             <div className="flex items-baseline gap-2">
               <Peak day={day} />
-              {source === "learned" && day.source === "hourly" ? (
+              {source === "learned" && day.source === "hourly" && day.forecastPeak !== null ? (
                 <span title="The learned model has no row for this day, so it is the hourly forecast's" className="rounded-sm border border-hairline-strong px-1 text-micro leading-4 text-ink-tertiary">
                   hourly
                 </span>
