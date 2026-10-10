@@ -1,6 +1,6 @@
 import pandas as pd
 
-from hazemodel.leaks import run_leak_tests, shifted_forward, shuffled_targets
+from hazemodel.leaks import _beats, run_leak_tests, shifted_forward, shuffled_targets
 from hazemodel.train import load_params
 
 SMALL = {"num_leaves": 4, "min_data_in_leaf": 2, "num_boost_round": 20, "learning_rate": 0.1, "num_threads": 1}
@@ -31,3 +31,13 @@ def test_leak_tests_run_and_report(frame):
     assert set(out) == {"shift", "shuffle"}
     for result in out.values():
         assert result["passed"] in (True, False)
+
+
+def _result(model_mae: float, baseline_mae: float) -> dict:
+    return {"model": {"mae": model_mae}, "baseline": {"mae": baseline_mae}}
+
+
+def test_beats_is_true_only_past_the_margin():
+    assert _beats(_result(9.0, 10.0)) is True
+    assert _beats(_result(9.6, 10.0)) is False  # 9.6 * 1.05 = 10.08, inside the margin
+    assert _beats(_result(12.0, 10.0)) is False

@@ -3,9 +3,9 @@
 import numpy as np
 import pandas as pd
 
+from hazemodel.backtest import embargo
 from hazemodel.index import pm25_to_api
 from hazemodel.region import MALAYSIA_OFFSET
-from hazemodel.backtest import embargo
 from hazemodel.scores import HAZY_UGM3, ONSET_API, REFERENCE_KINDS, score
 from hazemodel.splits import walk_forward
 from hazemodel.train import predict_frame, train_artifact
@@ -59,7 +59,8 @@ def scenario_masks(test: pd.DataFrame) -> dict[str, pd.Series]:
     masks = {
         "onset": onset,
         "end": (test["rain48"] >= 20) & hazy,
-        "fire_dropout": hazy & (test["fire_total_change"] <= -FIRE_LOSS_SHARE * before),
+        # An earlier total of zero would satisfy 0 <= -0.4 * 0 with no fire to lose, so it must be above zero.
+        "fire_dropout": hazy & (before > 0) & (test["fire_total_change"] <= -FIRE_LOSS_SHARE * before),
         "wind_reversal": _wind_angle(test) > 90,
         "clean_season": test["month"].isin(CLEAN_MONTHS),
     }
@@ -91,6 +92,7 @@ def run_scenarios(all_test: pd.DataFrame, forecasts: dict[str, pd.DataFrame]) ->
     model, persistence = forecasts["model"], forecasts["persistence"]
     usable = all_test["kind"].astype(str).isin(REFERENCE_KINDS) & all_test["peak_d1"].notna()
     usable &= model["p50_d1"].reindex(all_test.index).notna()
+    usable &= persistence["p50_d1"].reindex(all_test.index).notna()
     out = {}
     for name, mask in scenario_masks(all_test).items():
         rows = mask & usable
@@ -103,8 +105,6 @@ def run_scenarios(all_test: pd.DataFrame, forecasts: dict[str, pd.DataFrame]) ->
         result["passed"] = _judge(name, all_test, rows, model, result)
         out[name] = result
     return out
-
-
 
 
 def _reference_hazy_mae(tests: list[pd.DataFrame], forecasts: list[pd.DataFrame]) -> float:

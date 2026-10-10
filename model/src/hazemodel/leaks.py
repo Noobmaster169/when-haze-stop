@@ -58,8 +58,14 @@ def _beats(result: dict) -> bool:
 
 
 def run_leak_tests(frame: pd.DataFrame, params: dict, freq: str = "M", min_train_blocks: int = 1) -> dict:
-    """shift passes when the model beats persistence by more than the margin (the harness sees the future when
-    given it); shuffle passes when the model does not beat climatology by more than the margin."""
-    shift = _pooled(shifted_forward(frame), params, freq, min_train_blocks, lambda train, test: persistence(test))
+    """shift passes when the model, given tomorrow's features, beats an honest persistence by more than the
+    margin (the harness sees the future when given it); shuffle passes when the model does not beat climatology
+    by more than the margin."""
+
+    def honest(train: pd.DataFrame, test: pd.DataFrame) -> pd.DataFrame:
+        # Persistence reads the original peak24, not the one moved forward with the features.
+        return persistence(frame.reindex(test.index))
+
+    shift = _pooled(shifted_forward(frame), params, freq, min_train_blocks, honest)
     shuffle = _pooled(shuffled_targets(frame), params, freq, min_train_blocks, climatology)
     return {"shift": {**shift, "passed": _beats(shift)}, "shuffle": {**shuffle, "passed": not _beats(shuffle)}}
