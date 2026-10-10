@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Newsreader } from "next/font/google";
 
+import { InlineScript } from "@/components/ui/inline-script";
+import { SCHEME_SCRIPT } from "@/lib/scheme-script";
+
 import "./globals.css";
 
 /*
@@ -18,7 +21,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${newsreader.variable} ${inter.variable} ${jetbrains.variable}`}>
+    // The head script sets data-theme on <html> before React hydrates; suppressHydrationWarning lets that attribute stand.
+    <html lang="en" className={`${newsreader.variable} ${inter.variable} ${jetbrains.variable}`} suppressHydrationWarning>
+      <head>
+        <InlineScript html={SCHEME_SCRIPT} />
+      </head>
       <body className="font-sans text-body text-ink">{children}</body>
     </html>
   );

@@ -6,10 +6,11 @@ import type { ReactNode } from "react";
 import { Island } from "./island";
 import { IslandAlert } from "./island-alert";
 import { activeFor } from "./nav";
+import { SchemeSwitch } from "./scheme-switch";
 
 /**
  * What floats over the top of every page: the island in the middle with a
- * new alert hanging under it, and the chat's button in the right corner. The strip itself lets clicks through,
+ * new alert hanging under it, and the light or dark switch and the chat's button in the right corner. The strip itself lets clicks through,
  * so the page under it stays usable between the two.
  */
 export function TopControls({ toggle }: { toggle: ReactNode }) {
@@ -24,7 +25,10 @@ export function TopControls({ toggle }: { toggle: ReactNode }) {
           <IslandAlert />
         </div>
       </div>
-      <div className="pointer-events-auto absolute right-3 top-0">{toggle}</div>
+      <div className="pointer-events-auto absolute right-3 top-0 flex items-center gap-2">
+        <SchemeSwitch />
+        {toggle}
+      </div>
     </div>
   );
 }

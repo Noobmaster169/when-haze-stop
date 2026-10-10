@@ -1,67 +1,69 @@
 @import "tailwindcss";
 
 /*
- * A dark ground so the haze carries the colour, hairlines, ink at four weights,
- * amber for what is active, and five hues that mean something. Nothing else
- * in the frontend declares a colour; every screen is built from these tokens.
- * Rebrand here.
+ * Two schemes on one set of names: a white ground and a near-black one, each
+ * with hairlines, ink at four weights, amber for what is active, and five hues
+ * that mean something. lib/colour-scheme.ts picks one by setting
+ * <html data-theme>. Nothing else in the frontend declares a colour; every
+ * screen is built from these tokens. Rebrand here.
  */
 :root {
-  color-scheme: dark;
+  /* light by default; the dark values below replace these when <html data-theme="dark"> */
+  color-scheme: light;
 
   /* surfaces */
-  --shell: #0f1115;
-  --canvas: #15181d;
-  --surface: #1b1e24;
-  --surface-sunken: #22262d;
-  --surface-active: #2a2f37;
-  --scrim: rgb(0 0 0 / 0.55);
+  --shell: #f6f9fd;
+  --canvas: #ffffff;
+  --surface: #fcfcfd;
+  --surface-sunken: #f6f8fa;
+  --surface-active: #f3f4f6;
+  --scrim: rgb(17 24 39 / 0.32);
 
   /* lines */
-  --hairline: #2a2e36;
-  --hairline-strong: #3a404a;
-  --hairline-faint: #21252c;
+  --hairline: #eceff3;
+  --hairline-strong: #dde3ea;
+  --hairline-faint: #f3f4f6;
 
   /* ink. --ink-faint is never allowed to carry a fact. */
-  --ink: #f3f4f6;
-  --ink-secondary: #c4c9d1;
-  --ink-tertiary: #9aa1ab;
-  --ink-faint: #6b727d;
-  --ink-inverse: #111317;
+  --ink: #111827;
+  --ink-secondary: #4b5563;
+  --ink-tertiary: #6b7280;
+  --ink-faint: #9ca3af;
+  --ink-inverse: #ffffff;
 
   /* verdict hues: strong for text and rules, tint for chips and washes */
-  --verdict-match: #4ade80;
-  --verdict-match-tint: #11291b;
-  --verdict-match-line: #1f5235;
-  --verdict-differ: #f5b740;
-  --verdict-differ-tint: #2b2210;
-  --verdict-differ-mark: #3d2f12;
-  --verdict-differ-ink: #fcd38a;
-  --verdict-differ-line: #5c4517;
-  --verdict-review: #b69cf7;
-  --verdict-review-tint: #221a35;
-  --verdict-review-line: #41316a;
-  --verdict-fault: #f87171;
-  --verdict-fault-tint: #2e1616;
-  --verdict-fault-line: #5f2626;
-  --signal: #7aa7ff;
-  --signal-tint: #172036;
-  --signal-line: #2c3f66;
+  --verdict-match: #067647;
+  --verdict-match-tint: #ecfdf3;
+  --verdict-match-line: #abefc6;
+  --verdict-differ: #b54708;
+  --verdict-differ-tint: #fffaeb;
+  --verdict-differ-mark: #fef0c7;
+  --verdict-differ-ink: #7a3e06;
+  --verdict-differ-line: #f5d9ae;
+  --verdict-review: #6941c6;
+  --verdict-review-tint: #f4f3ff;
+  --verdict-review-line: #e9d7fe;
+  --verdict-fault: #b42318;
+  --verdict-fault-tint: #fef3f2;
+  --verdict-fault-line: #fecdca;
+  --signal: #175cd3;
+  --signal-tint: #eff4ff;
+  --signal-line: #bbd2f5;
 
   /* the accent: interactive and active states */
-  --accent: #f2b84b;
-  --accent-tint: #2d2412;
-  --accent-line: #6b5321;
+  --accent: #b45309;
+  --accent-tint: #fef3c7;
+  --accent-line: #e9b65c;
 
   /* the map: a dark chart under a solid field, with white names and dark coasts drawn over it */
-  --map-sea: #0d1420;
-  --map-land: #18202c;
-  --map-coast: rgb(10 12 18 / 0.85);
-  --map-border: rgb(10 12 18 / 0.7);
-  --map-label: #ffffff;
-  --map-wind: #ffffff;
-  --map-fire: #ff6a3d;
-  --map-fire-core: #ffe8c2;
+  --map-sea: #dfe7f0;
+  --map-land: #f1efe9;
+  --map-coast: rgb(30 36 48 / 0.7);
+  --map-border: rgb(30 36 48 / 0.5);
+  --map-label: #111827;
+  --map-wind: #1f2937;
+  --map-fire: #d92d20;
+  --map-fire-core: #fff1d6;
 
   /* the 3D city: a clear sky and the haze it greys toward, and the materials of the streets under it */
   --city-zenith: #4f86c6;
@@ -87,7 +89,7 @@
   --api-400: #4a1680;
 
   /* the one shadow in the product, and the focus ring */
-  --shadow-overlay: 0 10px 30px -10px rgb(0 0 0 / 0.6), 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-overlay: 0 8px 24px -8px rgb(17 24 39 / 0.18), 0 1px 2px rgb(17 24 39 / 0.06);
   --focus-ring: 0 0 0 2px var(--canvas), 0 0 0 4px var(--accent);
 
   /* radius */
@@ -96,6 +98,54 @@
   --r-md: 7px;
   --r-lg: 9px;
   --r-xl: 10px;
+}
+
+/* the dark scheme: a near-black ground so the haze carries the colour, light ink, amber for what is active */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --shell: #0f1115;
+  --canvas: #15181d;
+  --surface: #1b1e24;
+  --surface-sunken: #22262d;
+  --surface-active: #2a2f37;
+  --scrim: rgb(0 0 0 / 0.55);
+  --hairline: #2a2e36;
+  --hairline-strong: #3a404a;
+  --hairline-faint: #21252c;
+  --ink: #f3f4f6;
+  --ink-secondary: #c4c9d1;
+  --ink-tertiary: #9aa1ab;
+  --ink-faint: #6b727d;
+  --ink-inverse: #111317;
+  --verdict-match: #4ade80;
+  --verdict-match-tint: #11291b;
+  --verdict-match-line: #1f5235;
+  --verdict-differ: #f5b740;
+  --verdict-differ-tint: #2b2210;
+  --verdict-differ-mark: #3d2f12;
+  --verdict-differ-ink: #fcd38a;
+  --verdict-differ-line: #5c4517;
+  --verdict-review: #b69cf7;
+  --verdict-review-tint: #221a35;
+  --verdict-review-line: #41316a;
+  --verdict-fault: #f87171;
+  --verdict-fault-tint: #2e1616;
+  --verdict-fault-line: #5f2626;
+  --signal: #7aa7ff;
+  --signal-tint: #172036;
+  --signal-line: #2c3f66;
+  --accent: #f2b84b;
+  --accent-tint: #2d2412;
+  --accent-line: #6b5321;
+  --map-sea: #0d1420;
+  --map-land: #18202c;
+  --map-coast: rgb(10 12 18 / 0.85);
+  --map-border: rgb(10 12 18 / 0.7);
+  --map-label: #ffffff;
+  --map-wind: #ffffff;
+  --map-fire: #ff6a3d;
+  --map-fire-core: #ffe8c2;
+  --shadow-overlay: 0 10px 30px -10px rgb(0 0 0 / 0.6), 0 1px 2px rgb(0 0 0 / 0.4);
 }
 
 @theme inline {

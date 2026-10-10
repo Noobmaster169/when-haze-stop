@@ -3,6 +3,7 @@
 import { type RefObject, useCallback, useEffect, useImperativeHandle, useRef } from "react";
 
 import type { Station } from "@/lib/api/haze-schemas";
+import { useScheme } from "@/lib/colour-scheme";
 
 import type { Basemap } from "./basemap";
 import { drawChart, drawMarks, type Scene } from "./draw";
@@ -157,6 +158,18 @@ export function MapCanvas({ handle, data, basemap, at, layers, selectedId, pin, 
       cancelAnimationFrame(request);
     };
   }, [moved]);
+
+  // A canvas holds colours, not class names: when light and dark swap, read the tokens again and repaint.
+  const scheme = useScheme();
+  useEffect(() => {
+    const element = frame.current;
+    if (!element || !scheme || !tools.current) return;
+    const theme = readTheme(element);
+    tools.current = { ...tools.current, theme, heat: createHeat(theme.stops), wind: createWind(theme.wind) };
+    const { size } = target.current;
+    wind.current?.getContext("2d")?.clearRect(0, 0, size.width, size.height);
+    paint();
+  }, [scheme, paint]);
 
   useEffect(() => {
     live.current = { data, basemap, at, layers, selectedId, pin, preview, onPaint };
