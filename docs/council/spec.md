@@ -42,6 +42,11 @@ Full evidence: `research/01` to `05`, `01-spike-attribution.md`, `01b-spike-plan
    and suppression takes days to bite. Over 84 hours the ceiling is 0.84 ug/m3; over 14 days on
    analogue weather it is 3 to 21 ug/m3. An extended horizon is required.
 
+8. **A prototype council works** (`11-prototype-council.md`): five seats, critics and a Chair on
+   the real proxy produced grounded, adversarial reasoning and an honest verdict. Its drafts
+   converged, so proposers get assigned planning premises; its text ran long, so every answer has
+   a capped headline.
+
 ## 3. Scope
 
 In: target "Kuala Lumpur and surroundings" only (selector shows others disabled); fires as of the

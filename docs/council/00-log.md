@@ -28,3 +28,10 @@
   share) and made the analogue horizon a requirement.
 - Wrote `02` decision model, `03` package, `07` tools and skills, `10` open questions, and the
   consolidated `spec.md`.
+- Prototype council on the real proxy (`11-prototype-council.md`): 18 calls, about 10 minutes.
+  Grounded, adversarial, honest; drafts converged. Added planning premises and output discipline
+  to the protocol.
+- Phase 1 built and pushed: `backend/src/suppression/` (complexes, package, scenarios, effect,
+  attribution, score, validate, baselines), `contracts.council.ts`, the PEATMAP grid
+  (`sources/peat-data.ts`, `scripts/pack-peat.mjs`), Indonesian places
+  (`sources/places-id-data.ts`, `scripts/pack-places-id.mjs`), `sources/place-namer.ts`; 29 tests.

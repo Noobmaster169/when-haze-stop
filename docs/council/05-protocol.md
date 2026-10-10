@@ -10,8 +10,8 @@ cannot measure: consent, crew safety, peat behaviour, where the model is weak.
 | # | Stage | Who | Model calls | What comes out |
 | --- | --- | --- | --- | --- |
 | 0 | Situation | the run itself, no model | 0 | The fact sheet: complexes, influence on the target, persistence, peat, logistics, the ceiling, the package |
-| 1 | Mission | Chair | 1 | The objective, hard constraints, and the weights of the criteria the engine cannot score, frozen before any plan exists |
-| 2 | Independent drafts | 8 proposers, in parallel, blind to each other | 8 to 24 | Eight plans, each with its reasoning and its own tool lookups |
+| 1 | Mission | Chair | 1 | The objective (which complexes, with what, from when), the weights of the criteria the engine cannot score, and one distinct planning premise per proposer, all frozen before any plan exists. Hard constraints come from the validator, not the Chair |
+| 2 | Independent drafts | 8 proposers, in parallel, blind to each other, each under its assigned premise | 8 to 16 | Eight distinguishable plans, each with its reasoning and at most two tool steps |
 | 3 | Screening | validator (code), then Chair | 1 | Infeasible plans returned with the reason; near-duplicates merged; 3 to 5 distinct plans named |
 | 4 | Wargame | Engine (code) | 0 | Every plan scored central, optimistic, pessimistic, and per wind member, beside the baselines |
 | 5 | Cross-examination | assigned critics + Red Cell | 12 to 18 | Challenges, each citing a fact or a score, or marked as judgement; variants sent to the engine instead of argued |
@@ -20,6 +20,29 @@ cannot measure: consent, crew safety, peat behaviour, where the model is weak.
 | 8 | Decision | Chair | 1 | The verdict: plan, margin, evidence, minority report, what would trigger re-planning |
 
 About 45 to 65 model calls, eight to fifteen minutes with six calls in flight.
+
+## Planning premises
+
+The prototype (`11-prototype-council.md`) showed that blind drafts converge when every seat reads
+the same sheet. So the Chair hands each proposer a premise, and the seat drafts the best plan it
+can under that premise from its own mandate:
+
+| Premise | Typical seat |
+| --- | --- |
+| Within what Indonesia has accepted, nothing new asked | Force Command |
+| Best for KL if Indonesia agrees to every request | Air Quality |
+| Domestic first: what Malaysia controls today | Domestic Fire |
+| Robust: the best worst wind member | Meteorology |
+| Peat physics first: only what can actually be finished | Peat Science |
+| Most people out of unhealthy air soonest | Health |
+| Cheapest per ug/m3 removed | Air Operations |
+| Sarawak and KL together | Sarawak |
+
+## Output discipline
+
+Every structured answer has a `headline` (at most 25 words) and a capped `detail`. The verdict's
+three tracks are at most 40 words each. The page shows headlines and opens detail on click. The
+prototype's Chair wrote 1,500 words for one decision.
 
 ## Rules that make it a decision and not theatre
 
