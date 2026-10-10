@@ -18,8 +18,16 @@ export const SHADOW_GAIN = 0.1;
 const NETWORKS: Network[] = ["doe", "nea"];
 const LEADS = [1, 2];
 
+const round2 = (value: number): number => Math.round(value * 100) / 100;
+
+/** Unrounded, so the shadow gate never compares a figure that was rounded in its favour. */
+function average(values: number[]): number | null {
+  return values.length === 0 ? null : values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
 function mean(values: number[]): number | null {
-  return values.length === 0 ? null : Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 100) / 100;
+  const value = average(values);
+  return value === null ? null : round2(value);
 }
 
 /** The model is scored on every case; each baseline on the cases where it had a value, which live is nearly all of them. */
@@ -48,8 +56,13 @@ export async function modelSkill(db: Queryable, mode: ModelMode, version?: strin
   const leads = NETWORKS.flatMap((network) => LEADS.map((leadDays) => leadSkill(rows, network, leadDays)));
 
   const dayAhead = leads[0];
-  const shadowDays = new Set(rows.filter((row) => row.network === "doe" && row.leadDays === 1 && row.observed !== null).map((row) => row.asOf.toISOString().slice(0, 10))).size;
-  const gain = dayAhead.model !== null && dayAhead.v2 !== null && dayAhead.v2 > 0 ? Math.round((1 - dayAhead.model / dayAhead.v2) * 100) / 100 : null;
+  const doeDayAhead = rows.filter((row) => row.network === "doe" && row.leadDays === 1 && row.observed !== null);
+  const shadowDays = new Set(doeDayAhead.map((row) => row.asOf.toISOString().slice(0, 10))).size;
+  // The rule is "better on identical cases", so the gate scores only cases where the hourly run also had a value.
+  const compared = doeDayAhead.filter((row) => row.v2 !== null);
+  const modelError = average(compared.map((row) => Math.abs(pm25ToApi(row.p50) - (row.observed ?? 0))));
+  const v2Error = average(compared.map((row) => Math.abs((row.v2 ?? 0) - (row.observed ?? 0))));
+  const rawGain = modelError !== null && v2Error !== null && v2Error > 0 ? 1 - modelError / v2Error : null;
   const since = modelVersion && newest?.modelVersion === modelVersion ? newest.since.toISOString() : null;
   return {
     mode,
@@ -57,9 +70,11 @@ export async function modelSkill(db: Queryable, mode: ModelMode, version?: strin
     since,
     shadowDays,
     shadowDaysRequired: SHADOW_DAYS,
-    gain,
+    cases: dayAhead.cases,
+    comparedCases: compared.length,
+    gain: rawGain === null ? null : round2(rawGain),
     gainRequired: SHADOW_GAIN,
-    passed: shadowDays >= SHADOW_DAYS && gain !== null && gain >= SHADOW_GAIN,
+    passed: shadowDays >= SHADOW_DAYS && rawGain !== null && rawGain >= SHADOW_GAIN,
     leads,
   };
 }

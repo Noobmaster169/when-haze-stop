@@ -3,8 +3,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { Simulation } from "../../src/contracts";
 import { closePool, getPool } from "../../src/db";
+import { GRID_KEY } from "../../src/haze/grid";
 import { pm25ToApi } from "../../src/haze/api-index";
-import { modelForecasts, readings } from "../../src/repositories";
+import { forecasts, modelForecasts, readings } from "../../src/repositories";
 import { modelSkill, SHADOW_DAYS, SHADOW_GAIN } from "../../src/services/model-skill";
 import { testApp } from "../app";
 import { recordedCycle } from "../fixtures/cycle";
@@ -56,5 +57,35 @@ describe("the learned model's live score", () => {
     const simulation = Simulation.parse((await request(testApp()).get("/haze/simulation").expect(200)).body);
     expect(simulation.model.mode).toBe("off");
     expect(simulation.model.leads).toHaveLength(4);
+  });
+
+  it("scores the hourly run on the current grid only, and gates on identical cases", async () => {
+    const GATE = "test-skill-gate-b";
+    const asOf = new Date("2026-10-08T06:00:00Z");
+    const ninth = await readings.forStation(pool, "CA24N", new Date("2026-10-08T16:00:00Z"), new Date("2026-10-09T15:00:00Z"));
+    const peak = Math.max(...ninth.map((reading) => reading.api));
+    const model = pm25ToApi(60);
+    // The hourly run is worse than the model by construction, so the gain is well over the 0.1 required.
+    const level = Math.fround(peak + 3 * Math.abs(model - peak) + 20);
+    const calibration = { intercept: 0, slope: 1, rankCorrelation: null, pairs: 0, fallback: false };
+    // Runs are unique per hour and grid, so a rerun against the same database finds them and adds nothing.
+    if (!(await forecasts.exists(pool, asOf, "live"))) {
+      const current = await forecasts.insertRun(pool, asOf, "live", calibration);
+      await forecasts.insertStationForecasts(pool, current, [{ stationId: "CA24N", api: new Float32Array(36).fill(level) }]);
+      const other = await forecasts.insertRun(pool, asOf, "live", calibration, `${GRID_KEY}-other`);
+      await forecasts.insertStationForecasts(pool, other, [{ stationId: "CA24N", api: new Float32Array(36).fill(level + 500) }]);
+    }
+    await modelForecasts.insertMany(pool, [{ asOf, instrumentId: "CA24N", day: "2026-10-09", p10: 40, p50: 60, p90: 90, modelVersion: GATE }]);
+
+    const skill = await modelSkill(pool, "shadow", GATE);
+    const dayAhead = skill.leads[0];
+    expect(dayAhead).toMatchObject({ cases: 1, v2Cases: 1 });
+    expect(dayAhead.v2).toBeCloseTo(Math.round(Math.abs(level - peak) * 100) / 100, 1);
+    expect(skill).toMatchObject({ cases: 1, comparedCases: 1 });
+    expect(skill.gain).not.toBeNull();
+    expect(skill.gain).toBeCloseTo(1 - Math.abs(model - peak) / Math.abs(level - peak), 2);
+    expect(skill.gain ?? 0).toBeGreaterThan(SHADOW_GAIN);
+    expect(skill.shadowDays).toBe(1);
+    expect(skill.passed).toBe(false);
   });
 });

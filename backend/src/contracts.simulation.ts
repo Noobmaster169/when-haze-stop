@@ -71,6 +71,9 @@ export const ModelSkill = z.object({
   since: z.string().nullable(),
   shadowDays: z.number().int(),
   shadowDaysRequired: z.number().int(),
+  /** Day-ahead DOE cases the model has scored, and how many of them the hourly run also covers: the gain is over those alone. */
+  cases: z.number().int(),
+  comparedCases: z.number().int(),
   /** 1 minus model over v2 at one day ahead for DOE stations, null before both exist. */
   gain: z.number().nullable(),
   gainRequired: z.number(),
