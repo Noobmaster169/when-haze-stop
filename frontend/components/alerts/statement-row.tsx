@@ -1,10 +1,10 @@
 import { Icon } from "@/components/ui/icons";
 import type { Statement, StatementIssuer, StatementStatus } from "@/lib/api/statement-schemas";
-import { dayName } from "@/lib/malaysia-time";
+import { dayName, malaysiaDate } from "@/lib/malaysia-time";
 
 /** One official statement: who, what, its status, where it applies, and the original. */
 
-const ISSUER: Record<StatementIssuer, string> = {
+const CATEGORY: Record<StatementIssuer, string> = {
   moe: "KPM",
   doe: "JAS",
   nadma: "NADMA",
@@ -21,6 +21,17 @@ const STATUS: Record<StatementStatus, { label: string; className: string }> = {
   replaced: { label: "Replaced", className: "border-hairline text-ink-tertiary" },
   ended: { label: "Ended", className: "border-hairline text-ink-tertiary" },
 };
+
+/**
+ * The badge: a national body by its usual initials; a state body, Ruler or
+ * other by the short name it goes by ("JAKIM", "JAIS"), since "State" alone
+ * does not say which.
+ */
+export function badge(statement: Statement): string {
+  if (statement.issuer !== "state" && statement.issuer !== "ruler" && statement.issuer !== "other") return CATEGORY[statement.issuer];
+  const initials = statement.issuerName.match(/\b[A-Z]{3,8}\b/);
+  return initials ? initials[0] : CATEGORY[statement.issuer];
+}
 
 export function areas(statement: Statement): string {
   if (statement.nationwide) return statement.kind === "rule" ? "Wherever the line is passed" : "All of Malaysia";
@@ -39,16 +50,17 @@ export function StatementRow({ statement }: { statement: Statement }) {
   return (
     <li className="py-3.5">
       <div className="flex items-start gap-3">
-        <span className="w-[52px] shrink-0 pt-0.5 text-caption text-ink-tertiary tabular-nums">{dayName(statement.publishedAt.slice(0, 10)).slice(4)}</span>
+        <span className="w-[52px] shrink-0 pt-0.5 text-caption text-ink-tertiary tabular-nums">{malaysiaDate(statement.publishedAt)}</span>
         <span className="mt-px shrink-0 rounded-sm bg-sunken px-1.5 py-0.5 text-caption font-semibold tracking-[0.04em] text-ink-secondary" title={statement.issuerName}>
-          {ISSUER[statement.issuer]}
+          {badge(statement)}
         </span>
         <div className="min-w-0 grow">
           <p className={`text-body ${settled ? "text-ink-secondary" : "text-ink"}`}>{statement.summary}</p>
           <p className="mt-0.5 flex flex-wrap gap-x-3 text-caption text-ink-tertiary">
             <span>
               {areas(statement)}
-              {statement.effectiveUntil ? `, until ${dayName(statement.effectiveUntil)}` : ""}
+              {statement.effectiveFrom ? `, from ${dayName(statement.effectiveFrom)}` : ""}
+              {statement.effectiveUntil ? ` until ${dayName(statement.effectiveUntil)}` : ""}
             </span>
             <a href={statement.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-accent">
               {reports(statement)}

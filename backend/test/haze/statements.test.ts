@@ -69,12 +69,13 @@ describe("which statements are one, and which are still in force", () => {
     expect(resolveStatements([NEGERI_SEMBILAN, reopen], "2026-10-13").find((item) => item.id === 6)?.status).toBe("ended");
   });
 
-  it("makes the headlines of one day's closures one decision covering every area they name", () => {
-    const closure = byId(6);
-    expect(byId(7)).toBeUndefined();
-    expect(closure).toMatchObject({ reports: 2, districts: ["Rompin"], status: "in-force" });
-    expect(closure?.states.sort()).toEqual(["Melaka", "Negeri Sembilan", "Selangor", "WP Kuala Lumpur", "WP Putrajaya"]);
-    expect(resolved[0].id).toBe(6);
+  it("makes the headlines of one day's closures one decision once a report links their places", () => {
+    // Negeri Sembilan's report and the KL, Putrajaya and Rompin one share no place until this headline of 8 October names both sides.
+    const linking = statement(9, { states: ["Negeri Sembilan", "Melaka", "Selangor"], effectiveFrom: "2026-10-09", publishedAt: new Date("2026-10-08T15:13:00Z") });
+    expect(resolveStatements([NEGERI_SEMBILAN, ROMPIN], "2026-10-10")).toHaveLength(2);
+    const joined = resolveStatements([NEGERI_SEMBILAN, linking, ROMPIN], "2026-10-10").find((item) => item.id === 6);
+    expect(joined).toMatchObject({ reports: 3, districts: ["Rompin"], status: "in-force" });
+    expect(joined?.states.sort()).toEqual(["Melaka", "Negeri Sembilan", "Selangor", "WP Kuala Lumpur", "WP Putrajaya"]);
   });
 
   it("stops calling a closure with no stated end in force after a week without word", () => {
@@ -156,5 +157,42 @@ describe("two state bodies on one day", () => {
     const jais = statement(30, { issuer: "state", issuerName: "JAIS", states: ["Selangor"], effectiveFrom: "2026-10-09", publishedAt: new Date("2026-10-08T16:37:00Z") });
     const jheains = statement(32, { issuer: "state", issuerName: "JHEAINS", states: ["Negeri Sembilan"], effectiveFrom: "2026-10-09", publishedAt: new Date("2026-10-09T02:00:00Z") });
     expect(resolveStatements([jais, jheains], "2026-10-10").map((item) => item.states)).toEqual([["Negeri Sembilan"], ["Selangor"]]);
+  });
+});
+
+describe("the second live run", () => {
+  // From the news search of 10 October 2026, as the reader recorded them.
+  const dated = statement(40, { states: ["Negeri Sembilan", "Melaka", "Selangor", "WP Kuala Lumpur", "WP Putrajaya"], districts: ["Rompin"], effectiveFrom: "2026-10-09", publishedAt: new Date("2026-10-08T14:49:00Z") });
+  // Published at 22:32 on the 8th, so it is not the same day as the closure it reports.
+  const undated = statement(41, { states: ["Selangor", "Melaka", "WP Kuala Lumpur", "WP Putrajaya"], publishedAt: new Date("2026-10-08T14:32:00Z") });
+  const jais = statement(42, { issuer: "state", issuerName: "JAIS", states: ["Selangor"], effectiveFrom: "2026-10-09", publishedAt: new Date("2026-10-08T16:37:00Z") });
+  const batuPahat = statement(43, { issuerName: "JPN Johor", districts: ["Batu Pahat"], effectiveFrom: "2026-10-07", publishedAt: new Date("2026-10-06T08:00:00Z") });
+
+  it("folds an undated report into the dated decision of that day", () => {
+    const resolved = resolveStatements([dated, undated], "2026-10-10");
+    expect(resolved.find((item) => item.id === 41)?.status).toBe("replaced");
+    expect(resolved.find((item) => item.id === 40)?.status).toBe("in-force");
+  });
+
+  it("puts the ministry's closure of every school before a state's closure of its religious schools", () => {
+    const klang = { name: "Klang", state: "Selangor", lat: 3.0, lon: 101.4 };
+    expect(ordersFor(resolveStatements([dated, jais], "2026-10-10"), klang, () => null).map((item) => item.id)).toEqual([40, 42]);
+  });
+
+  it("keeps a neighbouring district with its own station out of a district's closure", () => {
+    // Batu Pahat's gazetteer point and the Kluang station, about 36 km apart.
+    const centre = () => ({ lat: 1.85, lon: 102.93 });
+    expect(covers(batuPahat, { name: "Kluang", state: "Johor", lat: 2.03, lon: 103.32 }, centre)).toBe(false);
+    expect(covers(batuPahat, { name: "Batu Pahat", state: "Johor", lat: 1.86, lon: 102.94 }, centre)).toBe(true);
+  });
+});
+
+describe("two closures announced the same evening", () => {
+  it("stay two decisions when they share no place", () => {
+    // The evening of 8 October 2026: the ministry's closures in the centre, and Johor's own.
+    const centre = statement(50, { states: ["Selangor", "Melaka", "WP Kuala Lumpur", "WP Putrajaya"], publishedAt: new Date("2026-10-08T14:32:00Z") });
+    const johor = statement(51, { states: ["Johor"], publishedAt: new Date("2026-10-08T15:10:00Z") });
+    const resolved = resolveStatements([centre, johor], "2026-10-10");
+    expect(resolved.map((item) => item.states)).toEqual([["Johor"], ["Selangor", "Melaka", "WP Kuala Lumpur", "WP Putrajaya"]]);
   });
 });

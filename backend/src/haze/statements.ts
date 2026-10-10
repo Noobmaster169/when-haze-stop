@@ -93,11 +93,16 @@ function overlaps(a: StoredStatement, b: StoredStatement): boolean {
   return a.states.some((state) => b.states.includes(state)) || a.districts.some((district) => b.districts.map(flatten).includes(flatten(district)));
 }
 
-function statusOf(statement: StoredStatement, later: StoredStatement[], today: string): StatementStatus {
+function statusOf(statement: StoredStatement, later: StoredStatement[], all: StoredStatement[], today: string): StatementStatus {
   const { kind, action, issuer } = statement;
   if (kind === "rule") {
     const replaced = later.some((other) => other.kind === "rule" && other.issuer === issuer && other.action === action && (other.sustainedDays ?? 1) === (statement.sustainedDays ?? 1));
     if (replaced) return "replaced";
+  }
+  if (kind === "order" && !statement.effectiveFrom) {
+    // A report with no start date is the dated decision of that day, told less fully.
+    const dated = all.some((other) => other !== statement && other.kind === "order" && other.issuer === issuer && other.action === action && other.effectiveFrom !== null && covering(other, statement) && Math.abs(other.publishedAt.getTime() - statement.publishedAt.getTime()) <= 86_400_000);
+    if (dated) return "replaced";
   }
   if (kind === "order") {
     // "Schools reopen on Monday" ends the closure on Monday, not on the day it was said.
@@ -127,14 +132,24 @@ export function usable(statement: StoredStatement): boolean {
 
 /** Every statement once, newest first, each with its status on `today` (a Malaysian `YYYY-MM-DD`). */
 export function resolveStatements(stored: StoredStatement[], today: string): Statement[] {
-  const groups = new Map<string, StoredStatement[]>();
+  const groups: { key: string; items: StoredStatement[] }[] = [];
   for (const statement of stored.filter(usable).sort((a, b) => a.publishedAt.getTime() - b.publishedAt.getTime() || a.id - b.id)) {
     const key = sameKey(statement);
-    groups.set(key, [...(groups.get(key) ?? []), statement]);
+    // Reports of one order share a place. Johor closing its schools the evening the ministry closed Selangor's is a second decision.
+    const matching = groups.filter((item) => item.key === key && (statement.kind === "rule" || item.items.some((other) => overlaps(other, statement))));
+    if (matching.length === 0) {
+      groups.push({ key, items: [statement] });
+      continue;
+    }
+    // A report naming places from two groups shows they were one decision: they become one.
+    const [into, ...rest] = matching;
+    into.items.push(...rest.flatMap((item) => item.items), statement);
+    into.items.sort((a, b) => a.publishedAt.getTime() - b.publishedAt.getTime() || a.id - b.id);
+    for (const item of rest) groups.splice(groups.indexOf(item), 1);
   }
-  const firsts = [...groups.values()].map(merged);
+  const firsts = groups.map((group) => merged(group.items));
 
-  const resolved = [...groups.values()].map((group, index): Statement => {
+  const resolved = groups.map(({ items: group }, index): Statement => {
     const first = firsts[index];
     const later = firsts.filter((other) => other !== first && other.publishedAt > first.publishedAt);
     // The ministry's own copy when one was fetched, else the report that names the most areas.
@@ -159,7 +174,7 @@ export function resolveStatements(stored: StoredStatement[], today: string): Sta
       url: link.url,
       outlet: link.outlet,
       reports: group.length,
-      status: statusOf(first, later, today),
+      status: statusOf(first, later, firsts, today),
     };
   });
   return resolved.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt) || b.id - a.id);
