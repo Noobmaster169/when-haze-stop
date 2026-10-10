@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { LITTLE_SMOKE, SMOKE_MATTERS_UGM3, whyFor } from "../../src/haze/why";
 
-/** A day whose calibrated smoke rises by `swing` ug/m3 to a peak at 15:00 and falls back. */
+/** A day whose calibrated smoke sits at 4 ug/m3 and rises by exactly `swing` at 15:00. */
 function dayWithSwing(swing: number): number[] {
-  return Array.from({ length: 24 }, (_, hour) => 4 + swing * Math.exp(-(((hour - 15) / 3) ** 2)));
+  return Array.from({ length: 24 }, (_, hour) => (hour === 15 ? 4 + swing : 4));
 }
 
 describe("the reason under a learned day", () => {

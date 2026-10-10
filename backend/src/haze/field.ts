@@ -1,6 +1,6 @@
 import { pm25ToApi } from "./api-index";
 import { type Calibration, toPm25 } from "./calibrate";
-import { cellCentre, distanceKm, FIELD_CELLS } from "./grid";
+import { cellCentre, distanceKm, DOMAIN, FIELD, FIELD_CELLS, inDomain } from "./grid";
 
 /**
  * The map: API over the whole grid at one hour, worked out in PM2.5.
@@ -93,12 +93,53 @@ export interface ForecastFrameInput {
   weight: Float32Array;
 }
 
-/** A frame after `asOf`: the stations' forecast near them, fading to the model's own change far from them. */
-export function forecastFrame(input: ForecastFrameInput): Uint8Array {
+/** A frame after `asOf` in PM2.5: the stations' forecast near them, fading to the model's own change far from them. */
+export function forecastPm25(input: ForecastFrameInput): Float32Array {
   const { model, modelAtAsOf, errorsAtAsOf, trend, weight } = input;
   const pm25 = new Float32Array(model.length);
   for (let cell = 0; cell < model.length; cell++) {
     pm25[cell] = modelAtAsOf[cell] + errorsAtAsOf[cell] + trend[cell] + (1 - weight[cell]) * (model[cell] - modelAtAsOf[cell]);
   }
-  return encode(pm25);
+  return pm25;
+}
+
+export function forecastFrame(input: ForecastFrameInput): Uint8Array {
+  return encode(forecastPm25(input));
+}
+
+/** The field's value at a point, bilinear between the four cell centres around it; at the rim the edge cells stand in. */
+export function sampleAt(field: Float32Array, lat: number, lon: number): number {
+  const x = (lon - DOMAIN.lon0) / FIELD.step - 0.5;
+  const y = (lat - DOMAIN.lat0) / FIELD.step - 0.5;
+  const x0 = Math.max(0, Math.min(FIELD.nx - 1, Math.floor(x)));
+  const y0 = Math.max(0, Math.min(FIELD.ny - 1, Math.floor(y)));
+  const x1 = Math.min(FIELD.nx - 1, x0 + 1);
+  const y1 = Math.min(FIELD.ny - 1, y0 + 1);
+  const tx = Math.max(0, Math.min(1, x - x0));
+  const ty = Math.max(0, Math.min(1, y - y0));
+  const south = field[y0 * FIELD.nx + x0] * (1 - tx) + field[y0 * FIELD.nx + x1] * tx;
+  const north = field[y1 * FIELD.nx + x0] * (1 - tx) + field[y1 * FIELD.nx + x1] * tx;
+  return south * (1 - ty) + north * ty;
+}
+
+/** A place with the PM2.5 the field should show there. */
+export interface Target {
+  lat: number;
+  lon: number;
+  pm25: number;
+}
+
+/**
+ * The field pulled to given values at given points, the way an observed frame
+ * is pulled to the stations' readings: the difference at each point is spread
+ * with the same weights. A point outside the region is skipped; with none left
+ * the field is returned as it is.
+ */
+export function correctToPoints(pm25: Float32Array, points: Target[]): Float32Array {
+  const anchors: Anchor[] = points.filter((point) => inDomain(point.lat, point.lon)).map((point) => ({ lat: point.lat, lon: point.lon, error: point.pm25 - sampleAt(pm25, point.lat, point.lon) }));
+  if (anchors.length === 0) return pm25;
+  const spread = spreadErrors(anchors);
+  const corrected = new Float32Array(pm25.length);
+  for (let cell = 0; cell < pm25.length; cell++) corrected[cell] = pm25[cell] + spread[cell];
+  return corrected;
 }
