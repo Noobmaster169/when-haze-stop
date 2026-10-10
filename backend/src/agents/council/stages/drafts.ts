@@ -15,7 +15,7 @@ import { describePlan, type Session } from "./session";
  * reasons. Six of eight drafts are needed to go on.
  */
 
-export const DRAFT_PROMPT = "v1";
+export const DRAFT_PROMPT = "v2";
 const QUORUM = 6;
 const log = childLogger({ module: "council.drafts" });
 
@@ -35,7 +35,8 @@ async function table(session: Session, proposer: Seat, draft: DraftAnswer, seen:
     violations: entry.violations,
     baseline: false,
   });
-  await say(session.deps, { from: proposer.id, to: ["chair"], act: "propose", headline, detail: entry.plan.rationale, planId: entry.id, seen });
+  // A seat's own units and days are its decisions, not claims to check.
+  await say(session.deps, { from: proposer.id, to: ["chair"], act: "propose", headline, detail: entry.plan.rationale, planId: entry.id, seen: [...seen, JSON.stringify(draft)] });
   return entry;
 }
 

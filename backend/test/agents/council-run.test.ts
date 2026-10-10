@@ -63,7 +63,7 @@ function script(request: LlmRequest): string {
   }
   if (system.includes("Run a pre-mortem")) {
     const ids = [...new Set(user.match(/\bP\d+\b/g) ?? [])];
-    return final({ headline: "The wind turned.", premortems: ids.map((planId) => ({ planId, failure: "The peat relit. It was 9999 ha.", evidence: "R3" })), mostFragile: ids[0], mostRobust: ids[1] ?? ids[0] });
+    return final({ headline: "The wind turned.", premortems: ids.map((planId) => ({ planId, headline: `${planId} failed: the peat relit over 9999 ha.`, failure: "The peat relit. It was 9999 ha.", evidence: "R3" })), mostFragile: ids[0], mostRobust: ids[1] ?? ids[0] });
   }
   if (system.includes("The Committee has cross-examined your plan")) {
     return final({ headline: "Held, with Bomba added.", plan: plan("Revised", [line("C02", "bomba_domestic", 100), line("C01", "cl415", 1)]), changes: "Added Bomba on C02 for its 0.2 a day." });
@@ -149,5 +149,12 @@ describe("the fact check", () => {
     const seen = figuresIn(["C014 is 11.06% of the ceiling, 1,899 MW, peat 0.640"]);
     expect(unverified("C014 causes 11.06% and burns 1899 MW at peat 0.64", seen)).toEqual([]);
     expect(unverified("It burns 2,500 MW on 14 days in 2026", seen)).toEqual(["2500"]);
+  });
+});
+
+describe("the fact check on names and ranges", () => {
+  it("reads no figures in ids, ranges or PM2.5", () => {
+    expect(unverified("C121 and P22 on days 1-10 in W2; PM2.5 at C120-C121", figuresIn([]))).toEqual([]);
+    expect(unverified("a fall of -2.5 ug/m3", figuresIn([]))).toEqual(["-2.5"]);
   });
 });

@@ -77,7 +77,7 @@ async function premortem(session: Session, plans: BoardPlan[]): Promise<void> {
   for (const item of value.premortems) {
     const plan = plans.find((entry) => entry.id === item.planId);
     if (!plan) continue;
-    await say(session.deps, { from: "red_cell", to: [plan.by], act: "challenge", headline: item.failure.split(/(?<=\.)\s/)[0].slice(0, 240), detail: `${item.failure}\nEvidence: ${item.evidence}`, planId: plan.id, seen });
+    await say(session.deps, { from: "red_cell", to: [plan.by], act: "challenge", headline: item.headline, detail: `${item.failure}\nEvidence: ${item.evidence}`, planId: plan.id, seen });
   }
 }
 

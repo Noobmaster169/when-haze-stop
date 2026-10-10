@@ -9,7 +9,8 @@ export async function say(
   deps: TurnDeps,
   message: { from: string; to: string[]; act: MessageAct; headline: string; detail: string; planId?: string | null; seen: string[] },
 ): Promise<void> {
-  const seen = figuresIn(message.seen);
+  // The engine's own messages are written by code from the scores; there is nothing to check them against.
+  const seen = message.from === "engine" ? null : figuresIn(message.seen);
   await deps.emit.emit("message", message.from, {
     id: `m${++counter}`,
     from: message.from,
@@ -18,6 +19,6 @@ export async function say(
     headline: message.headline,
     detail: message.detail,
     planId: message.planId ?? null,
-    unverified: unverified(`${message.headline}\n${message.detail}`, seen),
+    unverified: seen ? unverified(`${message.headline}\n${message.detail}`, seen) : [],
   });
 }

@@ -46,7 +46,9 @@ export type CritiqueAnswer = z.infer<typeof CritiqueAnswer>;
 
 export const PremortemAnswer = z.object({
   headline: Headline,
-  premortems: z.array(z.object({ planId: z.string(), failure: z.string().max(500), evidence: z.string().max(300) })).max(8),
+  premortems: z
+    .array(z.object({ planId: z.string(), headline: z.string().max(240).describe("One full sentence naming how this plan failed."), failure: z.string().max(500), evidence: z.string().max(300) }))
+    .max(8),
   mostFragile: z.string().max(8),
   mostRobust: z.string().max(8),
 });

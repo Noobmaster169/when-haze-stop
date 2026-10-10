@@ -8,7 +8,11 @@
  * days) and years are too common to check.
  */
 
-const NUMBER = /-?\d[\d,]*(?:\.\d+)?/g;
+/** A number not glued to a letter: C121, P22, W2 and PM2.5 are names, not figures. */
+const NUMBER = /(?<![A-Za-z\d.])-?\d[\d,]*(?:\.\d+)?/g;
+
+/** "days 1-10" and "C120-C121" are ranges and pairs, not negative numbers. */
+const plain = (text: string) => text.replace(/([\w)])-(?=\d)/g, "$1 ");
 
 function forms(raw: string): string[] {
   const plain = raw.replace(/,/g, "");
@@ -21,7 +25,7 @@ function forms(raw: string): string[] {
 /** Every figure in the texts, in the forms it may be quoted in. */
 export function figuresIn(texts: string[]): Set<string> {
   const seen = new Set<string>();
-  for (const text of texts) for (const match of text.match(NUMBER) ?? []) for (const form of forms(match)) seen.add(form);
+  for (const text of texts) for (const match of plain(text).match(NUMBER) ?? []) for (const form of forms(match)) seen.add(form);
   return seen;
 }
 
@@ -35,7 +39,7 @@ function checkable(raw: string): boolean {
 
 export function unverified(message: string, seen: Set<string>): string[] {
   const missing = new Set<string>();
-  for (const match of message.match(NUMBER) ?? []) {
+  for (const match of plain(message).match(NUMBER) ?? []) {
     if (!checkable(match)) continue;
     const plain = match.replace(/,/g, "");
     if (!forms(plain).some((form) => seen.has(form))) missing.add(plain);

@@ -31,7 +31,7 @@ import { meanOf } from "./tools/format";
 
 const log = childLogger({ module: "council.run" });
 /** Model calls allowed. A second round of critique runs only if it fits. */
-export const BUDGET_CALLS = 90;
+export const BUDGET_CALLS = 130;
 const SECOND_ROUND_COST = 20;
 
 const TITLES: Record<StageId, string> = {

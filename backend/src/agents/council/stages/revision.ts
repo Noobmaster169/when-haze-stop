@@ -15,7 +15,8 @@ import { describePlan, type Session } from "./session";
  * the shortlist and is scored again.
  */
 
-export const REVISE_PROMPT = "v1";
+export const REVISE_PROMPT = "v2";
+const ARCHIVE = 3;
 const log = childLogger({ module: "council.revision" });
 
 async function revise(session: Session, plan: BoardPlan): Promise<void> {
@@ -29,7 +30,13 @@ async function revise(session: Session, plan: BoardPlan): Promise<void> {
   const { value, seen } = await runTurn(session.deps, {
     seat: author,
     prompt: loadPrompt("council-revise", REVISE_PROMPT),
-    input: { "Fact sheet": session.facts, "Your plan": describePlan(plan), "What the council said about it": said.length ? said : ["(nothing)"], "Your premise": plan.premise ?? "" },
+    input: {
+      "Fact sheet": session.facts,
+      "Your plan": describePlan(plan),
+      "What the council said about it": said.length ? said : ["(nothing)"],
+      "The best plans on the board so far, yours and others, including those made by code": best(session).map(describePlan).join("\n\n"),
+      "Your premise": plan.premise ?? "",
+    },
     answer: RevisionAnswer,
     toolSteps: 1,
   });
@@ -49,9 +56,18 @@ async function revise(session: Session, plan: BoardPlan): Promise<void> {
     baseline: false,
   });
   await wargame(session, [entry]);
-  await say(session.deps, { from: author.id, to: critiques.map((item) => item.by), act: "revise", headline: value.headline, detail: value.changes, planId: entry.id, seen });
+  await say(session.deps, { from: author.id, to: critiques.map((item) => item.by), act: "revise", headline: value.headline, detail: value.changes, planId: entry.id, seen: [...seen, JSON.stringify(value.plan)] });
   // A revision the validator refuses does not replace a feasible plan.
   if (entry.violations.length === 0) session.shortlist = session.shortlist.map((id) => (id === plan.id ? entry.id : id));
+}
+
+/** The archive of the best-scored plans: authors edit good plans rather than start over (FunSearch, docs/council/research/04). */
+function best(session: Session): BoardPlan[] {
+  return session.deps.ctx
+    .plans()
+    .filter((entry) => entry.violations.length === 0)
+    .sort((a, b) => b.score.expected - a.score.expected)
+    .slice(0, ARCHIVE);
 }
 
 export async function revision(session: Session): Promise<void> {

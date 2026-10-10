@@ -63,6 +63,8 @@ export async function runTurn<T>(deps: TurnDeps, spec: TurnSpec<T>): Promise<Tur
     calls: z.array(Call).max(MAX_CALLS).default([]),
     answer: spec.answer.optional(),
   });
+  // On the last step the schema itself has no calls and requires the answer: told in words, seats still asked for tools (run 1).
+  const LastStep = z.object({ action: z.literal("final").default("final"), gist: z.string().max(240).default(""), calls: z.array(Call).max(0).default([]), answer: spec.answer });
   const system = spec.prompt.text.replace("{{seat}}", seatBlock(seat)).replace("{{tools}}", councilToolDescriptions(seat.tools));
   const skills = seat.skills.map((name) => councilSkills().get(name)).filter((skill) => skill !== undefined);
   for (const skill of skills) {
@@ -75,15 +77,15 @@ export async function runTurn<T>(deps: TurnDeps, spec: TurnSpec<T>): Promise<Tur
 
   for (let step = 0; ; step++) {
     const last = step >= spec.toolSteps;
-    const { value } = await callStructured(deps, {
+    const { value } = await callStructured<z.infer<typeof Step>>(deps, {
       prompt: { ...spec.prompt, text: system, model: seat.model },
       input: {
         ...(skills.length ? { "Skills you have read": skills.map(skillText).join("\n\n") } : {}),
         ...spec.input,
         "What you have looked up": done.length ? done.join("\n\n") : "(nothing yet)",
-        ...(last ? { Now: "This is your last step. Answer with action: final and your answer." } : {}),
+        ...(last ? { Now: "This is your last step: no more tools. Answer with action: final and your answer." } : {}),
       },
-      schema: Step,
+      schema: last ? LastStep : Step,
       project: "council",
       conversationId: null,
       defaultsOptional: true,

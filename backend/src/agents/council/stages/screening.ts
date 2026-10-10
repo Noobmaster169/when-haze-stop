@@ -64,7 +64,9 @@ export async function screen(session: Session): Promise<void> {
   for (const plan of feasible) if (!kept.some((other) => overlap(plan, other) >= SAME)) kept.push(plan);
   const must = [kept.find((plan) => !asks(plan)), kept.find(asks)].filter((plan): plan is BoardPlan => plan !== undefined);
   const top = [...must, ...kept.filter((plan) => !must.includes(plan))].slice(0, SHORTLIST).sort((a, b) => b.score.expected - a.score.expected);
-  session.shortlist = top.map((plan) => plan.id);
+  // The greedy plans contend too: the council must beat them on the record, or adopt them with its own judgement on what the engine cannot see.
+  const greedy = session.deps.ctx.plans().filter((plan) => plan.baseline && plan.plan.title.startsWith("Greedy") && plan.violations.length === 0);
+  session.shortlist = [...top, ...greedy].map((plan) => plan.id);
   const dropped = councilPlans(session).filter((plan) => !session.shortlist.includes(plan.id));
   await say(session.deps, {
     from: "engine",
