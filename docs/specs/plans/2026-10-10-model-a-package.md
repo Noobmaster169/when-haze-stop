@@ -1326,7 +1326,9 @@ def ring_of(distance):
 def _bins(table: pd.DataFrame, cells: pd.DataFrame) -> np.ndarray:
     """For each (instrument, cell) the flat bin sector * 3 + ring, or -1 beyond the outer ring."""
     lat_i, lon_i = table["lat"].to_numpy()[:, None], table["lon"].to_numpy()[:, None]
-    lat_c, lon_c = cells["lat10"].to_numpy()[None, :] + 0.05, cells["lon10"].to_numpy()[None, :] + 0.05
+    # lat10 and lon10 are integer tenths of a degree (lat10 = 25 is 2.5 N); the cell centre is a half tenth on.
+    lat_c = cells["lat10"].to_numpy(dtype=float)[None, :] / 10.0 + 0.05
+    lon_c = cells["lon10"].to_numpy(dtype=float)[None, :] / 10.0 + 0.05
     sector = sector_of(bearing_deg(lat_i, lon_i, lat_c, lon_c))
     ring = ring_of(distance_km(lat_i, lon_i, lat_c, lon_c))
     return np.where(ring >= 0, sector * (len(RINGS_KM) - 1) + ring, -1)
