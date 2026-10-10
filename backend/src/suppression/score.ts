@@ -16,22 +16,29 @@ const OVER_200 = apiToPm25(200);
 /** The benefit has arrived once it reaches this share of its peak. */
 const ARRIVED = 0.1;
 
-/** The hourly PM2.5 the plan removes at the target, in one scenario and one wind member. */
-export function removedSeries(plan: Pick<Plan, "assignments">, attribution: Attribution, scenario: ScenarioName, member: number): Float32Array {
-  const removed = new Float32Array(attribution.hours);
+/** The share of each touched complex still burning on each plan day (index 0 is day 1), in one scenario. */
+export function keepTable(plan: Pick<Plan, "assignments">, attribution: Attribution, scenario: ScenarioName): Map<string, number[]> {
   const byComplex = new Map<string, Assignment[]>();
   for (const assignment of plan.assignments) {
     if (!attribution.contributions.has(assignment.complexId)) continue;
     byComplex.set(assignment.complexId, [...(byComplex.get(assignment.complexId) ?? []), assignment]);
   }
-  const near = neighbours(attribution.complexes.filter((complex) => byComplex.has(complex.id) || attribution.contributions.has(complex.id)));
+  const near = neighbours(attribution.complexes.filter((complex) => attribution.contributions.has(complex.id)));
   const complexes = new Map(attribution.complexes.map((complex) => [complex.id, complex]));
-
+  const table = new Map<string, number[]>();
   for (const [id, assignments] of byComplex) {
     const complex = complexes.get(id);
     if (!complex) continue;
     const pressured = (near.get(id) ?? []).some((other) => !byComplex.has(other));
-    const keep = keepByDay(complex, assignments, SCENARIOS[scenario], attribution.days, pressured);
+    table.set(id, keepByDay(complex, assignments, SCENARIOS[scenario], attribution.days, pressured));
+  }
+  return table;
+}
+
+/** The hourly PM2.5 the plan removes at the target, in one scenario and one wind member. */
+export function removedSeries(plan: Pick<Plan, "assignments">, attribution: Attribution, scenario: ScenarioName, member: number): Float32Array {
+  const removed = new Float32Array(attribution.hours);
+  for (const [id, keep] of keepTable(plan, attribution, scenario)) {
     const byDay = attribution.contributions.get(id)![member];
     for (let day = 1; day <= attribution.days && day < byDay.length; day++) {
       const cut = 1 - keep[day - 1];

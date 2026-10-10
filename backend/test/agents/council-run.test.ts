@@ -89,7 +89,7 @@ function script(request: LlmRequest): string {
 async function run() {
   const llm = new FakeLlmClient(script);
   const { sink, events } = memorySink();
-  const verdict = await runCouncil({ llm, pool: getPool(), engine: { attribute: async () => vectorAttribution() }, emit: emitter(sink) }, TARGETS["klang-valley"]);
+  const verdict = await runCouncil({ llm, pool: getPool(), engine: { attribute: async () => vectorAttribution(), simulate: async () => null }, emit: emitter(sink) }, TARGETS["klang-valley"]);
   return { llm, events, verdict };
 }
 

@@ -1,39 +1,34 @@
+import type { VerdictMaps } from "../contracts";
 import type { Queryable } from "../db";
 import { ensembleMean } from "../haze/ensemble";
-import { emissionsFor } from "../haze/fires";
-import { addHours, cellsWithin, DOMAIN, distanceKm, hoursBetween, WEATHER, WEATHER_POINTS } from "../haze/grid";
-import { REACH_KM, smokeFrom } from "../haze/smoke";
+import { addHours, DOMAIN, distanceKm, FIELD } from "../haze/grid";
+import { smokeFrom } from "../haze/smoke";
 import type { Emission, Weather } from "../haze/transport";
 import { TerminalError } from "../lib/errors";
 import { childLogger } from "../lib/logger";
-import { council, fires as fireCells, stations, weather } from "../repositories";
 import type { FiresClient } from "../sources";
-import { ANALOGUE_DAYS, analogueStarts, extendWeather } from "../suppression/analogue";
-import { type Attribution, mean, type WindMember, type WindSummary } from "../suppression/attribution";
+import { type Attribution, mean } from "../suppression/attribution";
 import type { Complex } from "../suppression/complexes";
-import { dayOneFor } from "../suppression/package";
 import type { TargetArea } from "../suppression/targets";
-import { complexesFrom } from "./fire-complexes";
+import { HORIZON_DAYS, type Prepared, prepare, summariseWind } from "./suppression-inputs";
 
 /**
  * The seam between the council and the smoke engine (docs/council/06-engine-seam.md).
  *
  * The council never runs the engine itself: it gets one `Attribution` per run
- * and scores every plan from it. This implementation composes the engine's
- * public pieces (`emissionsFor`, `ensembleMean`, `smokeFrom`) and the stored
- * run's calibration, and changes none of them, so the engine can be reworked
- * underneath it. The fake hands back a recorded attribution.
+ * and scores every plan from it, then asks once for the verdict's maps. This
+ * implementation composes the engine's public pieces (`emissionsFor`,
+ * `ensembleMean`, `smokeFrom`) and the stored run's calibration, and changes
+ * none of them, so the engine can be reworked underneath it.
  */
 
 export interface SuppressionEngine {
   attribute(request: { target: TargetArea }): Promise<Attribution>;
+  /** The region's PM2.5 at one scored hour, without and with each complex's emissions scaled day by day. After `attribute`. */
+  simulate(request: { keep: Map<string, number[]>; hour: number }): Promise<VerdictMaps | null>;
 }
 
 const log = childLogger({ module: "services.suppression-engine" });
-/** Smoke lives up to six days, so the run starts far enough back to hold everything still in the air. */
-const LOOKBACK_DAYS = 8;
-export const HORIZON_DAYS = 14;
-const WIND_MEMBERS = 4;
 /** Ensemble members per wind member: a third of the hourly run's, as only a ranking and sums are read. */
 const ENSEMBLE = 3;
 /** Complexes given a day-by-day contribution: the most influential, plus the ones any rule or baseline names. */
@@ -48,126 +43,91 @@ export interface EngineDeps {
   fires?: FiresClient;
 }
 
-export function engineSuppression(deps: EngineDeps): SuppressionEngine {
+/** The target's 24-hour PM2.5 from some emissions, ug/m3, for each scored hour. */
+function atTarget(input: Prepared, some: Emission[], wind: Weather): Float32Array {
+  const smoke = smokeFrom(ensembleMean(some, wind, ENSEMBLE), input.hours);
+  const series = new Float32Array(input.span);
+  for (let hour = 0; hour < input.span; hour++) {
+    let sum = 0;
+    for (const near of input.stationCells) sum += smoke.near(near, input.now + 1 + hour);
+    series[hour] = (input.calibration.slope * sum) / input.stationCells.length;
+  }
+  return series;
+}
+
+async function attribution(run: Prepared, target: TargetArea): Promise<Attribution> {
+  const baseline = run.members.map(({ weather }) => atTarget(run, run.emissions, weather).map((value) => value + run.calibration.intercept));
+  const ceiling = run.members.map(({ weather }) => atTarget(run, run.emissions.filter((emission) => run.planDay(emission) >= 1), weather));
+  log.info({ asOf: run.asOf, complexes: run.complexes.length, members: run.members.length }, "baseline and ceiling made");
+
+  const worth = run.complexes.filter((complex) => complex.firePowerMw >= WORTH_MW || distanceKm(target.centre.lat, target.centre.lon, complex.lat, complex.lon) <= WORTH_KM);
+  const share = new Map<string, number>();
+  for (const complex of worth) {
+    const future = (run.byComplex.get(complex.id) ?? []).filter((emission) => run.planDay(emission) >= 1);
+    const shares = run.members.map(({ weather }, m) => mean(atTarget(run, future, weather)) / Math.max(1e-9, mean(ceiling[m])));
+    share.set(complex.id, shares.reduce((sum, value) => sum + value, 0) / shares.length);
+  }
+  const chosen = candidates(run.complexes, share, target);
+
+  const contributions = new Map<string, Float32Array[][]>();
+  for (const id of chosen) {
+    const byDay = new Map<number, Emission[]>();
+    for (const emission of run.byComplex.get(id) ?? []) {
+      const day = run.planDay(emission);
+      if (day >= 1 && day <= HORIZON_DAYS) byDay.set(day, [...(byDay.get(day) ?? []), emission]);
+    }
+    contributions.set(
+      id,
+      run.members.map(({ weather }) => Array.from({ length: HORIZON_DAYS + 1 }, (_, day) => (byDay.has(day) ? atTarget(run, byDay.get(day)!, weather) : new Float32Array(run.span)))),
+    );
+  }
+  log.info({ worth: worth.length, candidates: chosen.length }, "day-by-day contributions made");
+  const winds = run.members.map(({ member, weather }) => summariseWind(member.id, weather, run.now + 1, run.hours));
+  return { asOf: run.asOf.toISOString(), dayOne: run.dayOne, hours: run.span, days: HORIZON_DAYS, members: run.members.map((item) => item.member), baseline, ceiling, contributions, complexes: run.complexes, winds };
+}
+
+function maps(run: Prepared, keep: Map<string, number[]>, hour: number): VerdictMaps {
+  const owner = new Map<Emission, string>();
+  for (const [id, list] of run.byComplex) for (const emission of list) owner.set(emission, id);
+  const scaled = run.emissions.map((emission) => {
+    const day = run.planDay(emission);
+    const factor = day >= 1 ? (keep.get(owner.get(emission) ?? "")?.[day - 1] ?? 1) : 1;
+    return factor === 1 ? emission : { ...emission, frpMw: emission.frpMw * factor };
+  });
+  const cells = FIELD.nx * FIELD.ny;
+  const before = new Float32Array(cells);
+  const after = new Float32Array(cells);
+  const at = run.now + 1 + hour;
+  for (const { weather } of run.members) {
+    const without = smokeFrom(ensembleMean(run.emissions, weather, ENSEMBLE), run.hours).everywhere(at);
+    const withPlan = smokeFrom(ensembleMean(scaled, weather, ENSEMBLE), run.hours).everywhere(at);
+    for (let cell = 0; cell < cells; cell++) {
+      before[cell] += (run.calibration.intercept + run.calibration.slope * without[cell]) / run.members.length;
+      after[cell] += (run.calibration.intercept + run.calibration.slope * withPlan[cell]) / run.members.length;
+    }
+  }
+  const bytes = (field: Float32Array) => Buffer.from(Uint8Array.from(field, (value) => Math.max(0, Math.min(255, Math.round(value))))).toString("base64");
   return {
-    async attribute({ target }) {
-      const run = await council.latestCalibration(deps.pool);
-      if (!run) throw new TerminalError("no model run is stored yet, so there is no calibration to turn smoke into ug/m3");
-      const asOf = run.asOf;
-      const start = addHours(asOf, -24 * LOOKBACK_DAYS);
-      const now = hoursBetween(start, asOf);
-      const span = HORIZON_DAYS * 24;
-      const hours = now + span + 1;
-
-      const forecast = await weather.load(deps.pool, start, addHours(asOf, span));
-      if (!forecast || forecast.hours <= now) throw new TerminalError("the stored weather does not reach the latest run's hour");
-      const members: { member: WindMember; weather: Weather }[] = [];
-      for (const from of analogueStarts(asOf, WIND_MEMBERS)) {
-        const analogue = await weather.load(deps.pool, from, addHours(from, ANALOGUE_DAYS * 24 - 1));
-        if (!analogue || analogue.hours < ANALOGUE_DAYS * 24) continue;
-        const forecastEnd = addHours(start, forecast.hours - 1).toISOString().slice(0, 10);
-        members.push({
-          member: { id: `W${members.length + 1}`, label: `forecast to ${forecastEnd}, then the wind of ${from.toISOString().slice(0, 10)} onwards replayed` },
-          weather: extendWeather(forecast, analogue, hours, WEATHER_POINTS),
-        });
-      }
-      if (members.length === 0) throw new TerminalError("no stored analogue window of wind is complete");
-
-      const cells = await fireCells.since(deps.pool, addHours(start, -24).toISOString().slice(0, 10));
-      const lastKnownDay = addHours(new Date(`${asOf.toISOString().slice(0, 10)}T00:00:00Z`), -24).toISOString().slice(0, 10);
-      const { complexes } = await complexesFrom(deps.pool, cells, lastKnownDay, deps.fires);
-      const placed = (await stations.list(deps.pool)).filter((station) => target.stationIds.includes(station.id));
-      if (placed.length === 0) throw new TerminalError(`none of ${target.name}'s stations is stored`);
-      const stationCells = placed.map((station) => cellsWithin(station.lat, station.lon, REACH_KM));
-
-      const dayOne = dayOneFor(asOf);
-      const dayOneHour = hoursBetween(start, new Date(`${dayOne}T00:00:00Z`));
-      const planDay = (emission: Emission) => Math.max(0, Math.floor((emission.startHour - dayOneHour) / 24) + 1);
-      const emissions = emissionsFor(cells, start, asOf, hours);
-      const byComplex = groupEmissions(emissions, complexes);
-
-      /** The target's 24-hour PM2.5 from some emissions, ug/m3, for each hour after `asOf`. */
-      const atTarget = (some: Emission[], wind: Weather): Float32Array => {
-        const smoke = smokeFrom(ensembleMean(some, wind, ENSEMBLE), hours);
-        const series = new Float32Array(span);
-        for (let hour = 0; hour < span; hour++) {
-          let sum = 0;
-          for (const near of stationCells) sum += smoke.near(near, now + 1 + hour);
-          series[hour] = (run.slope * sum) / stationCells.length;
-        }
-        return series;
-      };
-
-      const baseline = members.map(({ weather: wind }) => atTarget(emissions, wind).map((value) => value + run.intercept));
-      const ceiling = members.map(({ weather: wind }) => atTarget(emissions.filter((emission) => planDay(emission) >= 1), wind));
-      log.info({ asOf, complexes: complexes.length, members: members.length }, "baseline and ceiling made");
-
-      const worth = complexes.filter((complex) => complex.firePowerMw >= WORTH_MW || distanceKm(target.centre.lat, target.centre.lon, complex.lat, complex.lon) <= WORTH_KM);
-      const share = new Map<string, number>();
-      for (const complex of worth) {
-        const future = (byComplex.get(complex.id) ?? []).filter((emission) => planDay(emission) >= 1);
-        const shares = members.map(({ weather: wind }, m) => mean(atTarget(future, wind)) / Math.max(1e-9, mean(ceiling[m])));
-        share.set(complex.id, shares.reduce((sum, value) => sum + value, 0) / shares.length);
-      }
-      const chosen = candidates(complexes, share, target);
-      log.info({ worth: worth.length, candidates: chosen.length }, "complexes ranked by influence");
-
-      const contributions = new Map<string, Float32Array[][]>();
-      for (const id of chosen) {
-        const byDay = new Map<number, Emission[]>();
-        for (const emission of byComplex.get(id) ?? []) {
-          const day = planDay(emission);
-          if (day >= 1 && day <= HORIZON_DAYS) byDay.set(day, [...(byDay.get(day) ?? []), emission]);
-        }
-        contributions.set(
-          id,
-          members.map(({ weather: wind }) => Array.from({ length: HORIZON_DAYS + 1 }, (_, day) => (byDay.has(day) ? atTarget(byDay.get(day)!, wind) : new Float32Array(span)))),
-        );
-      }
-      log.info({ candidates: chosen.length }, "day-by-day contributions made");
-      const winds = members.map(({ member, weather: wind }) => summariseWind(member.id, wind, now + 1, hours));
-      return { asOf: asOf.toISOString(), dayOne, hours: span, days: HORIZON_DAYS, members: members.map((item) => item.member), baseline, ceiling, contributions, complexes, winds };
-    },
+    at: addHours(run.asOf, hour + 1).toISOString(),
+    grid: { lon0: DOMAIN.lon0, lat0: DOMAIN.lat0, step: FIELD.step, nx: FIELD.nx, ny: FIELD.ny },
+    before: bytes(before),
+    after: bytes(after),
+    note: "The engine's smoke and calibration, averaged over the wind members, without the map's corrections towards the stations' readings.",
   };
 }
 
-/** Where MetMalaysia is asked about the wind: the source regions, the strait, and the target. */
-const WIND_PLACES = [
-  { name: "Riau", lat: 0, lon: 102 },
-  { name: "Jambi", lat: -2, lon: 104 },
-  { name: "South Sumatra", lat: -3, lon: 105 },
-  { name: "West Kalimantan", lat: -2, lon: 110 },
-  { name: "Central Kalimantan", lat: -3, lon: 113 },
-  { name: "Strait of Malacca", lat: 2, lon: 101 },
-  { name: "Kuala Lumpur", lat: 3, lon: 102 },
-];
-
-function summariseWind(member: string, wind: Weather, from: number, to: number): WindSummary {
-  const places = WIND_PLACES.map((place) => {
-    const point = (place.lat - DOMAIN.lat0) * WEATHER.nx + (place.lon - DOMAIN.lon0);
-    let u = 0;
-    let v = 0;
-    let rain = 0;
-    for (let hour = from; hour < to; hour++) {
-      u += wind.u[hour * WEATHER_POINTS + point];
-      v += wind.v[hour * WEATHER_POINTS + point];
-      rain += wind.rain[hour * WEATHER_POINTS + point];
-    }
-    const hours = Math.max(1, to - from);
-    return { ...place, u: u / hours, v: v / hours, rainMm: rain };
-  });
-  return { member, places };
-}
-
-function groupEmissions(emissions: Emission[], complexes: Complex[]): Map<string, Emission[]> {
-  const owner = new Map<string, string>();
-  for (const complex of complexes) for (const cell of complex.cells) owner.set(`${cell.lat10}|${cell.lon10}`, complex.id);
-  const grouped = new Map<string, Emission[]>();
-  for (const emission of emissions) {
-    const id = owner.get(`${Math.round(emission.lat * 10)}|${Math.round(emission.lon * 10)}`);
-    if (id) grouped.set(id, [...(grouped.get(id) ?? []), emission]);
-  }
-  return grouped;
+export function engineSuppression(deps: EngineDeps): SuppressionEngine {
+  let prepared: Prepared | null = null;
+  return {
+    async attribute({ target }) {
+      prepared = await prepare(deps.pool, target, deps.fires);
+      return attribution(prepared, target);
+    },
+    async simulate({ keep, hour }) {
+      if (!prepared) throw new TerminalError("simulate was asked before attribute");
+      return maps(prepared, keep, hour);
+    },
+  };
 }
 
 /** The most influential complexes, every Malaysian one that reaches the target, and the biggest and nearest in Kalimantan, which the baselines use. */
@@ -183,4 +143,3 @@ function candidates(complexes: Complex[], share: Map<string, number>, target: Ta
   if (nearest) chosen.add(nearest.id);
   return [...chosen];
 }
-

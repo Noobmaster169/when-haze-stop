@@ -103,6 +103,18 @@ export const StrikeLine = z.object({
 });
 export type StrikeLine = z.infer<typeof StrikeLine>;
 
+/** The engine's 24-hour PM2.5 over the region at the hour the plan helps most, without and with it. */
+export const VerdictMaps = z.object({
+  at: z.string(),
+  grid: z.object({ lon0: z.number(), lat0: z.number(), step: z.number(), nx: z.number().int(), ny: z.number().int() }),
+  /** ug/m3 per field cell, row-major from the south-west corner, one byte each (capped at 255), base64. */
+  before: z.string(),
+  after: z.string(),
+  /** The engine's smoke and calibration, without the map's corrections towards the stations' readings. */
+  note: z.string(),
+});
+export type VerdictMaps = z.infer<typeof VerdictMaps>;
+
 export const Verdict = z.object({
   planId: z.string(),
   title: z.string(),
@@ -120,6 +132,7 @@ export const Verdict = z.object({
   baselines: z.array(z.object({ planId: z.string(), title: z.string(), score: ScoreSummary })),
   /** The target's 24-hour PM2.5 each hour from the data's hour, central, mean over members: without and with the plan. */
   series: z.object({ baseline: z.array(z.number()), withPlan: z.array(z.number()) }),
+  maps: VerdictMaps.nullable().default(null),
   budgetLimited: z.boolean(),
 });
 export type Verdict = z.infer<typeof Verdict>;

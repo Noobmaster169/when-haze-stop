@@ -2,6 +2,7 @@ import type { StageId, Verdict } from "../../contracts";
 import { childLogger } from "../../lib/logger";
 import type { SuppressionEngine } from "../../services/suppression-engine";
 import { mean } from "../../suppression/attribution";
+import { keepTable } from "../../suppression/score";
 import type { TargetArea } from "../../suppression/targets";
 import type { LlmClient } from "../llm-client";
 import type { StructuredDeps } from "../structured";
@@ -55,6 +56,15 @@ export interface CouncilDeps extends StructuredDeps {
 
 const topByEngine = (session: Session) =>
   [...session.shortlist].sort((a, b) => session.deps.ctx.plan(b)!.score.expected - session.deps.ctx.plan(a)!.score.expected)[0];
+
+/** The region without and with the chosen plan, at the hour the plan helps most. */
+async function verdictMaps(engine: SuppressionEngine, session: Session, verdict: Verdict): Promise<Verdict["maps"]> {
+  const chosen = session.deps.ctx.plan(verdict.planId);
+  if (!chosen) return null;
+  const gains = verdict.series.baseline.map((value, hour) => value - verdict.series.withPlan[hour]);
+  const hour = gains.indexOf(Math.max(...gains));
+  return engine.simulate({ keep: keepTable(chosen.plan, session.deps.ctx.attribution, "central"), hour: Math.max(0, hour) });
+}
 
 export async function runCouncil(deps: CouncilDeps, target: TargetArea): Promise<Verdict> {
   const started = Date.now();
@@ -127,6 +137,7 @@ export async function runCouncil(deps: CouncilDeps, target: TargetArea): Promise
   await comparison(session);
   await stage("decision");
   const verdict = await decision(session, budgetLimited);
+  verdict.maps = await verdictMaps(deps.engine, session, verdict);
   const seconds = Math.round((Date.now() - started) / 1000);
   await deps.emit.emit("run_finished", "system", { seconds, calls });
   log.info({ seconds, calls, turns: session.turns, plan: verdict.planId }, "council run finished");

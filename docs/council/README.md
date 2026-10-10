@@ -8,9 +8,7 @@ A council of agents who play Malaysian ministers and experts argue the question 
 data. Their candidate plans go through the smoke model, and the plan that holds up best becomes
 the verdict. The page replays the whole meeting.
 
-Status: design done (`spec.md`) and tested on a prototype council (`11`). Building: phase 1 (the pure suppression core, the peat grid, Indonesian place names) is in. The smoke model itself is
-being reworked by a teammate, so everything here reaches it through one seam
-(`06-engine-seam.md`) and changes nothing inside `backend/src/haze/`.
+Status: design done (`spec.md`), tested on a prototype council (`11`), and built through phase 4: the suppression core, the engine seam, the store and API, and the council itself (`12-build.md`). The page is being built. The smoke model itself is being reworked by a teammate, so everything here reaches it through one seam (`06-engine-seam.md`) and changes nothing inside `backend/src/haze/`.
 
 ## Files
 
@@ -30,4 +28,5 @@ being reworked by a teammate, so everything here reaches it through one seam
 | `09-page.md` | The page: the graph, the player, the verdict |
 | `10-open-questions.md` | What is not settled, and what to ask the engine's owner |
 | `11-prototype-council.md` | A real five-seat council run through the proxy: what worked, what failed, what changed |
+| `12-build.md` | What is built, where it lives, how to run it |
 | `spec.md` | The design in one document, for review before building |

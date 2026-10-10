@@ -80,6 +80,8 @@ export function buildVerdict(session: Session, plan: BoardPlan, words: DecisionA
     ceiling: ctx.attribution.ceiling.reduce((sum, member) => sum + mean(member), 0) / ctx.attribution.ceiling.length,
     baselines: ctx.plans().filter((entry) => entry.baseline).map((entry) => ({ planId: entry.id, title: entry.plan.title, score: summarise(entry.score) })),
     series: series(session, plan),
+    // Filled by the run from the engine once the plan is chosen: it costs two full engine runs per wind member.
+    maps: null,
     budgetLimited,
   };
 }
