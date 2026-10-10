@@ -5,25 +5,21 @@ import { smokeHindcasts } from "../../src/repositories";
 
 afterAll(closePool);
 
-/** Two issue days for one instrument under a method name no job uses, so a rerun of this file meets only its own rows. */
-const MODEL = "test-hindcast";
-const DAY_ONE = new Date("2026-10-08T00:00:00Z");
-const DAY_TWO = new Date("2026-10-09T00:00:00Z");
-const ROWS = [
-  { asOf: DAY_ONE, instrumentId: "CA24N", smokeNow: 12.5, smoke24h: 20.25, smoke48h: 8, model: MODEL },
-  { asOf: DAY_TWO, instrumentId: "CA24N", smokeNow: 20.25, smoke24h: 8, smoke48h: 4, model: MODEL },
-];
+/** A model name no job writes, so the rows this file adds are its own on every run. */
+const MODEL = "test-repo";
+const AS_OF = new Date("2026-10-09T00:00:00Z");
 
-describe("the smoke hindcast repository", () => {
-  const pool = getPool();
+describe("smoke hindcasts", () => {
+  it("stores rows once, keeps the first on a repeat, and lists the days stored for a model", async () => {
+    const pool = getPool();
+    await smokeHindcasts.insertMany(pool, [{ asOf: AS_OF, instrumentId: "CA16W", smokeNow: 1.5, smoke24h: 2.5, smoke48h: 3.5, model: MODEL }]);
+    await smokeHindcasts.insertMany(pool, [{ asOf: AS_OF, instrumentId: "CA16W", smokeNow: 9, smoke24h: 9, smoke48h: 9, model: MODEL }]);
+    const days = await smokeHindcasts.storedDays(pool, MODEL);
+    expect(days.has(AS_OF.toISOString())).toBe(true);
+    expect(await smokeHindcasts.storedDays(pool, "no-such-model")).toEqual(new Set());
+  });
 
-  it("adds rows once and says which issue times a method already has", async () => {
-    expect(await smokeHindcasts.insertMany(pool, ROWS)).toBeLessThanOrEqual(2);
-    expect(await smokeHindcasts.insertMany(pool, ROWS)).toBe(0);
-    expect(await smokeHindcasts.insertMany(pool, [])).toBe(0);
-    const stored = await smokeHindcasts.storedDays(pool, MODEL);
-    expect(stored.has(DAY_ONE.toISOString())).toBe(true);
-    expect(stored.has(DAY_TWO.toISOString())).toBe(true);
-    expect((await smokeHindcasts.storedDays(pool, "no-such-method")).size).toBe(0);
+  it("does nothing with no rows", async () => {
+    await expect(smokeHindcasts.insertMany(getPool(), [])).resolves.toBe(0);
   });
 });

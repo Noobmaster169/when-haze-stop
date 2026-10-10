@@ -254,6 +254,7 @@ writes nothing. Check it before training on a span.
 | Wind and rain | Input | `weather_hours` | `valid_at`, the hour. Arrays of 375 values, row-major from the south-west corner (`haze/grid.ts`). | 1 degree grid, 96 to 120 E, 6 S to 8 N |
 | Airport visibility | Ground truth | `metar_obs` with `airports` | `(icao, observed_at)`, the report's own time, mostly every 30 or 60 minutes | 29 airports: 19 in Malaysia, Changi, Brunei, 8 in Sumatra and Kalimantan |
 | PM2.5 | Ground truth | `openaq_hours` with `openaq_sensors`; `nea_hours`; `readings` with `stations` | `observed_at`, the end of the hour measured | OpenAQ's sensors, Singapore's 5 regions, DOE's 68 stations |
+| Modelled smoke | Input (feature group 3) | `smoke_hindcasts` | `(as_of, instrument_id, model)`, the issue time 00:00 UTC. `smoke_now`, `smoke_24h`, `smoke_48h` are the ensemble-mean smoke within 50 km as a trailing day mean, uncalibrated, in the model's units. `model` names the method and the wind: `v2-analysis` is the stored analysis wind, the known leak. | Every instrument of `services/instruments.ts` |
 
 What to know before fitting anything to it:
 
@@ -279,6 +280,7 @@ What to know before fitting anything to it:
   and NOAA-21 its live feed, screened by the same rules and the same list of fixed sources. A
   cell-day is the largest satellite's sum either way.
 - **Nothing here is interpolated or filled.** A day with no row had no data from that source.
+- **The smoke hindcast is uncalibrated and on the analysis wind.** It is the physics' own view of where smoke was and would be, in its own units; the learned model fits the gain. A hindcast on the forecast wind needs `weather_forecasts` to have filled first, and will carry a different `model` name.
 
 ### 3.5 The learned forecast
 

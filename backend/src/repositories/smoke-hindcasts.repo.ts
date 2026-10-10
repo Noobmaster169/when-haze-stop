@@ -33,3 +33,12 @@ export async function storedDays(pool: Queryable, model: string): Promise<Set<st
   const { rows } = await pool.query<{ as_of: Date }>("select distinct as_of from smoke_hindcasts where model = $1", [model]);
   return new Set(rows.map((row) => row.as_of.toISOString()));
 }
+
+/** The instruments a method already has for each issue time, keyed by ISO string, so a rerun runs a day again only for instruments added since. */
+export async function storedInstruments(pool: Queryable, model: string): Promise<Map<string, Set<string>>> {
+  const { rows } = await pool.query<{ as_of: Date; instrument_ids: string[] }>(
+    "select as_of, array_agg(instrument_id) as instrument_ids from smoke_hindcasts where model = $1 group by as_of",
+    [model],
+  );
+  return new Map(rows.map((row) => [row.as_of.toISOString(), new Set(row.instrument_ids)]));
+}

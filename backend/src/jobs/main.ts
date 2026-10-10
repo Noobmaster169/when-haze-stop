@@ -22,6 +22,7 @@ import { coverage } from "./coverage";
 import { backfill, runCycle } from "./cycle";
 import { evaluate, formatScores } from "./evaluate";
 import { type HistoryPart, HISTORY_PARTS, isHistoryPart, runHistory } from "./history";
+import { formatHindcast, runHindcast } from "./hindcast";
 import type { IngestDeps } from "./ingest";
 
 /**
@@ -37,6 +38,9 @@ import type { IngestDeps } from "./ingest";
  *   pnpm haze:coverage   what is stored of those four, month by month; writes nothing
  *   pnpm haze:evaluate   replay the stored week and score it against no change; writes nothing
  *                        (optional: hours between runs, default 6; an ISO instant to score from)
+ *   pnpm haze:hindcast   replay the smoke model at 00:00 UTC of every stored day, for the learned model's
+ *                        training set; writes smoke_hindcasts and skips days that already have every instrument
+ *                        (optional: first day, last day, as YYYY-MM-DD; default HISTORY_FROM to yesterday)
  */
 
 const log = childLogger({ module: "jobs" });
@@ -118,7 +122,12 @@ async function main(): Promise<void> {
       const from = process.argv[4] ? new Date(process.argv[4]) : undefined;
       const rows = await evaluate(deps.pool, { everyHours: Number(process.argv[3] ?? 6), from });
       process.stdout.write(`${formatScores(rows)}\n`);
-    } else throw new Error(`unknown command "${command}". Use once, backfill, loop, history, coverage or evaluate.`);
+    } else if (command === "hindcast") {
+      const now = new Date();
+      const yesterday = new Date(now.getTime() - 24 * 3_600_000).toISOString().slice(0, 10);
+      const summary = await runHindcast(deps.pool, { from: process.argv[3] ?? config.HISTORY_FROM, to: process.argv[4] ?? yesterday, now });
+      process.stdout.write(`${formatHindcast(summary)}\n`);
+    } else throw new Error(`unknown command "${command}". Use once, backfill, loop, history, coverage, evaluate or hindcast.`);
   } finally {
     await closePool();
   }
