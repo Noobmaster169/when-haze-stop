@@ -6,6 +6,7 @@ import { evaluateAlerts } from "./alerts";
 import { runForecast } from "./forecast";
 import { type IngestDeps, ingestFires, ingestReadings, ingestWeather } from "./ingest";
 import { ingestMetars, ingestSingapore } from "./ingest-context";
+import { runModelForecast } from "./model-forecast";
 import { ingestOpenAq } from "./ingest-openaq";
 import { ingestStatements } from "./statements";
 
@@ -31,6 +32,8 @@ const COVERAGE_HOURS = 72;
 export interface CycleOptions {
   /** The fire files are large and change a few times a day, so the loop skips them on most hours. */
   fires: boolean;
+  /** Whether to ask the model service after the run: MODEL_MODE is shadow or live. */
+  model: boolean;
 }
 
 export async function runCycle(deps: IngestDeps, now: Date, options: CycleOptions): Promise<void> {
@@ -51,6 +54,8 @@ export async function runCycle(deps: IngestDeps, now: Date, options: CycleOption
     return;
   }
   await attempt("forecast", () => runForecast(deps.pool, asOf, "live"));
+  const model = deps.model;
+  if (options.model && model) await attempt("model", () => runModelForecast(deps.pool, model, asOf));
   await attempt("alerts", () => evaluateAlerts(deps.pool, deps.push ?? null, now));
 }
 

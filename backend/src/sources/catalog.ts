@@ -8,7 +8,7 @@ import { type SourceEntry, STATIC_SOURCES } from "./catalog-static";
 
 export type { SourceEntry } from "./catalog-static";
 
-export const TRACKED_SOURCES = ["doe-stations", "doe-readings", "firms", "open-meteo", "firms-archive", "open-meteo-history", "metar", "nea", "metar-archive", "nea-history", "openaq", "moe-statements", "doe-statements", "news-statements"] as const;
+export const TRACKED_SOURCES = ["doe-stations", "doe-readings", "firms", "open-meteo", "firms-archive", "open-meteo-history", "metar", "nea", "metar-archive", "nea-history", "openaq", "moe-statements", "doe-statements", "news-statements", "model"] as const;
 export type SourceId = (typeof TRACKED_SOURCES)[number];
 
 export const SOURCE_CATALOG: readonly SourceEntry[] = [
@@ -163,6 +163,17 @@ export const SOURCE_CATALOG: readonly SourceEntry[] = [
     endpoint: "https://news.google.com/rss/search?q=jerebu+when:7d",
     link: "https://news.google.com/",
     cadence: "Every hour, at 20 past",
+    everyHours: 1,
+    tracked: true,
+  },
+  {
+    id: "model",
+    name: "Learned forecast",
+    provider: "This app's model service",
+    what: "Each instrument's peak 24 hour PM2.5 for the next three days, with a band, from a model trained on the stored history. Asked after each hourly run while MODEL_MODE is shadow or live.",
+    endpoint: "http://model:4002/predict",
+    link: "docs/MODEL.md",
+    cadence: "Every hour, after the run",
     everyHours: 1,
     tracked: true,
   },

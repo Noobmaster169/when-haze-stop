@@ -31,6 +31,16 @@ const Env = z.object({
   // more only wait inside the proxy with their request timeout already running.
   LLM_MAX_CONCURRENCY: z.coerce.number().int().positive().default(4),
 
+  // The model service of the compose stack (model/). 4002 is where
+  // compose.yaml publishes it on the host; inside compose it is
+  // http://model:4002.
+  MODEL_URL: z.url().default("http://127.0.0.1:4002"),
+  // off: never asked. shadow: asked each cycle, stored and scored, shown on
+  // the Simulation page only. live: its forecast is the outlook's, so alerts
+  // and the assistant follow it. Set live by hand, once the shadow rule on the
+  // Simulation page has passed (14 days, 10% better than the hourly forecast).
+  MODEL_MODE: z.enum(["off", "shadow", "live"]).default("off"),
+
   // The NASA FIRMS archive key, read only by `pnpm haze:history`. Everything
   // else runs without it.
   FIRMS_MAP_KEY: optionalString,
@@ -58,6 +68,7 @@ const Env = z.object({
 });
 
 export type Config = z.infer<typeof Env>;
+export type ModelMode = Config["MODEL_MODE"];
 
 function load(): Config {
   const parsed = Env.safeParse(process.env);
