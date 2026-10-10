@@ -1,10 +1,12 @@
 import type { Pool } from "pg";
 
+import { screenDetections } from "../haze/fire-screen";
 import { toCellDays } from "../haze/fires";
-import { addHours } from "../haze/grid";
+import { addHours, WEATHER_POINTS } from "../haze/grid";
 import { childLogger } from "../lib/logger";
 import { fires, readings, stations, weather } from "../repositories";
 import type { DoeClient, FiresClient, WeatherClient } from "../sources";
+import { recordFetch } from "./record-fetch";
 
 /** Fetch what the sources have and store it. Each function is one source, so one being down does not stop the others. */
 
@@ -28,31 +30,69 @@ function topOfHour(at: Date): Date {
 
 /** Fetches as many days back as it takes to join up with what is stored, so a process that was off for a day leaves no hole. */
 export async function ingestReadings(deps: IngestDeps, now: Date): Promise<number> {
-  await stations.upsertMany(deps.pool, await deps.doe.stations());
+  await recordFetch(deps.pool, "doe-stations", async () => {
+    const found = await deps.doe.stations();
+    await stations.upsertMany(deps.pool, found);
+    return { stations: found.length, states: new Set(found.map((station) => station.stateId)).size };
+  });
+
   const newest = await readings.newestAt(deps.pool);
   const behindDays = newest ? Math.ceil((now.getTime() - newest.getTime()) / 86_400_000) : DOE_MAX_DAYS;
   const days = Math.max(1, Math.min(DOE_MAX_DAYS, behindDays));
 
-  let added = 0;
-  for (const stateId of await stations.stateIds(deps.pool)) {
-    for (let back = 0; back < days; back++) {
-      added += await readings.insertMany(deps.pool, await deps.doe.readings(stateId, addHours(topOfHour(now), -24 * back)));
+  const detail = await recordFetch(deps.pool, "doe-readings", async () => {
+    let requests = 0;
+    let empty = 0;
+    let received = 0;
+    let added = 0;
+    let latest = 0;
+    for (const stateId of await stations.stateIds(deps.pool)) {
+      for (let back = 0; back < days; back++) {
+        const found = await deps.doe.readings(stateId, addHours(topOfHour(now), -24 * back));
+        requests += 1;
+        if (found.length === 0) empty += 1;
+        received += found.length;
+        for (const reading of found) latest = Math.max(latest, reading.observedAt.getTime());
+        added += await readings.insertMany(deps.pool, found);
+      }
     }
-  }
-  log.info({ days, added }, "readings stored");
-  return added;
+    // An empty answer is a state with no readings or the portal shedding load; many of them mean the second.
+    return { daysBack: days, requests, emptyAnswers: empty, received, added, ...(latest ? { newestReading: new Date(latest).toISOString() } : {}) };
+  });
+  log.info(detail, "readings stored");
+  return detail.added;
 }
 
 export async function ingestFires(deps: IngestDeps): Promise<number> {
-  const cells = toCellDays(await deps.fires.recent());
-  await fires.upsertMany(deps.pool, cells);
-  log.info({ cells: cells.length }, "fire cells stored");
-  return cells.length;
+  const detail = await recordFetch(deps.pool, "firms", async () => {
+    const detections = await deps.fires.recent();
+    const screened = screenDetections(detections);
+    const cells = toCellDays(screened.kept);
+    await fires.upsertMany(deps.pool, cells);
+    const days = cells.map((cell) => cell.day).sort();
+    return {
+      detections: detections.length,
+      glintDropped: screened.glint,
+      offshoreDropped: screened.offshore,
+      cellDays: cells.length,
+      ...(days.length > 0 ? { firstDay: days[0], lastDay: days[days.length - 1] } : {}),
+    };
+  });
+  log.info(detail, "fire cells stored");
+  return detail.cellDays;
 }
 
 export async function ingestWeather(deps: IngestDeps): Promise<number> {
-  const grid = await deps.weather.grid(WEATHER_PAST_DAYS, WEATHER_FORECAST_DAYS);
-  await weather.upsertGrid(deps.pool, grid);
-  log.info({ hours: grid.hours, from: grid.start.toISOString() }, "weather stored");
-  return grid.hours;
+  const detail = await recordFetch(deps.pool, "open-meteo", async () => {
+    const grid = await deps.weather.grid(WEATHER_PAST_DAYS, WEATHER_FORECAST_DAYS);
+    await weather.upsertGrid(deps.pool, grid);
+    return {
+      points: WEATHER_POINTS,
+      hours: grid.hours,
+      from: grid.start.toISOString(),
+      to: addHours(grid.start, grid.hours - 1).toISOString(),
+    };
+  });
+  log.info(detail, "weather stored");
+  return detail.hours;
 }

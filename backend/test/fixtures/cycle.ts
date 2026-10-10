@@ -5,8 +5,21 @@ import { FakeDoeClient, FakeFiresClient, FakeWeatherClient } from "../../src/sou
 import { FIRE_CELLS, LAST_HOUR, READINGS, STATIONS } from "./recorded";
 import { steadyWind } from "./steady-wind";
 
-/** The recorded cell-days, as the single detections they would have come from. */
-const DETECTIONS: Detection[] = FIRE_CELLS.map((cell) => ({ satellite: "snpp", lat: cell.lat10 / 10 + 0.01, lon: cell.lon10 / 10 + 0.01, day: cell.day, frpMw: cell.frpMw }));
+/**
+ * The recorded cell-days, as the single detections they would have come from.
+ * A cell-day keeps neither the pass nor the brightness, so those are left
+ * neutral: no pass, not daytime, not saturated.
+ */
+const DETECTIONS: Detection[] = FIRE_CELLS.map((cell) => ({
+  satellite: "snpp",
+  lat: cell.lat10 / 10 + 0.01,
+  lon: cell.lon10 / 10 + 0.01,
+  day: cell.day,
+  hour: 0,
+  daytime: false,
+  saturated: false,
+  frpMw: cell.frpMw,
+}));
 const WEATHER_START = new Date("2026-10-06T00:00:00Z");
 
 /**

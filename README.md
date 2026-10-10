@@ -24,40 +24,55 @@ proxy/      Python gateway to `claude -p` (container) :4001 on the host
 
 ## Run it
 
-You need Node 24, pnpm 11 and Docker.
+You need Docker.
 
 ```sh
-# 1. backend config, with your Claude login
-cd backend
 cp .env.example .env
-claude setup-token          # paste the token into CLAUDE_CODE_OAUTH_TOKEN in .env
-
-# 2. postgres and the llm-proxy
-docker compose -f compose.local.yaml up -d
-
-# 3. the api
-pnpm install
-pnpm db:migrate
-pnpm dev                    # http://127.0.0.1:8091
-
-# 4. the data, in another terminal (no keys needed)
-cd backend
-pnpm haze:once              # fetch readings, fires and wind, run the model, raise alerts
-pnpm haze:backfill          # once: replay the stored week for the timeline and the track record
-pnpm haze:loop              # keep running: refreshes every hour
-
-# 5. the frontend, in another terminal
-cd ../frontend
-cp .env.example .env.local
-pnpm install
-pnpm dev                    # http://localhost:3000
+claude setup-token              # paste the token into CLAUDE_CODE_OAUTH_TOKEN in .env
+docker compose up -d --build
 ```
 
-Open http://localhost:3000. The map is the home page; ask the dock something about haze. `curl 127.0.0.1:8091/health` says
-whether Postgres and the proxy are up.
+Open http://localhost:3000. The map is the home page; ask the dock something about haze.
 
-Without Docker, the proxy also runs on the host with your own `claude` login:
-`cd proxy && python3 -m venv .venv && .venv/bin/pip install -e . && LLM_PROXY_PORT=4001 ./start.sh`.
+`compose.yaml` starts six services:
+
+| Service | What it does | Host port |
+| --- | --- | --- |
+| `postgres` | The database | 5433 |
+| `llm-proxy` | `claude -p` behind the Anthropic wire | 4001 |
+| `migrate` | Applies the migrations, then exits | |
+| `api` | The Express api | 8091 |
+| `jobs` | One data cycle, a backfill of the stored week, then every hour | |
+| `frontend` | The Next.js app, a production build | 3000 |
+
+The first cycle fetches a week of DOE readings and takes a few minutes, and the backfill after it
+takes longer. Until the cycle finishes the map says "No forecast has been made yet". Watch it with
+`docker compose logs -f jobs`. `curl 127.0.0.1:8091/health` says whether Postgres and the proxy
+are up. Without the token the map and alerts work and the chat does not.
+
+### Host development
+
+To run the api, jobs or frontend from source with reload, start only the infrastructure and stop
+the container you are replacing:
+
+```sh
+docker compose up -d postgres llm-proxy
+
+cd backend
+cp .env.example .env
+pnpm install && pnpm db:migrate
+pnpm dev                        # http://127.0.0.1:8091
+pnpm haze:once                  # in another terminal: fetch, run the model, raise alerts
+pnpm haze:backfill              # once: replay the stored week for the timeline and the track record
+pnpm haze:loop                  # keep running: refreshes every hour
+
+cd ../frontend
+cp .env.example .env.local
+pnpm install && pnpm dev        # http://localhost:3000
+```
+
+This needs Node 24 and pnpm 11. Without Docker, the proxy also runs on the host with your own
+`claude` login: `cd proxy && python3 -m venv .venv && .venv/bin/pip install -e . && LLM_PROXY_PORT=4001 ./start.sh`.
 
 ## How a chat turn works
 
@@ -104,6 +119,7 @@ Without Docker, the proxy also runs on the host with your own `claude` login:
 | GET | `/haze/accuracy` | Forecast error by lead time, beside "no change". |
 | GET | `/haze/guidelines` | The official API thresholds. |
 | GET | `/haze/places?q=` | Place search, each result with its nearest station. |
+| GET | `/sources` | Every data source, its newest good and failed fetch, and the recent fetch log. |
 | GET | `/alerts?session=&after=` | Alerts, newest first. |
 | GET, POST | `/alerts/subscriptions` | The stations a browser follows; follow one. |
 | DELETE | `/alerts/subscriptions/:stationId?session=` | Stop following. |

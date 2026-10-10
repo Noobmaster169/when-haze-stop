@@ -15,6 +15,11 @@ export interface Detection {
   lon: number;
   /** UTC calendar day, `YYYY-MM-DD`. */
   day: string;
+  /** UTC hour of the pass. With the satellite and the day it names one overpass. */
+  hour: number;
+  daytime: boolean;
+  /** The 4 micron channel hit its ceiling (367 K). Real fires do this now and then; sun glint does it everywhere it touches. */
+  saturated: boolean;
   frpMw: number;
 }
 

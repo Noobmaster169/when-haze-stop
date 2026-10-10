@@ -19,7 +19,7 @@ const Env = z.object({
   PG_USER: z.string().min(1),
   PG_PASSWORD: z.string().min(1),
 
-  // The llm-proxy service of the compose stack. 4001 is where compose.local.yaml
+  // The llm-proxy service of the compose stack. 4001 is where compose.yaml
   // publishes it on the host; inside compose it is http://llm-proxy:4000.
   LLM_PROXY_URL: z.url().default("http://127.0.0.1:4001"),
 

@@ -24,7 +24,7 @@ describe("reading what the sources send", () => {
   it("reads FIRMS rows and keeps only the cells inside the region", () => {
     const detections = parseFirmsCsv(FIRMS_CSV, "snpp");
     expect(detections).toHaveLength(9);
-    expect(detections[0]).toEqual({ satellite: "snpp", lat: -3.15776, lon: 113.95805, day: "2026-10-03", frpMw: 2.44 });
+    expect(detections[0]).toEqual({ satellite: "snpp", lat: -3.15776, lon: 113.95805, day: "2026-10-03", hour: 6, daytime: true, saturated: false, frpMw: 2.44 });
     // The other eight are east of New Guinea.
     expect(toCellDays(detections)).toEqual([{ day: "2026-10-03", lat10: -32, lon10: 1139, frpMw: 2.44 }]);
   });

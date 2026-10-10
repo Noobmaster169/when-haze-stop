@@ -21,6 +21,8 @@ const FILES = [
   { satellite: "noaa21", path: "noaa-21-viirs-c2/csv/J2_VIIRS_C2_SouthEast_Asia_7d.csv" },
 ] as const;
 const TIMEOUT_MS = 180_000;
+/** Where VIIRS I4 saturates. A pixel reported at this value measured "at least this hot". */
+const SATURATED_K = 367;
 
 /** Rows FIRMS itself marks low confidence are mostly sun glint and hot roofs. */
 export function parseFirmsCsv(csv: string, satellite: string): Detection[] {
@@ -34,6 +36,9 @@ export function parseFirmsCsv(csv: string, satellite: string): Detection[] {
   const lat = column("latitude");
   const lon = column("longitude");
   const day = column("acq_date");
+  const time = column("acq_time");
+  const brightness = column("bright_ti4");
+  const daynight = column("daynight");
   const frp = column("frp");
   const confidence = column("confidence");
 
@@ -42,7 +47,17 @@ export function parseFirmsCsv(csv: string, satellite: string): Detection[] {
     const cells = lines[n].split(",");
     if (cells.length < header.length) continue;
     if (cells[confidence].trim().toLowerCase().startsWith("l")) continue;
-    detections.push({ satellite, lat: Number(cells[lat]), lon: Number(cells[lon]), day: cells[day], frpMw: Number(cells[frp]) });
+    detections.push({
+      satellite,
+      lat: Number(cells[lat]),
+      lon: Number(cells[lon]),
+      day: cells[day],
+      // acq_time is HHMM in UTC, sometimes without its leading zero.
+      hour: Math.floor(Number(cells[time]) / 100),
+      daytime: cells[daynight].trim() === "D",
+      saturated: Number(cells[brightness]) >= SATURATED_K,
+      frpMw: Number(cells[frp]),
+    });
   }
   return detections;
 }

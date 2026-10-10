@@ -10,6 +10,7 @@ import { alertsRouter } from "./routes/alerts.routes";
 import { chatRouter } from "./routes/chat.routes";
 import { hazeRouter } from "./routes/haze.routes";
 import { requestLog } from "./routes/request-log";
+import { sourcesRouter } from "./routes/sources.routes";
 import type { Geocoder } from "./sources";
 
 const log = childLogger({ module: "api" });
@@ -46,6 +47,7 @@ export function createApp(deps: AppDeps): express.Express {
   app.use("/chat", chatRouter({ pool: deps.pool, llm: deps.llm, geocoder: deps.geocoder }));
   app.use("/haze", hazeRouter({ pool: deps.pool, geocoder: deps.geocoder }));
   app.use("/alerts", alertsRouter({ pool: deps.pool }));
+  app.use("/sources", sourcesRouter({ pool: deps.pool }));
 
   app.use(
     // Four parameters are what make Express treat this as an error handler.

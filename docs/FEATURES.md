@@ -115,7 +115,7 @@ Both are stored row by row from the south-west corner.
 
 ### 3.3 Tables
 
-Migration `backend/db/migrations/002_haze.sql`. Never edit it; add `003_...sql` for a change.
+Migrations `backend/db/migrations/002_haze.sql` and `003_source_fetches.sql`. Never edit an applied one; add the next number for a change.
 
 | Table | One row is | Notes |
 | --- | --- | --- |
@@ -127,6 +127,7 @@ Migration `backend/db/migrations/002_haze.sql`. Never edit it; add `003_...sql` 
 | `forecast_frames` | The API field at one time for one run | One byte a cell, API / 2. |
 | `station_forecasts` | One station's hourly forecast for one run | 84 values, from `as_of` + 1 hour. |
 | `alert_subscriptions` | A browser following a station | No login. `session_id` is made by the browser. |
+| `source_fetches` | One fetch of a source by the jobs process | Migration `003_source_fetches.sql`. Insert only: when, how long, what came back or why it failed. The Sources page reads it. |
 | `alert_events` | One alert | `open` stays true while its condition holds. A unique index allows only one open alert per station, kind and line. |
 
 Note on `weather_hours`: this is the one table where a later fetch overwrites an earlier value. An
@@ -158,6 +159,11 @@ Page `/map` (also the home page).
 - `/map?station=CA24N` opens on that station. Alerts and assistant answers link this way.
 - The page asks for new data every 5 minutes, so a new hourly run appears without a reload. If the
   timeline is on Now, it stays on Now when new data lands.
+
+Page `/sources` lists every outside source: what it gives, the endpoint, how often it is asked, and
+its newest good and failed fetch with what came back (stations, readings added, detections, weather
+hours). A source is marked late when two of its cycles pass without a good fetch. Below is the log
+of the newest fetches. Every fetch is a row in `source_fetches`, written by `jobs/record-fetch.ts`.
 
 Page `/accuracy` (Track record) shows the forecast's measured error beside "no change", the
 official lines with their issuers, the data sources and the limits.
@@ -416,9 +422,10 @@ not meant to serve other users.
 ## 7. The API
 
 Backend, on `127.0.0.1:8091`. The browser never calls it; it calls the Next routes under
-`/api/...`, which forward. Contracts are zod schemas in `backend/src/contracts.haze.ts` and
-`contracts.alerts.ts`, mirrored by hand in `frontend/lib/api/haze-schemas.ts` and
-`alert-schemas.ts`. Change both together.
+`/api/...`, which forward; the Track record and Sources pages read it from the Next server. Contracts
+are zod schemas in `backend/src/contracts.haze.ts`, `contracts.alerts.ts` and `contracts.sources.ts`,
+mirrored by hand in `frontend/lib/api/haze-schemas.ts`, `alert-schemas.ts` and `source-schemas.ts`.
+Change both together.
 
 | Method | Path | Returns |
 | --- | --- | --- |
@@ -427,6 +434,7 @@ Backend, on `127.0.0.1:8091`. The browser never calls it; it calls the Next rout
 | GET | `/haze/accuracy` | `Accuracy`: error by lead for model and persistence |
 | GET | `/haze/guidelines` | `GuidelineList` |
 | GET | `/haze/places?q=` | `PlaceList`: stations by name first, then geocoded places, each with its nearest station |
+| GET | `/sources` | `SourceReport`: each source from `sources/catalog.ts` with its newest good and failed fetch and the last 24 hours' tally, and the 60 newest fetches |
 | GET | `/alerts?session=&after=` | `AlertFeed`: newest first; with a session only followed stations |
 | GET | `/alerts/subscriptions?session=` | `SubscriptionList` |
 | POST | `/alerts/subscriptions` | Body `{ sessionId, stationId }`. Following twice is following once. |
@@ -441,10 +449,22 @@ There is no authentication. The api binds to loopback.
 
 ## 8. Running it
 
+Everything at once, from the root (see README for the token):
+
 ```sh
-# infra and api (see README for first-time setup)
+docker compose up -d --build   # postgres, llm-proxy, migrate, api, jobs, frontend
+docker compose logs -f jobs    # the first cycle, then the backfill, then hourly
+```
+
+The `jobs` service runs `once`, then `backfill`, then `loop`, the same three commands as below.
+Backfill skips hours already run, so restarting the container costs little.
+
+From source, with only the infrastructure in Docker:
+
+```sh
+# infra and api
+docker compose up -d postgres llm-proxy
 cd backend
-docker compose -f compose.local.yaml up -d
 pnpm install && pnpm db:migrate
 pnpm dev                 # api on :8091
 
@@ -471,11 +491,11 @@ The first `haze:once` on an empty database fetches 7 days of readings (16 states
 takes a few minutes. A model run takes tens of seconds.
 
 If the map says "No forecast has been made yet", the jobs have not run. If it shows old data,
-check the jobs terminal for a failed source.
+check the jobs terminal (or `docker compose logs jobs`) for a failed source.
 
 ## 9. Tests
 
-Backend: `cd backend && pnpm test` (needs Postgres from compose; uses database `haze_test`).
+Backend: `cd backend && pnpm test` (needs `docker compose up -d postgres`; uses database `haze_test`).
 Frontend: `cd frontend && pnpm test`.
 
 | File | Covers |

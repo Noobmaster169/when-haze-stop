@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 #
-# The llm-proxy, as a service of the compose stack (backend/compose.local.yaml).
+# The llm-proxy, as a service of the compose stack (compose.yaml at the root).
 # Built from this directory:
 #   docker build -t haze-llm-proxy proxy
 #

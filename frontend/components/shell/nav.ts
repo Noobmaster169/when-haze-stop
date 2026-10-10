@@ -1,6 +1,6 @@
 import type { IconName } from "@/components/ui/icons";
 
-/** The rail's destinations, and the one place they are named. A new page is a line here. */
+/** The island's destinations, and the one place they are named. A new page is a line here. */
 export interface Destination {
   key: string;
   label: string;
@@ -12,6 +12,7 @@ export const DESTINATIONS: Destination[] = [
   { key: "map", label: "Map", href: "/map", icon: "map" },
   { key: "alerts", label: "Alerts", href: "/alerts", icon: "bell" },
   { key: "accuracy", label: "Track record", href: "/accuracy", icon: "chart" },
+  { key: "sources", label: "Sources", href: "/sources", icon: "database" },
 ];
 
 /** The destination a pathname sits under: the longest href that prefixes it. */
