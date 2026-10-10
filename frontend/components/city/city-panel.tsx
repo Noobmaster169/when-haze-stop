@@ -33,7 +33,7 @@ export function CityPanel({ air, city }: { air: AirAt; city: CityAir }) {
         <Figure value={`${Math.round(air.pm25)} µg/m³`} label="PM2.5" />
       </div>
       <p className="mt-3 border-t border-hairline pt-2 text-caption text-ink-tertiary">
-        DOE {city.stations.map((station) => station.name).join(" and ")} ·{" "}
+        From DOE {city.stations.map((station) => station.name).join(" and ")}, buildings{" "}
         <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-ink">
           © OpenStreetMap
         </a>

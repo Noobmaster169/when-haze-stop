@@ -85,10 +85,7 @@ export function PointPanel({ data, basemap, probe, at, onStation, onClose }: { d
           </button>
         ) : null}
 
-        <div>
-          <SeriesChart known={known} ahead={ahead} at={at} label={`Modelled API at ${coordinates(lat, lon)} over the past week and the next three days`} />
-          <p className="text-caption text-ink-tertiary">Black is the model, blue dashes its forecast.</p>
-        </div>
+        <SeriesChart known={known} ahead={ahead} at={at} legend={{ known: "Model", ahead: "Forecast" }} label={`Modelled API at ${coordinates(lat, lon)} over the past week and the next three days`} />
 
         <p className="text-caption leading-[17px] text-ink-tertiary">
           {nearest && nearest.km > FAR_KM
