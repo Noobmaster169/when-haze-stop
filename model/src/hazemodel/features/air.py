@@ -19,8 +19,8 @@ def _one(series: pd.Series, issue: pd.Timestamp) -> dict | None:
     level = _at(series, issue, STALE_HOURS)
     if np.isnan(level):
         return None
-    last24 = series[issue - pd.Timedelta(hours=24) : issue]
-    history = series[: issue - pd.Timedelta(hours=1)]
+    last24 = series[(series.index > issue - pd.Timedelta(hours=24)) & (series.index <= issue)]
+    history = series[series.index < issue]
     lag24, lag48, lag72 = (_at(series, issue - pd.Timedelta(hours=h), STALE_HOURS) for h in (24, 48, 72))
     three = _at(series, issue - pd.Timedelta(hours=3), STALE_HOURS)
     peak_at = last24.idxmax() if not last24.empty else issue
@@ -62,7 +62,7 @@ def _with_neighbours(frame: pd.DataFrame, table: pd.DataFrame) -> pd.DataFrame:
     for km in NEAR_KM:
         column = f"near{km}"
         frame[column] = np.nan
-        for issue, group in frame.groupby(level="issue_at"):
+        for _issue, group in frame.groupby(level="issue_at"):
             levels = group["level"].droplevel("issue_at")
             present = pd.Series(levels).reindex(ids)
             values = present.to_numpy(dtype=float)
@@ -71,5 +71,7 @@ def _with_neighbours(frame: pd.DataFrame, table: pd.DataFrame) -> pd.DataFrame:
             counts = mask.sum(axis=1)
             means = pd.Series(np.where(counts > 0, sums / np.maximum(counts, 1), np.nan), index=ids)
             members = group.index.get_level_values("instrument_id")
-            frame.loc[(members, issue), column] = means[members].to_numpy()
+            aligned = means.reindex(members)
+            aligned.index = group.index
+            frame.loc[group.index, column] = aligned
     return frame

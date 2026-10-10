@@ -6,7 +6,7 @@ from hazemodel.features.calendar import calendar_features
 from hazemodel.features.fires import fire_features, sector_of
 from hazemodel.features.physics import physics_features
 from hazemodel.features.weather import weather_features
-from hazemodel.instruments import instruments
+from hazemodel.instruments import distance_km, instruments
 from hazemodel.region import region_from_env
 from hazemodel.truth.reference import reference_series
 
@@ -24,6 +24,8 @@ def test_air_features_are_leak_free_and_complete(data):
     assert abs(row["d24"] - (row["level"] - row["lag24"])) < 1e-6
     assert 0 <= row["peak_hour"] <= 23
     assert abs(row["hist_mean"] - stored["pm25_24h"].iloc[:-1].mean()) < 1e-6
+    cut = series[series["observed_at"] <= ISSUES[-1]]
+    pd.testing.assert_frame_equal(air, air_features(cut, table, ISSUES))
 
 
 def test_sector_boundary_is_kept():
@@ -74,3 +76,29 @@ def test_physics_features_are_nan_when_no_hindcast(data):
     assert "has_physics" in physics.columns
     if data.smoke_hindcasts.empty:
         assert physics.empty or (physics["has_physics"] == 0).all()
+
+
+def _without_days(data, days):
+    keep = ~data.fire_cells["day"].isin([pd.Timestamp(d) for d in days])
+    return type(data)(**{**data.__dict__, "fire_cells": data.fire_cells[keep]})
+
+
+def test_fire_features_ignore_issue_day_and_count_last_complete_day(data):
+    table = instruments(data)
+    issue = ISSUES[1:]
+    base = fire_features(data, table, issue)
+    pd.testing.assert_frame_equal(base, fire_features(_without_days(data, ["2026-10-09"]), table, issue))
+    assert not base.equals(fire_features(_without_days(data, ["2026-10-08"]), table, issue))
+
+
+def test_fire_total_d3_matches_an_independent_sum(data):
+    table = instruments(data)
+    fires = fire_features(data, table, ISSUES[1:])
+    cells = data.fire_cells
+    cells = cells[cells["day"].isin([pd.Timestamp(d) for d in ("2026-10-06", "2026-10-07", "2026-10-08")])]
+    kl = table[table["instrument_id"] == "WMKK"].iloc[0]
+    km = distance_km(kl["lat"], kl["lon"], cells["lat10"] / 10.0 + 0.05, cells["lon10"] / 10.0 + 0.05)
+    power = cells["burning_mw"].fillna(cells["frp_mw"])
+    expected = power[km.to_numpy() < 1500.0].sum()
+    assert expected > 0
+    assert abs(fires.loc[("WMKK", ISSUES[1]), "fire_total_d3"] - expected) < 1e-6
