@@ -75,3 +75,26 @@ export async function fetchPatiently(url: string, what: string, timeoutMs: numbe
 export function pause(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+/**
+ * One POST of a JSON body, with the same rules as a GET: a failure answered
+ * is an UpstreamError, no answer is retryable.
+ */
+export async function postJson(url: string, what: string, timeoutMs: number, body: unknown): Promise<string> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: { accept: "application/json", "content-type": "application/json", "user-agent": "Mozilla/5.0 (compatible; WhenHazeStop/1.0)" },
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
+    throw new RetryableError(`${what} did not answer`, { cause: error });
+  }
+  if (!response.ok) throw new UpstreamError(response.status, `${what} answered ${response.status}`);
+  try {
+    return await response.text();
+  } catch (error) {
+    throw new RetryableError(`${what} stopped answering part way`, { cause: error });
+  }
+}
