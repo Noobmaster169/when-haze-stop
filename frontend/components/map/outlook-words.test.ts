@@ -7,10 +7,10 @@ import { dayLine, headline, trend } from "./outlook-words";
 // Nilai (CA23N) as the station panel showed it at 16:00 on 10 October 2026.
 const chance = (c100: number, c150: number, c180: number, c200: number) => ({ "100": c100, "150": c150, "180": c180, "200": c200 });
 const nilai: DayOutlook[] = [
-  { day: "2026-10-10", observedPeak: 181, forecastPeak: null, low: null, high: null, chance: chance(1, 1, 1, 0.01) },
-  { day: "2026-10-11", observedPeak: null, forecastPeak: 154, low: 128, high: 168, chance: chance(0.99, 0.56, 0.01, 0.01) },
-  { day: "2026-10-12", observedPeak: null, forecastPeak: 94, low: 34, high: 110, chance: chance(0.27, 0.01, 0.01, 0.01) },
-  { day: "2026-10-13", observedPeak: null, forecastPeak: 92, low: 47, high: 128, chance: chance(0.58, 0.01, 0.01, 0.01) },
+  { day: "2026-10-10", observedPeak: 181, forecastPeak: null, low: null, high: null, chance: chance(1, 1, 1, 0.01) , source: "hourly", why: null },
+  { day: "2026-10-11", observedPeak: null, forecastPeak: 154, low: 128, high: 168, chance: chance(0.99, 0.56, 0.01, 0.01) , source: "hourly", why: null },
+  { day: "2026-10-12", observedPeak: null, forecastPeak: 94, low: 34, high: 110, chance: chance(0.27, 0.01, 0.01, 0.01) , source: "hourly", why: null },
+  { day: "2026-10-13", observedPeak: null, forecastPeak: 92, low: 47, high: 128, chance: chance(0.58, 0.01, 0.01, 0.01) , source: "hourly", why: null },
 ];
 
 describe("a station's outlook in words", () => {

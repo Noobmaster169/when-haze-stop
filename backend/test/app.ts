@@ -18,6 +18,8 @@ export function testApp(overrides: Partial<AppDeps> = {}) {
     llm: new FakeLlmClient("{}"),
     // Nor a geocoder: a test that searches hands in the places it expects back.
     geocoder: new FakeGeocoder(),
+    // No model service either: the source line then carries no backtest figure.
+    model: null,
     ...overrides,
   });
 }

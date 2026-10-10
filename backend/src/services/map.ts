@@ -1,8 +1,11 @@
+import { config, type ModelMode } from "../config";
 import type { Airport, HazeMap } from "../contracts";
 import type { Queryable } from "../db";
 import { addHours, DOMAIN, FIELD, WEATHER } from "../haze/grid";
 import { HORIZON_HOURS } from "../haze/run";
 import { fires, forecasts, metar, stations, weather } from "../repositories";
+import type { ModelClient } from "../sources/model";
+import { forecastSource } from "./forecast-source";
 
 /** Everything the map draws, in one read: the week behind, the days ahead, the stations, the fires and the wind. */
 
@@ -33,12 +36,14 @@ export async function airportsBetween(db: Queryable, from: Date, until: Date | n
   }));
 }
 
-export async function hazeMap(db: Queryable): Promise<HazeMap> {
+export async function hazeMap(db: Queryable, mode: ModelMode = config.MODEL_MODE, model: ModelClient | null = null): Promise<HazeMap> {
   const run = await forecasts.latest(db);
   const grid = { lon0: DOMAIN.lon0, lat0: DOMAIN.lat0, nx: FIELD.nx, ny: FIELD.ny, step: FIELD.step };
   const windGrid = { lon0: DOMAIN.lon0, lat0: DOMAIN.lat0, nx: WEATHER.nx, ny: WEATHER.ny, step: WEATHER.step };
   const all = await stations.list(db);
-  if (!run) return { run: null, grid, windGrid, stations: all, frames: [], wind: [], fires: [], airports: await airportsBetween(db, addHours(new Date(), -24 * HISTORY_DAYS), null) };
+  if (!run) {
+    return { run: null, grid, windGrid, stations: all, frames: [], wind: [], fires: [], airports: await airportsBetween(db, addHours(new Date(), -24 * HISTORY_DAYS), null), source: null, learnedFrom: null };
+  }
 
   const asOf = new Date(run.asOf);
   const stored = await forecasts.timeline(db, addHours(asOf, -24 * HISTORY_DAYS), addHours(asOf, HORIZON_HOURS));
@@ -54,5 +59,7 @@ export async function hazeMap(db: Queryable): Promise<HazeMap> {
     wind: winds.map((hour) => ({ validAt: hour.validAt.toISOString(), uv: packWind(hour.u, hour.v) })),
     fires: await fires.strongestByDay(db, fireFrom, FIRE_LIMIT),
     airports: await airportsBetween(db, addHours(asOf, -24 * HISTORY_DAYS), null),
+    source: await forecastSource(db, mode, model, asOf),
+    learnedFrom: null,
   };
 }

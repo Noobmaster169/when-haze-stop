@@ -7,7 +7,7 @@ import { headlineFor } from "../../src/haze/headline";
 const never = (): boolean => false;
 
 function day(date: string, forecastPeak: number | null, chance: Record<string, number>, observedPeak: number | null = null): DayOutlook {
-  return { day: date, observedPeak, forecastPeak, low: null, high: null, chance };
+  return { day: date, observedPeak, forecastPeak, low: null, high: null, chance, source: "hourly", why: null };
 }
 
 // Seremban at 11:00 on 10 October 2026 read 182, with these chances for the 11th from the first live run.

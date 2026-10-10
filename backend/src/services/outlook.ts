@@ -1,11 +1,15 @@
 import { config, type ModelMode } from "../config";
-import type { Station, StationOutlook } from "../contracts";
+import type { ForecastSource, Station, StationOutlook } from "../contracts";
 import type { Queryable } from "../db";
 import { firstHindcast, leadBucket } from "../haze/chance";
 import { addHours } from "../haze/grid";
 import { dayOutlooks, type ErrorsFor, type Hourly, type ModelDay } from "../haze/outlook";
 import { forecasts, modelForecasts, nea, readings, scores, stations } from "../repositories";
+import type { ModelClient } from "../sources/model";
 import { neaRegionOf } from "../sources/nea";
+import { forecastSource, hourlySource, LEARNED_STALE_HOURS } from "./forecast-source";
+
+export { LEARNED_STALE_HOURS };
 
 /**
  * A station's readings, forecast and next few days, read from what the last
@@ -26,14 +30,6 @@ export async function loadErrors(db: Queryable): Promise<ErrorsFor> {
   };
 }
 
-/**
- * A learned forecast older than this against the run is stale, and the hourly
- * forecast speaks instead. The model issues once a day at 00:00 UTC, so its
- * newest forecast is up to 23 hours old by design. When the day's ask fails,
- * yesterday's issue keeps the outlook until 06:00 UTC while the job retries
- * each hour, so one missed hour does not drop the model's days.
- */
-export const LEARNED_STALE_HOURS = 30;
 
 export interface OutlookContext {
   asOf: Date;
@@ -41,13 +37,16 @@ export interface OutlookContext {
   errorsFor: ErrorsFor;
   /** Whether the learned model's forecast is the outlook's for the days ahead: MODEL_MODE is live. */
   learned: boolean;
+  /** Whose forecast the days ahead are, with the model's record, stated once per context. */
+  source: ForecastSource;
 }
 
-/** Null before the model has run once. `mode` is the config's unless a test says otherwise. */
-export async function outlookContext(db: Queryable, mode: ModelMode = config.MODEL_MODE): Promise<OutlookContext | null> {
+/** Null before the model has run once. `mode` is the config's unless a test says otherwise; `model` only adds the backtest figure. */
+export async function outlookContext(db: Queryable, mode: ModelMode = config.MODEL_MODE, model: ModelClient | null = null): Promise<OutlookContext | null> {
   const run = await forecasts.latest(db);
   if (!run) return null;
-  return { asOf: new Date(run.asOf), runId: run.id, errorsFor: await loadErrors(db), learned: mode === "live" };
+  const asOf = new Date(run.asOf);
+  return { asOf, runId: run.id, errorsFor: await loadErrors(db), learned: mode === "live", source: await forecastSource(db, mode, model, asOf) };
 }
 
 /** The newest learned forecast for a station, empty where there is none or it is stale. */
@@ -70,6 +69,7 @@ export async function outlookFor(db: Queryable, station: Station, context: Outlo
     forecast: ahead.map((value) => ({ at: value.at.toISOString(), api: Math.round(value.api) })),
     days: dayOutlooks(asOf, observed, ahead, errorsFor, modelDays),
     pm25: await measuredPm25(db, station),
+    source: context.source,
   };
 }
 
@@ -82,10 +82,10 @@ async function measuredPm25(db: Queryable, station: Station): Promise<StationOut
 }
 
 /** Null for a station that does not exist. A station with no forecast still answers, with its readings alone. */
-export async function stationOutlook(db: Queryable, stationId: string): Promise<StationOutlook | null> {
+export async function stationOutlook(db: Queryable, stationId: string, model: ModelClient | null = null): Promise<StationOutlook | null> {
   const station = await stations.find(db, stationId);
   if (!station) return null;
-  const context = await outlookContext(db);
-  if (!context) return { station, readings: [], forecast: [], days: [], pm25: await measuredPm25(db, station) };
+  const context = await outlookContext(db, config.MODEL_MODE, model);
+  if (!context) return { station, readings: [], forecast: [], days: [], pm25: await measuredPm25(db, station), source: hourlySource() };
   return outlookFor(db, station, context);
 }

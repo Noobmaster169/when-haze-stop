@@ -3,8 +3,8 @@ import type { Queryable } from "../db";
 import { pm25ToApi } from "../haze/api-index";
 import { GRID_KEY } from "../haze/grid";
 import { MODEL_VERSION } from "../haze/run";
-import { modelForecasts } from "../repositories";
-import type { ScoreRow } from "../repositories/model-forecasts.repo";
+import { modelForecasts, modelScores } from "../repositories";
+import type { ScoreRow } from "../repositories/model-scores.repo";
 
 /**
  * The learned model scored on what came in, beside "no change" and the hourly
@@ -63,7 +63,7 @@ export async function modelSkill(db: Queryable, mode: ModelMode, version?: strin
   if (mode === "off") return offSkill();
   const newest = await modelForecasts.newestVersion(db);
   const modelVersion = version ?? newest?.modelVersion ?? null;
-  const rows = modelVersion ? await modelForecasts.scorable(db, modelVersion, MODEL_VERSION, GRID_KEY) : [];
+  const rows = modelVersion ? await modelScores.scorable(db, modelVersion, MODEL_VERSION, GRID_KEY) : [];
   const leads = NETWORKS.flatMap((network) => LEADS.map((leadDays) => leadSkill(rows, network, leadDays)));
 
   const dayAhead = leads[0];

@@ -1,4 +1,5 @@
 import datetime as dt
+import json
 import pathlib
 
 import lightgbm as lgb
@@ -13,7 +14,7 @@ from hazemodel.predict import predict_rows
 from hazemodel.region import region_from_env
 from hazemodel import serve
 from hazemodel.features.air import STALE_HOURS
-from hazemodel.serve import create_app, parse_as_of, serve_window
+from hazemodel.serve import create_app, parse_as_of, report_summary, serve_window
 from hazemodel.store import SourceData
 
 ISSUE = pd.Timestamp("2026-10-08T00:00:00Z")
@@ -161,3 +162,40 @@ def test_no_fresh_level_answers_an_empty_list(app_env, data, monkeypatch):
     answer = TestClient(create_app()).post("/predict", json={"asOf": ISSUE.isoformat()})
     assert answer.status_code == 200
     assert answer.json() == {"modelVersion": artifact.version, "asOf": ISSUE.isoformat(), "forecasts": []}
+
+
+def test_report_is_404_without_a_live_model(app_env, monkeypatch, tmp_path):
+    monkeypatch.setenv("MODEL_REPORTS", str(tmp_path / "reports"))
+    answer = TestClient(create_app()).get("/report")
+    assert answer.status_code == 404
+    assert answer.json() == {"error": "no report for the live model"}
+
+
+def test_report_trims_the_live_scores(app_env, data, monkeypatch, tmp_path):
+    artifact = fit_on_fixture(data)
+    save_artifact(app_env, artifact)
+    set_live(app_env, artifact.version)
+    reports = tmp_path / "reports"
+    monkeypatch.setenv("MODEL_REPORTS", str(reports))
+    scores = {
+        "version": artifact.version,
+        "trained_at": "2026-10-10T00:00:00+00:00",
+        "backtest": {
+            "promotion_score": 15.5,
+            "pooled": {
+                "model": {"d1": {"nea": {"hazy_mae": 15.5}}, "d2": {"nea": {"hazy_mae": float("nan")}}},
+                "persistence": {"d1": {"nea": {"hazy_mae": 17.5}}, "d2": {"nea": {"hazy_mae": 20.6}}},
+                "v2": {"d1": {"nea": {"hazy_mae": 18.1}}, "d2": {"nea": {"hazy_mae": 23.1}}},
+            },
+        },
+    }
+    (reports / artifact.version).mkdir(parents=True)
+    (reports / artifact.version / "scores.json").write_text(json.dumps(scores))
+    body = TestClient(create_app()).get("/report").json()
+    assert body == {
+        "version": artifact.version,
+        "trainedAt": "2026-10-10T00:00:00+00:00",
+        "promotionScore": 15.5,
+        "hazyMae": {"d1": {"model": 15.5, "persistence": 17.5, "v2": 18.1}, "d2": None},
+    }
+    assert report_summary(scores)["hazyMae"]["d2"] is None

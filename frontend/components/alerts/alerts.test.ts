@@ -53,7 +53,7 @@ describe("an issuer's badge", () => {
 describe("a day in the strip", () => {
   it("shows what was read when it is higher than the forecast, else the forecast", () => {
     // Seremban on 10 October 2026: read up to 189, forecast peak 173.
-    expect(dayPeak({ day: "2026-10-10", observedPeak: 189, forecastPeak: 173, low: null, high: null, chance: {} })).toBe(189);
-    expect(dayPeak({ day: "2026-10-11", observedPeak: null, forecastPeak: 173, low: 150, high: 196, chance: {} })).toBe(173);
+    expect(dayPeak({ day: "2026-10-10", observedPeak: 189, forecastPeak: 173, low: null, high: null, chance: {}, source: "hourly", why: null })).toBe(189);
+    expect(dayPeak({ day: "2026-10-11", observedPeak: null, forecastPeak: 173, low: 150, high: 196, chance: {}, source: "hourly", why: null })).toBe(173);
   });
 });

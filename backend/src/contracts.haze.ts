@@ -90,6 +90,30 @@ export const Airport = z.object({
 });
 export type Airport = z.infer<typeof Airport>;
 
+/** Whose forecast a number is: the learned model's, or the hourly forecast from the station's own slope. */
+export const ForecastSourceKind = z.enum(["learned", "hourly"]);
+export type ForecastSourceKind = z.infer<typeof ForecastSourceKind>;
+
+export const ForecastRecord = z.object({
+  /** Malaysian days with a day-ahead DOE forecast scored so far. */
+  checkedDays: z.number().int(),
+  /** Live gain over the hourly forecast on DOE stations a day ahead, 0.1 for 10%; null before any day is checked. */
+  gain: z.number().nullable(),
+  /** The committed backtest's hazy-day MAE at a day ahead on the reference instruments, ug/m3; null when the model service cannot be asked. */
+  backtest: z.object({ model: z.number(), persistence: z.number(), v2: z.number() }).nullable(),
+});
+export type ForecastRecord = z.infer<typeof ForecastRecord>;
+
+export const ForecastSource = z.object({
+  kind: ForecastSourceKind,
+  modelVersion: z.string().nullable(),
+  issuedAt: z.string().nullable(),
+  /** True while the shadow rule has not passed: the forecast is shown, labelled as on trial. */
+  trial: z.boolean(),
+  record: ForecastRecord,
+});
+export type ForecastSource = z.infer<typeof ForecastSource>;
+
 export const HazeMap = z.object({
   /** Null until the model has run once. The page says so instead of drawing an empty sea. */
   run: RunSummary.nullable(),
@@ -102,6 +126,10 @@ export const HazeMap = z.object({
   fires: z.array(DatedFireCell),
   /** The visibility layer: every airport with its reports over the map's past week. */
   airports: z.array(Airport),
+  /** Whose forecast the frames past the run are. Null before any run. */
+  source: ForecastSource.nullable(),
+  /** The first frame corrected to the learned forecast, or null where none was. */
+  learnedFrom: z.string().nullable(),
 });
 export type HazeMap = z.infer<typeof HazeMap>;
 
@@ -185,6 +213,9 @@ export const DayOutlook = z.object({
   high: z.number().int().nullable(),
   /** Chance the day's peak passes each official line, 0 to 1, keyed by the line. */
   chance: z.record(z.string(), z.number()),
+  source: ForecastSourceKind,
+  /** The simulation's reason for the day, one sentence, for learned days only. */
+  why: z.string().nullable(),
 });
 export type DayOutlook = z.infer<typeof DayOutlook>;
 
@@ -195,6 +226,7 @@ export const StationOutlook = z.object({
   days: z.array(DayOutlook),
   /** NEA's measured one-hour PM2.5 for a Singapore region, which DOE has no equivalent of. Null elsewhere. */
   pm25: z.object({ at: z.string(), value: z.number() }).nullable(),
+  source: ForecastSource,
 });
 export type StationOutlook = z.infer<typeof StationOutlook>;
 

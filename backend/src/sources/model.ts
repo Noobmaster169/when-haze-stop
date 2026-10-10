@@ -27,9 +27,25 @@ export interface ModelHealth {
   trainedAt: Date | null;
 }
 
+/** Hazy-day mean absolute error at one lead on the reference instruments, ug/m3, for the model and its two baselines. */
+export interface HazyMae {
+  model: number;
+  persistence: number;
+  v2: number;
+}
+
+/** The live version's committed backtest, trimmed to what the app states beside a forecast. */
+export interface ModelReport {
+  version: string;
+  trainedAt: Date;
+  promotionScore: number | null;
+  hazyMae: { d1: HazyMae | null; d2: HazyMae | null };
+}
+
 export interface ModelClient {
   health(): Promise<ModelHealth>;
   predict(asOf: Date): Promise<ModelForecast[]>;
+  report(): Promise<ModelReport>;
 }
 
 /** Features for 189 instruments are read from the database on each ask, which can take a while on a cold service. */
@@ -39,6 +55,8 @@ const Day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const Forecast = z.object({ instrumentId: z.string().min(1), day: Day, p10: z.number(), p50: z.number(), p90: z.number() });
 const Prediction = z.object({ modelVersion: z.string().min(1), asOf: z.string(), forecasts: z.array(Forecast) });
 const Health = z.object({ status: z.literal("ok"), modelVersion: z.string().nullable(), trainedAt: z.string().nullable() });
+const Mae = z.object({ model: z.number(), persistence: z.number(), v2: z.number() }).nullable();
+const Report = z.object({ version: z.string().min(1), trainedAt: z.string(), promotionScore: z.number().nullable(), hazyMae: z.object({ d1: Mae, d2: Mae }) });
 
 function parse<T extends z.ZodType>(schema: T, text: string, what: string): z.output<T> {
   let json: unknown;
@@ -66,6 +84,11 @@ export function parseHealth(text: string): ModelHealth {
   return { modelVersion, trainedAt: trainedAt ? new Date(trainedAt) : null };
 }
 
+export function parseReport(text: string): ModelReport {
+  const report = parse(Report, text, "model report");
+  return { ...report, trainedAt: new Date(report.trainedAt) };
+}
+
 export function modelClient(baseUrl: string): ModelClient {
   const base = baseUrl.replace(/\/$/, "");
   return {
@@ -74,6 +97,9 @@ export function modelClient(baseUrl: string): ModelClient {
     },
     async predict(asOf) {
       return parsePrediction(await postJson(`${base}/predict`, "model predict", TIMEOUT_MS, { asOf: asOf.toISOString() }));
+    },
+    async report() {
+      return parseReport(await fetchText(`${base}/report`, "model report", TIMEOUT_MS));
     },
   };
 }

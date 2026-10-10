@@ -8,6 +8,7 @@ export * as forecasts from "./forecasts.repo";
 export * as llmCalls from "./llm-calls.repo";
 export * as metar from "./metar.repo";
 export * as modelForecasts from "./model-forecasts.repo";
+export * as modelScores from "./model-scores.repo";
 export * as nea from "./nea.repo";
 export * as openaq from "./openaq.repo";
 export * as readings from "./readings.repo";

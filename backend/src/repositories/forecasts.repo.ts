@@ -24,10 +24,11 @@ export async function exists(db: Queryable, asOf: Date, kind: RunKind): Promise<
   return (rowCount ?? 0) > 0;
 }
 
-export async function insertRun(db: Queryable, asOf: Date, kind: RunKind, calibration: Calibration, grid: string = GRID_KEY): Promise<number> {
+/** `learnedVersion` names the learned model whose forecast the run's future frames were corrected to, null when none was. */
+export async function insertRun(db: Queryable, asOf: Date, kind: RunKind, calibration: Calibration, grid: string = GRID_KEY, learnedVersion: string | null = null): Promise<number> {
   const { rows } = await db.query<{ id: string }>(
-    "insert into forecast_runs (as_of, kind, intercept, slope, fit, grid, model) values ($1, $2, $3, $4, $5, $6, $7) returning id",
-    [asOf, kind, calibration.intercept, calibration.slope, JSON.stringify({ rankCorrelation: calibration.rankCorrelation, pairs: calibration.pairs, fallback: calibration.fallback }), grid, MODEL_VERSION],
+    "insert into forecast_runs (as_of, kind, intercept, slope, fit, grid, model, learned_version) values ($1, $2, $3, $4, $5, $6, $7, $8) returning id",
+    [asOf, kind, calibration.intercept, calibration.slope, JSON.stringify({ rankCorrelation: calibration.rankCorrelation, pairs: calibration.pairs, fallback: calibration.fallback }), grid, MODEL_VERSION, learnedVersion],
   );
   return Number(rows[0].id);
 }
@@ -41,9 +42,15 @@ export async function insertFrames(db: Queryable, runId: number, frames: { valid
   ]);
 }
 
-export async function insertStationForecasts(db: Queryable, runId: number, forecasts: { stationId: string; api: Float32Array }[]): Promise<void> {
+/** `physics` is the calibrated smoke at the station, PM2.5 per hour on the same indices as `api`; absent for a run that did not compute it. */
+export async function insertStationForecasts(db: Queryable, runId: number, forecasts: { stationId: string; api: Float32Array; physics?: Float32Array }[]): Promise<void> {
   for (const forecast of forecasts) {
-    await db.query("insert into station_forecasts (run_id, station_id, api) values ($1, $2, $3)", [runId, forecast.stationId, Array.from(forecast.api)]);
+    await db.query("insert into station_forecasts (run_id, station_id, api, physics) values ($1, $2, $3, $4)", [
+      runId,
+      forecast.stationId,
+      Array.from(forecast.api),
+      forecast.physics ? Array.from(forecast.physics) : null,
+    ]);
   }
 }
 
@@ -80,6 +87,18 @@ export async function timeline(db: Queryable, from: Date, to: Date): Promise<Sto
 export async function stationForecast(db: Queryable, runId: number, stationId: string): Promise<number[] | null> {
   const { rows } = await db.query<{ api: number[] }>("select api from station_forecasts where run_id = $1 and station_id = $2", [runId, stationId]);
   return rows[0]?.api ?? null;
+}
+
+/** The calibrated smoke at a station from one run, PM2.5 per hour from an hour after `asOf`; null for a run made before it was stored. */
+export async function stationPhysics(db: Queryable, runId: number, stationId: string): Promise<number[] | null> {
+  const { rows } = await db.query<{ physics: number[] | null }>("select physics from station_forecasts where run_id = $1 and station_id = $2", [runId, stationId]);
+  return rows[0]?.physics ?? null;
+}
+
+/** The learned model version a run's future frames were corrected to, null where none was. */
+export async function learnedVersion(db: Queryable, runId: number): Promise<string | null> {
+  const { rows } = await db.query<{ learned_version: string | null }>("select learned_version from forecast_runs where id = $1", [runId]);
+  return rows[0]?.learned_version ?? null;
 }
 
 export async function stationForecasts(db: Queryable, runId: number): Promise<Map<string, number[]>> {

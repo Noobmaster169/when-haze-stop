@@ -13,6 +13,7 @@ import { requestLog } from "./routes/request-log";
 import { sourcesRouter } from "./routes/sources.routes";
 import { statementsRouter } from "./routes/statements.routes";
 import type { Geocoder } from "./sources";
+import type { ModelClient } from "./sources/model";
 
 const log = childLogger({ module: "api" });
 
@@ -23,6 +24,8 @@ export interface AppDeps {
   llm: LlmClient;
   /** Place names to coordinates, for the search box and the assistant. */
   geocoder: Geocoder;
+  /** The model service, asked only for its published report. Null while MODEL_MODE is off. */
+  model: ModelClient | null;
   health: () => Promise<HealthReport>;
 }
 
@@ -46,7 +49,7 @@ export function createApp(deps: AppDeps): express.Express {
 
   app.use("/ai", aiRouter());
   app.use("/chat", chatRouter({ pool: deps.pool, llm: deps.llm, geocoder: deps.geocoder }));
-  app.use("/haze", hazeRouter({ pool: deps.pool, geocoder: deps.geocoder }));
+  app.use("/haze", hazeRouter({ pool: deps.pool, geocoder: deps.geocoder, model: deps.model }));
   app.use("/alerts", alertsRouter({ pool: deps.pool }));
   app.use("/sources", sourcesRouter({ pool: deps.pool }));
   app.use("/statements", statementsRouter({ pool: deps.pool }));

@@ -1,6 +1,8 @@
 """The forecast service: /health and /predict for the jobs process. Features are computed here and nowhere else."""
 
 import datetime as dt
+import json
+import math
 import os
 import pathlib
 
@@ -14,6 +16,7 @@ from hazemodel.features.air import HISTORY_DAYS
 from hazemodel.features.build import build_rows
 from hazemodel.predict import predict_rows
 from hazemodel.region import region_from_env
+from hazemodel.report import reports_dir
 from hazemodel.store import connect, load_source_data, load_source_data_from_csv
 
 LOOKBACK_DAYS = HISTORY_DAYS
@@ -24,6 +27,32 @@ LOOKAHEAD_DAYS = 3
 
 class PredictBody(BaseModel):
     asOf: str
+
+
+def _hazy_mae(pooled: dict, day: str) -> dict | None:
+    """The reference kind's hazy-day MAE for the model and its two baselines; None where the report lacks a row."""
+    out = {}
+    for name, key in (("model", "model"), ("persistence", "persistence"), ("v2", "v2")):
+        by_kind = pooled.get(key, {}).get(day, {})
+        kind = by_kind.get("reference") or by_kind.get("nea") or {}
+        value = kind.get("hazy_mae")
+        if value is None or (isinstance(value, float) and math.isnan(value)):
+            return None
+        out[name] = float(value)
+    return out
+
+
+def report_summary(scores: dict) -> dict:
+    """What the app states beside a forecast: the version, its promotion score and the hazy-day MAE at each lead."""
+    backtest = scores.get("backtest", {})
+    pooled = backtest.get("pooled", {})
+    score = backtest.get("promotion_score")
+    return {
+        "version": scores["version"],
+        "trainedAt": scores["trained_at"],
+        "promotionScore": None if score is None or (isinstance(score, float) and math.isnan(score)) else float(score),
+        "hazyMae": {"d1": _hazy_mae(pooled, "d1"), "d2": _hazy_mae(pooled, "d2")},
+    }
 
 
 def serve_window(as_of: pd.Timestamp) -> tuple[pd.Timestamp, pd.Timestamp]:
@@ -68,6 +97,14 @@ def create_app() -> FastAPI:
             "modelVersion": meta["version"] if meta else None,
             "trainedAt": meta["trained_at"] if meta else None,
         }
+
+    @app.get("/report")
+    def report():
+        version = live_version(directory)
+        path = reports_dir() / version / "scores.json" if version else None
+        if path is None or not path.exists():
+            return JSONResponse(status_code=404, content={"error": "no report for the live model"})
+        return report_summary(json.loads(path.read_text()))
 
     @app.post("/predict")
     def predict(body: PredictBody):

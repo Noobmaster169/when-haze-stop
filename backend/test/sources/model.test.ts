@@ -2,8 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TerminalError, UpstreamError } from "../../src/lib/errors";
 import { FakeModelClient } from "../../src/sources/__fakes__/fake.model";
-import { modelClient, parseHealth, parsePrediction } from "../../src/sources/model";
+import { modelClient, parseHealth, parsePrediction, parseReport } from "../../src/sources/model";
 import { CONTRACT_FORECASTS, CONTRACT_VERSION, HEALTH_EMPTY_JSON, HEALTH_JSON, PREDICT_JSON } from "../fixtures/model-contract";
+import { RECORDED_REPORT, REPORT_JSON } from "../fixtures/recorded-model-report";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -58,5 +59,19 @@ describe("the model service client", () => {
     expect(fake.asked).toEqual([asOf]);
     expect((await fake.health()).modelVersion).toBe(CONTRACT_VERSION);
     expect((await new FakeModelClient([]).health()).modelVersion).toBeNull();
+  });
+
+  it("reads the published report, and refuses one without a version", async () => {
+    expect(parseReport(REPORT_JSON)).toEqual(RECORDED_REPORT);
+    expect(() => parseReport(JSON.stringify({ trainedAt: "2026-10-10T00:00:00Z", promotionScore: null, hazyMae: { d1: null, d2: null } }))).toThrow(TerminalError);
+    const { calls } = answering(200, REPORT_JSON);
+    const report = await modelClient("http://model:4002/").report();
+    expect(report.hazyMae.d1?.model).toBeCloseTo(15.48, 2);
+    expect(calls[0]).toMatchObject({ url: "http://model:4002/report", method: "GET" });
+  });
+
+  it("surfaces a service without a report as the dependency's own failure", async () => {
+    answering(404, JSON.stringify({ error: "no report for the live model" }));
+    await expect(modelClient("http://model:4002").report()).rejects.toBeInstanceOf(UpstreamError);
   });
 });

@@ -88,6 +88,8 @@ export function dayOutlooks(asOf: Date, readings: Hourly[], forecast: Hourly[], 
       low: expected ? Math.round(expected.low) : null,
       high: expected ? Math.round(expected.high) : null,
       chance,
+      source: learned ? "learned" : "hourly",
+      why: null,
     });
   }
   return days;

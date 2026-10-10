@@ -67,6 +67,8 @@ services:
       - "127.0.0.1:4002:4002"
     volumes:
       - model-artifacts:/app/artifacts
+      # The committed reports, so GET /report can state the live version's backtest.
+      - ./model/reports:/app/reports:ro
     depends_on:
       postgres:
         condition: service_healthy

@@ -3,9 +3,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closePool, getPool } from "../../src/db";
 import { GRID_KEY } from "../../src/haze/grid";
 import { MODEL_VERSION } from "../../src/haze/run";
-import { modelForecasts, readings } from "../../src/repositories";
+import { modelForecasts, modelScores, readings } from "../../src/repositories";
 import { recordedCycle } from "../fixtures/cycle";
 import { LAST_HOUR } from "../fixtures/recorded";
+import { ISSUE_AT, ISSUE_VERSION, RECORDED_ISSUE } from "../fixtures/recorded-model-issue";
 
 afterAll(closePool);
 
@@ -34,7 +35,7 @@ describe("the model forecasts repository", () => {
 
   it("offers a forecast for scoring only once its day's readings are all in", async () => {
     // The recorded readings end at 11:00 on 10 October, Malaysian time, so neither the 10th nor any later day is scoreable yet.
-    const rows = (await modelForecasts.scorable(pool, VERSION, MODEL_VERSION, GRID_KEY)).filter((row) => row.day >= "2026-10-10");
+    const rows = (await modelScores.scorable(pool, VERSION, MODEL_VERSION, GRID_KEY)).filter((row) => row.day >= "2026-10-10");
     expect(rows).toEqual([]);
   });
 
@@ -45,11 +46,23 @@ describe("the model forecasts repository", () => {
     await modelForecasts.insertMany(pool, [{ ...band("2026-10-09", 60, 90, 120), asOf: madeAt }]);
     const ninth = await readings.forStation(pool, "CA24N", new Date("2026-10-08T16:00:00Z"), new Date("2026-10-09T15:00:00Z"));
     const peak = Math.max(...ninth.map((reading) => reading.api));
-    const scored = await modelForecasts.scorable(pool, VERSION, MODEL_VERSION, GRID_KEY);
+    const scored = await modelScores.scorable(pool, VERSION, MODEL_VERSION, GRID_KEY);
     expect(scored.length).toBeGreaterThan(0);
     expect(scored.every((item) => item.modelVersion === VERSION)).toBe(true);
     const [row] = scored.filter((item) => item.day === "2026-10-09");
     expect(row).toMatchObject({ instrumentId: "CA24N", network: "doe", leadDays: 1, p50: 90, observed: peak, persistence: null });
     expect(peak).toBeGreaterThan(100);
+  });
+
+  it("reads the newest issue whole, by instrument then day, and none that is too old", async () => {
+    await modelForecasts.insertMany(pool, RECORDED_ISSUE.map((row) => ({ asOf: ISSUE_AT, ...row })));
+    const issue = await modelForecasts.latestIssue(pool, new Date("2026-10-09T18:00:00Z"));
+    expect(issue).not.toBeNull();
+    // The recorded week's test rows are issued at LAST_HOUR, three hours after the real issue, so they are the newest.
+    expect(issue?.asOf.getTime()).toBeGreaterThanOrEqual(ISSUE_AT.getTime());
+    const real = await modelForecasts.latestIssue(pool, new Date("2026-10-11T00:00:00Z"));
+    expect(real).toBeNull();
+    const rows = await pool.query("select count(*)::int as n from model_forecasts where as_of = $1 and model_version = $2", [ISSUE_AT, ISSUE_VERSION]);
+    expect(rows.rows[0].n).toBe(RECORDED_ISSUE.length);
   });
 });

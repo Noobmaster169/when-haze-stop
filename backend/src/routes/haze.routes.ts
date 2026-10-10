@@ -13,12 +13,15 @@ import { stationOutlook } from "../services/outlook";
 import { findPlaces } from "../services/places";
 import { simulation } from "../services/simulation";
 import type { Geocoder } from "../sources";
+import type { ModelClient } from "../sources/model";
 
 /** The haze map and everything behind it, read-only. The jobs process is what writes. */
 
 export interface HazeRouteDeps {
   pool: Pool;
   geocoder: Geocoder;
+  /** The model service, for the backtest figure beside a forecast. Null while MODEL_MODE is off. */
+  model: ModelClient | null;
 }
 
 const StationId = z.string().regex(/^[A-Za-z0-9]{2,40}$/);
@@ -30,7 +33,7 @@ export function hazeRouter(deps: HazeRouteDeps): Router {
   const router = Router();
 
   router.get("/map", async (_req, res) => {
-    res.json(await hazeMap(deps.pool));
+    res.json(await hazeMap(deps.pool, config.MODEL_MODE, deps.model));
   });
 
   router.get("/days", async (_req, res) => {
@@ -52,7 +55,7 @@ export function hazeRouter(deps: HazeRouteDeps): Router {
       res.status(400).json({ error: "bad station id" });
       return;
     }
-    const outlook = await stationOutlook(deps.pool, id.data);
+    const outlook = await stationOutlook(deps.pool, id.data, deps.model);
     if (!outlook) {
       res.status(404).json({ error: "no such station" });
       return;

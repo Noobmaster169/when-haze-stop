@@ -51,6 +51,25 @@ export type VisibilityReport = z.infer<typeof VisibilityReport>;
 export const Airport = z.object({ icao: z.string(), name: z.string(), lat: z.number(), lon: z.number(), reports: z.array(VisibilityReport) });
 export type Airport = z.infer<typeof Airport>;
 
+export const ForecastSourceKind = z.enum(["learned", "hourly"]);
+export type ForecastSourceKind = z.infer<typeof ForecastSourceKind>;
+
+export const ForecastRecord = z.object({
+  checkedDays: z.number().int(),
+  gain: z.number().nullable(),
+  backtest: z.object({ model: z.number(), persistence: z.number(), v2: z.number() }).nullable(),
+});
+export type ForecastRecord = z.infer<typeof ForecastRecord>;
+
+export const ForecastSource = z.object({
+  kind: ForecastSourceKind,
+  modelVersion: z.string().nullable(),
+  issuedAt: z.string().nullable(),
+  trial: z.boolean(),
+  record: ForecastRecord,
+});
+export type ForecastSource = z.infer<typeof ForecastSource>;
+
 export const HazeMap = z.object({
   run: RunSummary.nullable(),
   grid: FieldGrid,
@@ -60,6 +79,8 @@ export const HazeMap = z.object({
   wind: z.array(WindFrame),
   fires: z.array(DatedFireCell),
   airports: z.array(Airport),
+  source: ForecastSource.nullable(),
+  learnedFrom: z.string().nullable(),
 });
 export type HazeMap = z.infer<typeof HazeMap>;
 
@@ -113,6 +134,8 @@ export const DayOutlook = z.object({
   low: z.number().int().nullable(),
   high: z.number().int().nullable(),
   chance: z.record(z.string(), z.number()),
+  source: ForecastSourceKind,
+  why: z.string().nullable(),
 });
 export type DayOutlook = z.infer<typeof DayOutlook>;
 
@@ -122,6 +145,7 @@ export const StationOutlook = z.object({
   forecast: z.array(z.object({ at: z.string(), api: z.number() })),
   days: z.array(DayOutlook),
   pm25: z.object({ at: z.string(), value: z.number() }).nullable(),
+  source: ForecastSource,
 });
 export type StationOutlook = z.infer<typeof StationOutlook>;
 
