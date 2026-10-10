@@ -22,7 +22,7 @@ export const Assignment = z.object({
   asset: AssetKind,
   /** Aircraft count for `cl415` and `helicopters`, teams for `ground_teams`, people for the two Bomba kinds. */
   units: z.number().int().positive().max(1000),
-  /** Plan day 1 is the first day the package can work (`PACKAGE.dayOne`). */
+  /** Plan day 1 is the first day the package can work (`dayOneFor` in suppression/package.ts). */
   fromDay: z.number().int().min(1).max(30),
   toDay: z.number().int().min(1).max(30),
   needsConsent: Consent.nullable().default(null),

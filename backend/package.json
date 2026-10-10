@@ -16,7 +16,8 @@
     "haze:backfill": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts backfill",
     "haze:history": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts history",
     "haze:loop": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts loop",
-    "haze:evaluate": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts evaluate"
+    "haze:evaluate": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts evaluate",
+    "council:situation": "node --env-file-if-exists=.env --import tsx src/jobs/council-situation.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

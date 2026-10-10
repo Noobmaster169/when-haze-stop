@@ -1,6 +1,7 @@
 /** All SQL lives under this folder. Import a repository as a namespace: `chat.find(db, id)`. */
 export * as alerts from "./alerts.repo";
 export * as chat from "./chat.repo";
+export * as council from "./council.repo";
 export * as fires from "./fires.repo";
 export * as fixedSources from "./fixed-sources.repo";
 export * as forecasts from "./forecasts.repo";

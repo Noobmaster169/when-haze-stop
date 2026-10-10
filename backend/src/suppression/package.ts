@@ -34,8 +34,8 @@ export interface AssetLine {
 }
 
 export const PACKAGE = {
-  /** Plan day 1. The team was not reported deployed by 7 October, so plans start two days after the data. */
-  dayOne: "2026-10-12",
+  /** Plan day 1 is this many UTC days after the data's day: the team was not reported deployed by 7 October 2026. */
+  leadDays: 2,
   daysInTheatre: 14,
   budgetRm: { low: 11_000_000, high: 12_000_000, basis: "assumption" as Basis },
   assets: [
@@ -96,6 +96,12 @@ export const PACKAGE = {
     },
   ] satisfies AssetLine[],
 } as const;
+
+/** The UTC date of plan day 1 for data as of `asOf`. */
+export function dayOneFor(asOf: Date): string {
+  const day = new Date(Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth(), asOf.getUTCDate() + PACKAGE.leadDays));
+  return day.toISOString().slice(0, 10);
+}
 
 export function assetLine(kind: AssetKind): AssetLine {
   const line = PACKAGE.assets.find((asset) => asset.kind === kind);
