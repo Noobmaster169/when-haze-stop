@@ -11,6 +11,7 @@ export * as nea from "./nea.repo";
 export * as openaq from "./openaq.repo";
 export * as readings from "./readings.repo";
 export * as scores from "./scores.repo";
+export * as smokeHindcasts from "./smoke-hindcasts.repo";
 export * as sourceFetches from "./source-fetches.repo";
 export * as statements from "./statements.repo";
 export * as stations from "./stations.repo";
