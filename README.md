@@ -34,7 +34,7 @@ docker compose up -d --build
 
 Open http://localhost:3000. The map is the home page; ask the dock something about haze.
 
-`compose.yaml` starts six services:
+`compose.yaml` starts seven services:
 
 | Service | What it does | Host port |
 | --- | --- | --- |
@@ -43,6 +43,7 @@ Open http://localhost:3000. The map is the home page; ask the dock something abo
 | `migrate` | Applies the migrations, then exits | |
 | `api` | The Express api | 8091 |
 | `jobs` | One data cycle, a backfill of the stored week, then every hour | |
+| `council` | The Suppression Council worker: executes runs queued by the Council page's "Convene the council" button, one at a time (20 to 40 minutes of model calls each). See `docs/council/` | |
 | `frontend` | The Next.js app, a production build | 3000 |
 
 The first cycle fetches a week of DOE readings and takes a few minutes, and the backfill after it
