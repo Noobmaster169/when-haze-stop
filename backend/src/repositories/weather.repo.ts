@@ -34,7 +34,8 @@ export async function load(db: Queryable, from: Date, to: Date): Promise<Weather
     [from, to],
   );
   let hours = 0;
-  while (hours < rows.length && hoursBetween(from, rows[hours].valid_at) === hours) hours++;
+  // A row on an older, smaller grid counts as missing: the next fetch replaces it.
+  while (hours < rows.length && hoursBetween(from, rows[hours].valid_at) === hours && rows[hours].u_ms.length === WEATHER_POINTS) hours++;
   if (hours === 0) return null;
 
   const grid: WeatherGrid = {
@@ -61,5 +62,5 @@ export async function earliestAt(db: Queryable): Promise<Date | null> {
 export async function windAt(db: Queryable, hours: Date[]): Promise<{ validAt: Date; u: number[]; v: number[] }[]> {
   if (hours.length === 0) return [];
   const { rows } = await db.query<HourRow>("select valid_at, u_ms, v_ms, rain_mm from weather_hours where valid_at = any($1) order by valid_at", [hours]);
-  return rows.map((row) => ({ validAt: row.valid_at, u: row.u_ms, v: row.v_ms }));
+  return rows.filter((row) => row.u_ms.length === WEATHER_POINTS).map((row) => ({ validAt: row.valid_at, u: row.u_ms, v: row.v_ms }));
 }

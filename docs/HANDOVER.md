@@ -75,8 +75,8 @@ Open http://localhost:3000 and go through this list:
 1. Fix whatever the first live run breaks.
 2. Read real assistant answers and tune. A prompt change is a new file `prompts/chat/v3.md` and a
    bump of `CHAT_PROMPT` in `agents/chat/loop.ts`. Never edit `v2.md`.
-3. Look at the heat layer with real data. Its opacity is `FAINT_ALPHA` and `FULL_ALPHA` in
-   `frontend/components/map/heat.ts`.
+3. Look at the heat layer with real data. Good air (50 and under) is not painted; colour
+   fades in to `FULL_ALPHA` at 100. Both are in `frontend/components/map/heat.ts`.
 4. Run `pnpm build` in `frontend/`.
 5. Push `haze-product` and merge.
 

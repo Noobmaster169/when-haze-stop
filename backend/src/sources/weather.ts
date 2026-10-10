@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { DOMAIN, WEATHER, WEATHER_POINTS } from "../haze/grid";
 import type { WeatherGrid } from "../haze/transport";
-import { TerminalError } from "../lib/errors";
+import { RetryableError, TerminalError } from "../lib/errors";
 import { fetchText, pause } from "./http";
 
 /**
@@ -83,6 +83,21 @@ export function assembleGrid(rows: Location[][]): WeatherGrid {
   return grid;
 }
 
+/** Tries per row before the whole fetch is given up. A dropped connection on one of fifteen rows should not cost the hour. */
+const ATTEMPTS = 3;
+const RETRY_WAIT_MS = 5_000;
+
+async function fetchRow(url: string): Promise<string> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fetchText(url, "Open-Meteo forecast", TIMEOUT_MS);
+    } catch (error) {
+      if (!(error instanceof RetryableError) || attempt >= ATTEMPTS) throw error;
+      await pause(RETRY_WAIT_MS * attempt);
+    }
+  }
+}
+
 export function openMeteoClient(): WeatherClient {
   return {
     async grid(pastDays, forecastDays) {
@@ -93,7 +108,7 @@ export function openMeteoClient(): WeatherClient {
         const url =
           `${BASE}?latitude=${lons.map(() => lat).join(",")}&longitude=${lons.join(",")}` +
           `&hourly=${FIELDS}&past_days=${pastDays}&forecast_days=${forecastDays}&wind_speed_unit=ms&timezone=GMT`;
-        const parsed = Row.safeParse(JSON.parse(await fetchText(url, "Open-Meteo forecast", TIMEOUT_MS)));
+        const parsed = Row.safeParse(JSON.parse(await fetchRow(url)));
         if (!parsed.success) throw new TerminalError("Open-Meteo answered in a shape this client does not know", { cause: parsed.error });
         rows.push(parsed.data);
         if (j < WEATHER.ny - 1) await pause(SPACING_MS);

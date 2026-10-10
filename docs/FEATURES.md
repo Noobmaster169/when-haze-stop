@@ -97,19 +97,19 @@ Things to know about each source, learned by using them:
 - FIRMS files are 8 to 9 MB each. Low-confidence detections are dropped. Three satellites see the
   same fire, so a cell's fire power for a day is the largest of the three satellites' sums, not
   their total.
-- Open-Meteo is asked one grid row at a time (15 requests of 23 points), 1.5 s apart. Its last
+- Open-Meteo is asked one grid row at a time (15 requests of 25 points), 1.5 s apart. Its last
   forecast hours can be empty for some variables; the grid stops at the first incomplete hour.
 
 ### 3.2 The region and the two grids
 
-Defined in `haze/grid.ts`. Longitude 96 to 118 east, latitude 6 south to 8 north. That holds the
-fires that reach Malaysia and the sea the smoke crosses. Singapore, southern Thailand and Brunei
-fall inside it.
+Defined in `haze/grid.ts`. Longitude 96 to 120 east, latitude 6 south to 8 north. That holds the
+fires that reach Malaysia and the sea the smoke crosses, and all of Malaysia including eastern
+Sabah. Singapore, southern Thailand and Brunei fall inside it.
 
 | Grid | Size | Used for |
 | --- | --- | --- |
-| Weather | 23 by 15 points, 1 degree | Wind and rain |
-| Field | 88 by 56 cells, 0.25 degree (about 28 km) | Smoke and the API shown on the map |
+| Weather | 25 by 15 points, 1 degree | Wind and rain |
+| Field | 96 by 56 cells, 0.25 degree (about 28 km) | Smoke and the API shown on the map |
 
 Both are stored row by row from the south-west corner.
 

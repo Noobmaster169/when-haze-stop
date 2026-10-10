@@ -17,7 +17,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const SOURCE = join(here, "../../frontend/public/basemap.json");
 const TARGET = join(here, "../src/haze/land-outline.ts");
 // The model's region, with a degree to spare so a coast just outside still counts.
-const BOX = { lon0: 95, lat0: -7, lon1: 119, lat1: 9 };
+const BOX = { lon0: 95, lat0: -7, lon1: 121, lat1: 9 };
 
 function bounds(steps) {
   let lon = 0;
