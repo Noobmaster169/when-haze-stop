@@ -9,6 +9,7 @@ def test_walk_forward_by_day_keeps_time_order(frame):
     assert len(blocks) == 4
     for label, train, test in blocks:
         assert train.index.get_level_values("issue_at").max() < test.index.get_level_values("issue_at").min()
+        assert train.index.intersection(test.index).empty
         assert label == test.index.get_level_values("issue_at")[0].strftime("%Y-%m-%d")
 
 

@@ -15,6 +15,15 @@ def _rate(numerator: int, denominator: int) -> float:
     return numerator / denominator if denominator else np.nan
 
 
+def _outside(truth: np.ndarray, bound, below: bool) -> float:
+    if bound is None:
+        return np.nan
+    known = ~np.isnan(bound)
+    if not known.any():
+        return np.nan
+    return float((truth[known] < bound[known] if below else truth[known] > bound[known]).mean())
+
+
 def _one(truth: np.ndarray, p50: np.ndarray, p10, p90) -> dict:
     error = p50 - truth
     hazy = truth >= HAZY_UGM3
@@ -31,8 +40,8 @@ def _one(truth: np.ndarray, p50: np.ndarray, p10, p90) -> dict:
         event, said = truth_api >= line, p50_api >= line
         out[f"hit_{line}"] = _rate(int((event & said).sum()), int(event.sum()))
         out[f"far_{line}"] = _rate(int((~event & said).sum()), int(said.sum()))
-    out["below_p10"] = float((truth < p10).mean()) if p10 is not None and len(truth) else np.nan
-    out["above_p90"] = float((truth > p90).mean()) if p90 is not None and len(truth) else np.nan
+    out["below_p10"] = _outside(truth, p10, below=True)
+    out["above_p90"] = _outside(truth, p90, below=False)
     return out
 
 
@@ -58,42 +67,55 @@ def score(test: pd.DataFrame, forecast: pd.DataFrame, day: int) -> dict:
     return out
 
 
+def _daily(values: pd.Series, own_days: pd.DatetimeIndex, calendar: pd.DatetimeIndex) -> np.ndarray:
+    return pd.Series(values.to_numpy(dtype=float), index=own_days).reindex(calendar).to_numpy()
+
+
 def lead_to_onset(test: pd.DataFrame, forecasts_by_day: dict[int, pd.DataFrame]) -> pd.DataFrame:
+    """Onsets per instrument on a daily calendar, so a missing day is a gap and never a neighbour."""
     rows = []
     ids = test.index.get_level_values("instrument_id")
     for instrument_id in ids.unique():
         own = test[ids == instrument_id].sort_index(level="issue_at")
-        days = (own.index.get_level_values("issue_at") + MALAYSIA_OFFSET).date
-        truth = pm25_to_api(own["peak_d1"].to_numpy(dtype=float))
-        for position in range(3, len(own)):
-            if truth[position] >= ONSET_API and np.all(truth[position - 3 : position] < ONSET_API):
-                lead = 0
-                for d in (2, 1):
-                    earlier = position - (d - 1)
-                    if earlier < 0 or d not in forecasts_by_day:
-                        continue
-                    said = forecasts_by_day[d][f"p50_d{d}"].reindex(own.index).to_numpy(dtype=float)[earlier]
-                    if not np.isnan(said) and pm25_to_api(said) >= ONSET_API:
-                        lead = max(lead, d)
-                onset_day = days[position] + pd.Timedelta(days=1)
-                rows.append({"instrument_id": instrument_id, "onset_day": onset_day, "lead_days": lead})
+        own_days = pd.DatetimeIndex((own.index.get_level_values("issue_at") + MALAYSIA_OFFSET).date)
+        calendar = pd.date_range(own_days.min(), own_days.max(), freq="D")
+        truth = pm25_to_api(_daily(own["peak_d1"], own_days, calendar))
+        said = {
+            d: pm25_to_api(_daily(forecast[f"p50_d{d}"].reindex(own.index), own_days, calendar))
+            for d, forecast in forecasts_by_day.items()
+        }
+        for position in range(3, len(calendar)):
+            if not truth[position] >= ONSET_API or not (truth[position - 3 : position] < ONSET_API).all():
+                continue
+            lead = 0
+            for d in sorted(said):
+                earlier = position - (d - 1)
+                if earlier >= 0 and said[d][earlier] >= ONSET_API:
+                    lead = max(lead, d)
+            onset_day = calendar[position] + pd.Timedelta(days=1)
+            rows.append({"instrument_id": instrument_id, "onset_day": onset_day, "lead_days": lead})
     return pd.DataFrame(rows, columns=["instrument_id", "onset_day", "lead_days"])
 
 
 def bootstrap_difference(
     test: pd.DataFrame, a: pd.DataFrame, b: pd.DataFrame, day: int, draws: int = 500, seed: int = 1
 ) -> tuple[float, float]:
+    """5th and 95th percentile of mae(a) - mae(b) over resampled issue days.
+
+    Pools whatever rows it is given, so callers filter by kind first.
+    """
     truth = test[f"peak_d{day}"].to_numpy(dtype=float)
     ea = np.abs(a[f"p50_d{day}"].reindex(test.index).to_numpy(dtype=float) - truth)
     eb = np.abs(b[f"p50_d{day}"].reindex(test.index).to_numpy(dtype=float) - truth)
     keep = ~np.isnan(ea) & ~np.isnan(eb)
     issue = test.index.get_level_values("issue_at").to_numpy()[keep]
-    ea, eb = ea[keep], eb[keep]
-    days = np.unique(issue)
+    _, inverse = np.unique(issue, return_inverse=True)
+    counts = np.bincount(inverse).astype(float)
+    sum_a, sum_b = np.bincount(inverse, weights=ea[keep]), np.bincount(inverse, weights=eb[keep])
+    if not len(counts):
+        return np.nan, np.nan
     rng = np.random.default_rng(seed)
-    diffs = []
-    for _ in range(draws):
-        chosen = rng.choice(days, size=len(days), replace=True)
-        picked = np.concatenate([np.flatnonzero(issue == one) for one in chosen]) if len(chosen) else np.array([], int)
-        diffs.append(ea[picked].mean() - eb[picked].mean() if len(picked) else np.nan)
-    return float(np.nanpercentile(diffs, 5)), float(np.nanpercentile(diffs, 95))
+    chosen = rng.integers(0, len(counts), size=(draws, len(counts)))
+    n = counts[chosen].sum(axis=1)
+    diffs = (sum_a[chosen].sum(axis=1) - sum_b[chosen].sum(axis=1)) / n
+    return float(np.percentile(diffs, 5)), float(np.percentile(diffs, 95))
