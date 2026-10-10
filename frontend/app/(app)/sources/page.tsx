@@ -72,7 +72,7 @@ export default async function SourcesPage({ searchParams }: PageProps<"/sources"
             <header className="pt-20 pb-6">
               <h1 className="font-display text-display text-ink">Sources</h1>
               <p className="mt-2 max-w-[62ch] text-body text-ink-secondary">
-                Three kinds of data feed the map, each fetched on a schedule. Times are Malaysian time.
+                Four kinds of data feed the map and the alerts, each fetched on a schedule. Times are Malaysian time.
               </p>
             </header>
 

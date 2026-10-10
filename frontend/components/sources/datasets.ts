@@ -3,7 +3,7 @@ import type { FetchDetail, SourceFetch } from "@/lib/api/source-schemas";
 import { malaysiaClock, malaysiaDate } from "@/lib/malaysia-time";
 
 /**
- * The three kinds of data the hourly job fetches, as a person would name them,
+ * The four kinds of data the hourly job fetches, as a person would name them,
  * each with the numbers worth showing from its newest fetch. A dataset can be
  * more than one fetch (air quality is the station list and the readings); its
  * history pages through the one that carries the data.
@@ -17,7 +17,7 @@ export interface Stat {
 
 export interface Dataset {
   /** Also the query parameter that pages its history. */
-  key: "air" | "fires" | "weather";
+  key: "air" | "fires" | "weather" | "statements";
   title: string;
   icon: IconName;
   what: string;
@@ -36,6 +36,12 @@ function count(detail: FetchDetail | null, key: string): string {
 function text(detail: FetchDetail | null, key: string): string | null {
   const value = detail?.[key];
   return typeof value === "string" ? value : null;
+}
+
+/** One number added up over several fetches, or n/a when none of them recorded it. */
+function total(details: (FetchDetail | null)[], key: string): string {
+  const values = details.map((detail) => detail?.[key]).filter((value): value is number => typeof value === "number");
+  return values.length === 0 ? "n/a" : values.reduce((sum, value) => sum + value, 0).toLocaleString("en-GB");
 }
 
 /** "2 to 15 Oct", or "28 Sep to 3 Oct" across a month. */
@@ -100,6 +106,23 @@ export const DATASETS: readonly Dataset[] = [
       ];
     },
     summary: (detail) => `${count(detail, "hours")} hours`,
+  },
+  {
+    key: "statements",
+    title: "Official statements",
+    icon: "alert",
+    what: "What ministries, states and Rulers decided about the haze, read by the model once each.",
+    members: ["moe-statements", "doe-statements", "news-statements"],
+    history: "news-statements",
+    stats: (detailOf) => {
+      const all = ["moe-statements", "doe-statements", "news-statements"].map(detailOf);
+      return [
+        { icon: "home", value: count(detailOf("moe-statements"), "listed"), label: "ministry statements on haze" },
+        { icon: "external", value: count(detailOf("news-statements"), "listed"), label: "headlines that announce" },
+        { icon: "check", value: total(all, "statements"), label: "statements read, newest fetch" },
+      ];
+    },
+    summary: (detail) => `${count(detail, "new")} new, ${count(detail, "statements")} statements`,
   },
 ];
 

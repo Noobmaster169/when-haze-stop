@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Place } from "@/lib/api/haze-schemas";
 
-import { distanceKm } from "./geo";
+import { distanceKm, REGION } from "./geo";
+import { LocateCard } from "./locate-card";
 import { type Layers, MapCanvas, type MapHandle, type Pick } from "./map-canvas";
 import { Legend, LayerToggles, ZoomButtons } from "./map-controls";
 import { apiAt } from "./map-data";
@@ -14,6 +15,7 @@ import { type Probe, ProbeTip } from "./probe-tip";
 import { StationPanel } from "./station-panel";
 import { Timeline } from "./timeline";
 import { useHazeMap } from "./use-haze-map";
+import { saveLocation, useMyLocation } from "./my-location";
 
 /**
  * The map page: the map, what is laid over it, the timeline under it and the
@@ -77,6 +79,27 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
     [nearestTo],
   );
 
+  const location = useMyLocation();
+  /** Your own spot opens like any other, named as yours, with its nearest station one tap away. */
+  const goHome = useCallback(
+    (lat: number, lon: number) => {
+      const inside = lon >= REGION.lon0 && lon <= REGION.lon1 && lat >= REGION.lat0 && lat <= REGION.lat1;
+      const nearest = inside ? nearestTo(lon, lat) : null;
+      saveLocation({ lat, lon, nearest });
+      if (!inside) return;
+      handle.current?.flyTo(lon, lat);
+      setSelected(null);
+      setProbe({ lon, lat, name: "Your location", nearest });
+    },
+    [nearestTo],
+  );
+  const homed = useRef(false);
+  useEffect(() => {
+    if (homed.current || initialStation || !data || !location || location === "declined") return;
+    homed.current = true;
+    goHome(location.lat, location.lon);
+  }, [data, location, initialStation, goHome]);
+
   /** A station opens its own panel. Anywhere else opens the spot itself, named, with its nearest station one tap away. */
   const choosePlace = useCallback((place: Place) => {
     handle.current?.flyTo(place.lon, place.lat);
@@ -132,6 +155,11 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
             <Legend />
           </div>
           {probe && data ? <ProbeTip anchor={tip} api={apiAt(data, at, probe.lon, probe.lat)} at={at} /> : null}
+          {data && location === null ? (
+            <div className="absolute left-1/2 top-1/2 z-30 -translate-x-1/2 -translate-y-1/2">
+              <LocateCard onLocated={goHome} onDecline={() => saveLocation("declined")} />
+            </div>
+          ) : null}
           {!data ? <p className="absolute inset-x-0 top-1/2 text-center text-small text-ink-tertiary">Loading the map</p> : null}
           {station ? <StationPanel key={station.id} station={station} at={at} via={selected?.via ?? null} onClose={() => setSelected(null)} /> : null}
           {!station && probe && data ? <PointPanel data={data} basemap={basemap} probe={probe} at={at} onStation={openStation} onClose={() => setProbe(null)} /> : null}

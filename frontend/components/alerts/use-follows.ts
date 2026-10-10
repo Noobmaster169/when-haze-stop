@@ -6,6 +6,7 @@ import useSWR, { mutate } from "swr";
 import { type Subscription, SubscriptionList } from "@/lib/api/alert-schemas";
 import { parsedFetcher } from "@/lib/poll";
 
+import { refreshPush } from "./push";
 import { useSessionId } from "./session";
 
 /** The stations this browser follows, and the two things it can do about them. */
@@ -38,6 +39,8 @@ export function useFollows(): Follows {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ sessionId: session, stationId }),
       });
+      // A device already notified for other areas hears about this one too.
+      await refreshPush(session);
       await refreshAlerts();
     },
     [session],

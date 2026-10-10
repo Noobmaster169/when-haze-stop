@@ -56,6 +56,10 @@ services:
       LLM_PROXY_URL: http://llm-proxy:4000
       LLM_MODEL_CHAT: ${LLM_MODEL_CHAT:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Web Push, so alerts reach a device with the tab closed. Empty: in-app only.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@localhost}
     command: ["node", "db/migrate.mjs"]
     depends_on:
       postgres:
@@ -84,9 +88,10 @@ services:
       retries: 6
     restart: unless-stopped
 
-  # The hourly fetch, model run and alert pass: one cycle now so the map has
-  # data, a backfill of the stored week (it skips hours already run, so a
-  # restart costs little), then a cycle at 20 past every hour.
+  # The hourly fetch, statement reading, model run and alert pass: one cycle
+  # now so the map has data, a backfill of the stored week (it skips hours
+  # already run, so a restart costs little), then a cycle at 20 past every hour.
+  # The proxy reads the new official statements each cycle.
   jobs:
     build: ./backend
     environment: *backend-env
@@ -94,6 +99,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      llm-proxy:
+        condition: service_started
     restart: unless-stopped
 
   frontend:

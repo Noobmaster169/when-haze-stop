@@ -8,4 +8,5 @@ export * from "./api/city-client";
 export * from "./api/haze-client";
 export * from "./api/simulation-client";
 export * from "./api/sources-client";
+export * from "./api/statements-client";
 export { BackendError } from "./api/transport";

@@ -1,4 +1,4 @@
-import { AlertFeed, Subscription, SubscriptionList } from "./alert-schemas";
+import { AlertFeed, AreaList, PushKey, type PushSubscription, Subscription, SubscriptionList } from "./alert-schemas";
 import type { Outcome } from "./chat-client";
 import { get, parseAs, refusalMessage, request } from "./transport";
 
@@ -24,5 +24,21 @@ export async function unfollow(session: string, stationId: string): Promise<Outc
   const response = await request(`/alerts/subscriptions/${encodeURIComponent(stationId)}?session=${encodeURIComponent(session)}`, { method: "DELETE" });
   // Not following it already is the state that was asked for.
   if (!response.ok && response.status !== 404) return { ok: false, message: await refusalMessage(response) };
+  return { ok: true, value: null };
+}
+
+/** One card per area a browser follows, each leading with tomorrow's forecast. */
+export async function getAreas(session: string): Promise<AreaList> {
+  return get(AreaList, `/alerts/areas?session=${encodeURIComponent(session)}`);
+}
+
+export async function getPushKey(): Promise<PushKey> {
+  return get(PushKey, "/alerts/push-key");
+}
+
+/** The device a browser's alerts are sent to, or null to stop sending. */
+export async function setPush(session: string, push: PushSubscription | null): Promise<Outcome<null>> {
+  const response = await request("/alerts/push", { method: "PUT", body: JSON.stringify({ sessionId: session, push }) });
+  if (!response.ok) return { ok: false, message: await refusalMessage(response) };
   return { ok: true, value: null };
 }
