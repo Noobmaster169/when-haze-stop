@@ -4,14 +4,11 @@ import { colourAt, type Stop } from "./scale";
 
 /**
  * The haze field as an image: one pixel a cell, which the canvas then scales
- * up smoothly. Only haze is drawn. Good air (the official band, 50 and under)
- * is left clear so the map shows where the haze is and nothing else; the
- * colour fades in through Moderate and is full from Unhealthy (above 100).
+ * up smoothly. Painted solid everywhere, good air included, so the reading at
+ * any spot is plain at a glance; the coasts and names are drawn over it.
  */
 
-const CLEAR_TO = 50;
-const FULL_FROM = 100;
-const FULL_ALPHA = 0.64;
+const ALPHA = 0.88;
 
 export interface Heat {
   canvas: HTMLCanvasElement;
@@ -25,8 +22,7 @@ export function createHeat(stops: Stop[]): Heat {
   for (let byte = 0; byte < 256; byte++) {
     const api = byte * API_PER_BYTE;
     const [red, green, blue] = colourAt(stops, api);
-    const alpha = FULL_ALPHA * Math.min(1, Math.max(0, (api - CLEAR_TO) / (FULL_FROM - CLEAR_TO)));
-    table.set([red, green, blue, Math.round(alpha * 255)], byte * 4);
+    table.set([red, green, blue, Math.round(ALPHA * 255)], byte * 4);
   }
 
   return {

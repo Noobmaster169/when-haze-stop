@@ -62,14 +62,14 @@ export default async function SourcesPage({ searchParams }: PageProps<"/sources"
         <div className="flex max-w-[1180px] gap-12">
           {report ? (
             <aside className="hidden w-52 shrink-0 lg:block">
-              <div className="sticky top-0 pt-24">
+              <div className="sticky top-0 pt-36">
                 <SourcesToc groups={groups} rootId={SCROLL_ID} layout="column" />
               </div>
             </aside>
           ) : null}
 
           <div className="min-w-0 max-w-[920px] grow">
-            <header className="pt-8 pb-6">
+            <header className="pt-20 pb-6">
               <h1 className="font-display text-display text-ink">Sources</h1>
               <p className="mt-2 max-w-[62ch] text-body text-ink-secondary">
                 The map is built from three kinds of data. An hourly job fetches each one and records every fetch. Times are Malaysian time.
@@ -80,7 +80,7 @@ export default async function SourcesPage({ searchParams }: PageProps<"/sources"
               <p className="text-small text-fault">The backend could not be reached, so there is nothing to show. Check that the api is running.</p>
             ) : (
               <>
-                <div className="sticky top-0 z-10 lg:hidden">
+                <div className="sticky top-14 z-10 lg:hidden">
                   <SourcesToc groups={groups} rootId={SCROLL_ID} layout="bar" />
                 </div>
                 <div>

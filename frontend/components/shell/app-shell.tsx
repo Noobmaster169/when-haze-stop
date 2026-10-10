@@ -5,25 +5,29 @@ import type { ReactNode } from "react";
 import { AlertBar } from "@/components/alerts/alert-bar";
 import { Dock } from "@/components/dock/dock";
 import { DockProvider } from "@/components/dock/dock-state";
+import { DockToggle } from "@/components/dock/dock-toggle";
 
-import { Banner } from "./banner";
+import { TopControls } from "./top-controls";
 
 /**
- * Every screen is this: the banner, the alert bar when there is one, then the page and the dock.
+ * Every screen is this: the alert bar when there is one, then the page with
+ * the island floating over its top, and the dock beside it when it is open.
+ * No banner: the island is the navigation and the page keeps the height.
  *
- * Mounted once by app/(app)/layout.tsx, so the banner and the chat survive
- * every navigation. A page renders its content in a column that fills the
- * space beside the dock.
+ * Mounted once by app/(app)/layout.tsx, so the island and the chat survive
+ * every navigation.
  */
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <DockProvider>
       {/* Relative so an absolutely placed child (an sr-only label, say) is clipped here instead of stretching the document past the viewport. */}
       <div className="relative flex h-dvh flex-col overflow-hidden bg-canvas text-ink">
-        <Banner />
         <AlertBar />
         <div className="flex min-h-0 grow">
-          {children}
+          <div className="relative flex min-w-0 grow">
+            {children}
+            <TopControls toggle={<DockToggle />} />
+          </div>
           <Dock />
         </div>
       </div>

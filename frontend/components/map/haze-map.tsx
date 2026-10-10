@@ -117,10 +117,12 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
       <div className="flex min-w-0 shrink-0 grow flex-col lg:min-h-0 lg:shrink">
         <div className="@container relative h-[54dvh] min-h-[300px] shrink-0 lg:h-auto lg:shrink lg:grow">
           <MapCanvas handle={handle} data={data} basemap={basemap} at={at} layers={layers} selectedId={station?.id ?? null} pin={probe} preview={preview && (preview.lon !== probe?.lon || preview.lat !== probe?.lat) ? preview : null} onPick={pick} onPaint={followTip} />
-          <div className="absolute left-3 top-3 z-30">
+          {/* Under the island on a map too narrow to hold both side by side. */}
+          <div className="absolute left-3 top-16 z-30 @[900px]:top-3">
             <PlaceSearch onChoose={choosePlace} onPreview={setPreview} />
           </div>
-          <div className="absolute right-3 top-3">
+          {/* Below the chat's button, which floats in the corner above. */}
+          <div className="absolute right-3 top-16">
             <ZoomButtons onZoom={(factor) => handle.current?.zoom(factor)} />
           </div>
           <div className="absolute bottom-3 left-3">

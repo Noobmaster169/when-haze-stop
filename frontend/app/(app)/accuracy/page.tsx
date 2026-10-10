@@ -44,7 +44,7 @@ export default async function AccuracyPage() {
 
   return (
     <main className="flex min-w-0 grow flex-col">
-      <div className="min-h-0 grow overflow-y-auto px-6 py-8 md:px-10">
+      <div className="min-h-0 grow overflow-y-auto px-6 pt-20 pb-8 md:px-10">
         <h1 className="font-display text-display text-ink">Track record</h1>
         <p className={prose}>
           Every forecast is checked against the reading DOE published when its hour arrived, and against the simplest forecast there is: that nothing changes. The number is the average miss in API points. Lower is better.

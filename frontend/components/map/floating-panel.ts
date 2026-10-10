@@ -7,7 +7,7 @@
  * inside itself when it is taller than the space it has.
  */
 export const FLOATING_PANEL =
-  "absolute z-20 flex flex-col overflow-y-auto overscroll-contain rounded-xl border border-hairline bg-canvas shadow-overlay inset-x-3 bottom-3 max-h-[62%] @[720px]:inset-x-auto @[720px]:bottom-auto @[720px]:left-3 @[720px]:top-16 @[720px]:w-[348px] @[720px]:max-h-[calc(100%-8.5rem)]";
+  "absolute z-20 flex flex-col overflow-y-auto overscroll-contain rounded-xl border border-hairline bg-canvas shadow-overlay inset-x-3 bottom-3 max-h-[62%] @[720px]:inset-x-auto @[720px]:bottom-auto @[720px]:left-3 @[720px]:top-[7.25rem] @[720px]:w-[348px] @[720px]:max-h-[calc(100%-11.75rem)] @[900px]:top-16 @[900px]:max-h-[calc(100%-8.5rem)]";
 
 /** What the panel covers, so a glide can put its place in the middle of what is left. Matches the classes above. */
 export function panelInset(size: { width: number; height: number }): { left: number; bottom: number } {
