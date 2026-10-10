@@ -8,7 +8,7 @@ A council of agents who play Malaysian ministers and experts argue the question 
 data. Their candidate plans go through the smoke model, and the plan that holds up best becomes
 the verdict. The page replays the whole meeting.
 
-Status: design done (`spec.md`), tested on a prototype council (`11`), and built through phase 4: the suppression core, the engine seam, the store and API, and the council itself (`12-build.md`). The page is being built. The smoke model itself is being reworked by a teammate, so everything here reaches it through one seam (`06-engine-seam.md`) and changes nothing inside `backend/src/haze/`.
+Status: design done (`spec.md`), tested on a prototype council (`11`), and built: the suppression core, the engine seam, the store and API, the council itself, and the page at `/council` (`12-build.md`). The nav still points at the old Simulation page until the switch. The smoke model itself is being reworked by a teammate, so everything here reaches it through one seam (`06-engine-seam.md`) and changes nothing inside `backend/src/haze/`.
 
 ## Files
 

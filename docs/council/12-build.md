@@ -28,6 +28,7 @@ The api serves `POST /council/runs`, `GET /council/runs`, `GET /council/runs/:id
 | Council | `backend/src/agents/council/`: `seats.ts`, `context.ts`, `situation.ts`, `turn.ts`, `fact-check.ts`, `events.ts`, `run.ts`, `stages/*.ts`, `tools/*.ts`, `skills/*/SKILL.md` | `04`, `05`, `07` |
 | Prompts | `backend/src/agents/prompts/council-{mission,draft,critique,premortem,revise,rate,decide}/v1.md` | `05` |
 | Worker | `backend/src/jobs/council-worker.ts`, `council-situation.ts` | |
+| Page | `frontend/app/(app)/council/page.tsx`; `frontend/components/council/` (pure: `timeline.ts` beats, `scene.ts` scene at time t, `tray.ts`, `caption.ts`, `layout.ts`; UI: `graph.tsx` and `paint.ts` for the animated SVG, `use-playback.ts`, `use-council-run.ts` live polling, `replay.tsx`, `rail.tsx`, `plan-tray.tsx`, `player.tsx`, `start-panel.tsx`, `verdict*.tsx`); `frontend/lib/api/council-*.ts`; route handlers under `frontend/app/api/council/` | `09` |
 | Tests | `backend/test/suppression/`, `test/sources/place-namer.test.ts`, `test/agents/council-run.test.ts`, `test/routes/council.routes.test.ts`; fixtures `recorded-council.ts` (real cells), `council-vector.ts` (a labelled test vector) | |
 
 ## How a run goes, in code
@@ -55,3 +56,12 @@ The api serves `POST /council/runs`, `GET /council/runs`, `GET /council/runs/:id
 
 Every step writes events (`agents/council/events.ts`) in sequence; a failed run writes
 `run_failed` and keeps its events.
+
+## The replay's timing
+
+Model latency is thrown away. Each event gets a fixed beat by kind and plays after the previous
+one in sequence: stage and run_started 1.4 s, agent_joined 0.6 s, thinking 0.7 s, tool_call
+0.3 s, tool_result 0.12 s, candidate 0.9 s, simulation 0.5 s, vote 0.4 s, verdict 2 s; a message
+has a 0.35 s lead, then pulses travel two at a time (0.9 s each, a broadcast squeezed to at most
+2.6 s), then 0.25 s to settle. Run 1 (472 events) plays in 3 min 51 s at 1x. The scene is a pure
+function of the events and the time, so scrubbing back equals playing forward.
