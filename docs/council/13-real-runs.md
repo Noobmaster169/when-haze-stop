@@ -53,6 +53,31 @@ the Johor fires 3.5% and 2.3%, C007 West Kalimantan 0.09%.
 | The Red Cell's headlines were cryptic first sentences ("Everything that could fail did.") | Each pre-mortem item has its own one-sentence headline |
 | Foreign Affairs' pressure moved revisions back to Kalimantan, where the engine shows almost no benefit | Not a bug: it is the consent trade-off the Committee must weigh. The archive of best plans and the greedy contenders now keep the engine's view in the room |
 
-## Run 2
+## Run 2, 10 October 2026, 21:11 MYT (incomplete)
 
-Started after the fixes; recorded here when read.
+The first run after the fixes. Its process was killed when the session that started it ended,
+during the cross-examination (404 events); it is closed as failed with that reason and a
+`run_failed` event, so its replay ends cleanly. What it showed before it stopped:
+
+| Plan | Made by | Expected share of the ceiling | Worst wind |
+| --- | --- | --- | --- |
+| P12 | Greedy search, if Indonesia agrees (code) | 16.4% | 8.8% |
+| P2 | Air Quality: crews and the task force on C005 and C014 in Jambi, Bomba in Johor | 14.3% | 8.9% |
+| P3 | Health: the whole package on Jambi's two largest peat sources, Bomba in Johor | 13.6% | 7.6% |
+| P13 | a critic's variant | 11.5% | 8.0% |
+| P8 | Meteorology: South Sumatra C001 and C002 by request, Bomba in Johor | 11.3% | 7.6% |
+| P11 | Greedy search, within accepted consent (code) | 6.4% | 1.2% |
+| P1 | Domestic Fire: Bomba on the two Johor fires | 5.7% | 1.1% |
+
+The best council drafts now come within two points of the greedy request plan (run 1's best
+draft was 6.9%, its verdict 11.1%), and P2's worst-wind figure beats it. The greedy plans were
+critiqued like any other: Force Command found the within-consent greedy plan "scatters Bomba
+crews onto dead fires, misuses the sole scooper, and runs air crews 14 days straight with no rest
+day", which the engine cannot see. Air Operations caught a draft sending the scooper to C005, 62
+km from open sea.
+
+Long runs are now started detached (`nohup`), so a session ending cannot kill them.
+
+## Run 3
+
+Started 21:29 MYT (run id 7); recorded here when read.
