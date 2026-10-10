@@ -14,13 +14,9 @@ import type { Scenario } from "./scenarios";
  * next door keeps a share burning however hard the complex is worked.
  */
 
-/** The first day an assignment can work: its own start, or later where it waits on travel or consent. */
+/** The first day an assignment can work: its own start, or later where the asset is still on its way. */
 export function arrivalDay(assignment: Assignment): number {
-  const line = assetLine(assignment.asset);
-  // A ground crew needs a day to reach the fire and set up pumps; aircraft and Bomba at home do not.
-  const travel = assignment.asset === "ground_teams" || assignment.asset === "ground_task_force" ? 2 : 1;
-  const waits = assignment.needsConsent ? line.earliestWithConsent : travel;
-  return Math.max(assignment.fromDay, waits);
+  return Math.max(assignment.fromDay, assetLine(assignment.asset).arrivesDay);
 }
 
 function teams(assignment: Assignment): number {

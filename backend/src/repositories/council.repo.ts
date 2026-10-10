@@ -144,3 +144,22 @@ export async function eventsAfter(db: Queryable, runId: number, after: number, l
   );
   return rows.map((row) => ({ seq: row.seq, at: row.at.toISOString(), kind: row.kind, actor: row.actor, payload: row.payload }));
 }
+
+/**
+ * Closes runs left "running" by a worker that died: each gets a last
+ * `run_failed` event and is marked failed, so the one-active-run rule stops
+ * refusing new runs. Only for a worker starting up, when nothing can be
+ * running; there is one worker.
+ */
+export async function failAbandoned(db: Queryable, reason: string): Promise<number[]> {
+  const { rows } = await db.query<{ id: string }>("select id from council_runs where status = 'running'");
+  for (const { id } of rows) {
+    await db.query(
+      `insert into council_events (run_id, seq, kind, actor, payload)
+        values ($1, coalesce((select max(seq) + 1 from council_events where run_id = $1), 0), 'run_failed', 'system', $2)`,
+      [id, JSON.stringify({ error: reason })],
+    );
+    await fail(db, Number(id), reason);
+  }
+  return rows.map((row) => Number(row.id));
+}

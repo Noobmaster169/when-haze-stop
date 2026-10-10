@@ -20,11 +20,12 @@ describe("the effect of suppression", () => {
   it("does nothing before the crews can arrive", () => {
     expect(arrivalDay(line("C01", "cl415", 1))).toBe(1);
     expect(arrivalDay(line("C01", "ground_teams", 2))).toBe(2);
-    expect(arrivalDay(line("C03", "ground_teams", 2, 1, 14, "sumatra"))).toBe(5);
-    expect(arrivalDay(line("C01", "ground_task_force", 150, 1, 14, "ground_crews"))).toBe(7);
-    const keep = keepByDay(peatKal, [line("C01", "ground_task_force", 150, 1, 14, "ground_crews")], SCENARIOS.central, 14, false);
-    expect(keep.slice(0, 6).every((value) => value === 1)).toBe(true);
-    expect(keep[6]).toBeLessThan(1);
+    // The task force has to be flown in; no request to wait on, only travel.
+    expect(arrivalDay(line("C03", "ground_task_force", 150))).toBe(3);
+    expect(arrivalDay(line("C03", "ground_teams", 2, 5))).toBe(5);
+    const keep = keepByDay(peatKal, [line("C01", "ground_task_force", 150)], SCENARIOS.central, 14, false);
+    expect(keep.slice(0, 2).every((value) => value === 1)).toBe(true);
+    expect(keep[2]).toBeLessThan(1);
   });
 
   it("puts out a small surface fire quickly with Bomba", () => {
@@ -59,7 +60,7 @@ describe("scoring a plan", () => {
   it("is the sum of its parts on complexes that do not touch", () => {
     const attribution = vectorAttribution();
     const a = [line("C02", "bomba_domestic", 100)];
-    const b = [line("C03", "ground_teams", 2, 2, 13, "sumatra")];
+    const b = [line("C03", "ground_teams", 2, 2, 13)];
     const both = removedSeries({ assignments: [...a, ...b] }, attribution, "central", 0)[0];
     const sum = removedSeries({ assignments: a }, attribution, "central", 0)[0] + removedSeries({ assignments: b }, attribution, "central", 0)[0];
     expect(both).toBeCloseTo(sum, 5);
@@ -73,7 +74,7 @@ describe("scoring a plan", () => {
   });
 
   it("orders the scenarios: optimistic at least central at least pessimistic", () => {
-    const score = scorePlan({ assignments: [line("C03", "ground_task_force", 150, 7, 14, "sumatra")] }, vectorAttribution());
+    const score = scorePlan({ assignments: [line("C03", "ground_task_force", 150, 3, 14)] }, vectorAttribution());
     expect(score.optimistic).toBeGreaterThanOrEqual(score.expected);
     expect(score.expected).toBeGreaterThanOrEqual(score.pessimistic);
     expect(score.measures).toHaveLength(3);

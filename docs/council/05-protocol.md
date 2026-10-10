@@ -1,5 +1,11 @@
 # The meeting
 
+**Simplified on 10 October 2026:** no diplomacy criterion, no consent rules and no "Ask
+Indonesia" track (Indonesia is assumed to allow everything); eight agents (`04-council-roles.md`);
+criteria KL benefit, robustness, feasibility and cost; three critics a plan; the verdict is one
+"The plan" line, the reasoning, the cost and what could go wrong. Where the text below mentions
+consent, requests or diplomacy it describes the earlier design.
+
 A propose, verify, critique, revise loop with the engine as referee, shaped after the military
 decision-making process (mission analysis, courses of action, wargaming, comparison, decision)
 and the evidence in `research/04-deliberation-design.md`. Talk is spent only on what the engine

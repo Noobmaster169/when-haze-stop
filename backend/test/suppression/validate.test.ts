@@ -19,13 +19,14 @@ const plan = (assignments: Assignment[]): Plan => ({
 const line = (complexId: string, asset: Assignment["asset"], units: number, fromDay = 1, toDay = 10): Assignment => ({ complexId, asset, units, fromDay, toDay, needsConsent: null });
 
 describe("validating a plan", () => {
-  it("accepts the accepted package in Kalimantan and Bomba at home", () => {
+  it("accepts the package anywhere in Indonesia and Bomba at home", () => {
     expect(validate(plan([line("C01", "cl415", 1), line("C01", "helicopters", 3), line("C02", "bomba_domestic", 100)]), VECTOR_COMPLEXES)).toEqual([]);
   });
 
-  it("works out consent from the place, whatever the plan claimed", () => {
-    const normalised = normalise(plan([line("C03", "cl415", 1), line("C01", "ground_task_force", 150), line("C02", "bomba_domestic", 50)]), VECTOR_COMPLEXES);
-    expect(normalised.assignments.map((item) => item.needsConsent)).toEqual(["sumatra", "ground_crews", null]);
+  it("asks Indonesia for nothing: every line is cleared of any consent a plan claimed", () => {
+    const claimed = plan([{ ...line("C03", "cl415", 1), needsConsent: "sumatra" }, { ...line("C01", "ground_task_force", 150), needsConsent: "ground_crews" }]);
+    expect(normalise(claimed).assignments.map((item) => item.needsConsent)).toEqual([null, null]);
+    expect(validate(normalise(claimed), VECTOR_COMPLEXES)).toEqual([]);
   });
 
   it("refuses more aircraft than Malaysia has, on any one day", () => {
@@ -61,19 +62,19 @@ describe("validating a plan", () => {
 });
 
 describe("the baselines", () => {
-  it("send everything to the biggest and to the nearest Kalimantan fire", () => {
-    expect(biggestFirst(VECTOR_COMPLEXES)!.assignments.every((item) => item.complexId === "C01")).toBe(true);
-    expect(nearestFirst(VECTOR_COMPLEXES, { lat: 3.14, lon: 101.69 })!.assignments[0].complexId).toBe("C01");
+  it("send everything to the biggest and to the nearest fire in Indonesia, named by place", () => {
+    const biggest = biggestFirst(VECTOR_COMPLEXES)!;
+    expect(biggest.assignments.every((item) => item.complexId === "C01")).toBe(true);
+    expect(biggest.title).not.toMatch(/C0\d/);
+    // The Sumatra test fire is nearer KL than the Kalimantan one.
+    expect(nearestFirst(VECTOR_COMPLEXES, { lat: 3.14, lon: 101.69 })!.assignments[0].complexId).toBe("C03");
   });
 
-  it("make a valid greedy plan that beats biggest-first, and does better still with requests", () => {
+  it("make a valid greedy plan inside the budget that beats biggest-first", () => {
     const attribution = vectorAttribution();
-    const within = greedy(attribution, false);
-    const asking = greedy(attribution, true);
-    expect(validate(plan(within.assignments), VECTOR_COMPLEXES)).toEqual([]);
-    expect(within.assignments.some((item) => item.complexId === "C03")).toBe(false);
-    const naive = scorePlan(biggestFirst(VECTOR_COMPLEXES)!, attribution).expected;
-    expect(scorePlan(within, attribution).expected).toBeGreaterThan(naive);
-    expect(scorePlan(asking, attribution).expected).toBeGreaterThanOrEqual(scorePlan(within, attribution).expected);
+    const computed = greedy(attribution, 8_000_000);
+    expect(validate(plan(computed.assignments), VECTOR_COMPLEXES, { budgetRm: 8_000_000 })).toEqual([]);
+    const naive = scorePlan(biggestFirst(VECTOR_COMPLEXES, 8_000_000)!, attribution).expected;
+    expect(scorePlan(computed, attribution).expected).toBeGreaterThan(naive);
   });
 });

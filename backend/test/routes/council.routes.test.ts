@@ -47,3 +47,17 @@ describe("the council routes", () => {
     expect((await request(testApp()).get("/council/runs/999999999")).status).toBe(404);
   });
 });
+
+describe("a worker starting up", () => {
+  it("closes a run left running by a worker that died, so a new run can queue", async () => {
+    const pool = getPool();
+    const queued = (await council.queue(pool, "klang-valley", 8_000_000))!;
+    await council.claimNext(pool);
+    expect(await council.failAbandoned(pool, "the worker restarted")).toContain(queued.id);
+    const closed = await council.find(pool, queued.id);
+    expect(closed?.status).toBe("failed");
+    const events = await council.eventsAfter(pool, queued.id, -1);
+    expect(events.at(-1)?.kind).toBe("run_failed");
+    expect(await council.queue(pool, "klang-valley", 8_000_000)).not.toBeNull();
+  });
+});

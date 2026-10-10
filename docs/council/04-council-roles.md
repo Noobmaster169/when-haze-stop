@@ -1,7 +1,7 @@
 # Who sits at the table
 
-Eleven seats (a Chair and ten members) plus a Red Cell, named by office and never by the person who
-holds it. The council's words are
+A Chair, six members and a Red Cell (eight agents since the simplification of 10 October 2026),
+named by office and never by the person who holds it. The council's words are
 simulated; putting them in a real minister's mouth would invent what a real person said, which
 the project's real-data rule forbids. The page says "role-played by AI" under the council.
 
@@ -19,38 +19,31 @@ voice is the least of them:
 3. **Tools**: what it can look up itself.
 4. **Natural conflict**: where its mandate pulls against another seat's.
 
-## The seats
+## The seats (simplified on 10 October 2026)
 
-| Seat | Mandate | Private brief | Tools | Pulls against |
+The user simplified the council: Indonesia is assumed to let every Malaysian aircraft and crew
+work wherever they are needed, so diplomacy drops out, and only the most relevant seats remain.
+Foreign Affairs, Sarawak and Health were removed; Force Command and Domestic Fire became one Fire
+Operations seat. Eight agents:
+
+| Seat | Mandate | Private brief | Tools | Premise when drafting |
 | --- | --- | --- | --- | --- |
-| **Chair**, National Disaster Management Committee (NADMA secretariat) | Runs the meeting, freezes the criteria before any plan exists, decides. Speaks last, never proposes. | The package, the political guidance, the budget | none beyond the shared board | Everyone; must resist visible-action-for-its-own-sake |
-| **Air Quality**, NRES / DOE | Lower the API over the Klang Valley | DOE readings and the forecast for the target stations, the ceiling (all fires out) | `get_target_air`, `get_influence` | Health on whose exposure counts; Sarawak on which region matters |
-| **Meteorology**, MetMalaysia | Say where smoke goes and how sure that is | The wind for the horizon and its ensemble spread, the influence matrix by scenario | `get_influence`, `get_wind_outlook` | Anyone treating one wind forecast as fact |
-| **Peat Science**, a university tropical peat scientist | Physical realism about what can be put out and what relights | Fire persistence history (days burning of the last 30), the peat map, burn depth guidance | `get_complexes`, `get_complex` (persistence, peat and night share), `get_influence`, `simulate_plan` | Air Ops (water bombing barely touches deep peat); the model (fire power under-weights smouldering peat) |
-| **Force Command**, NADMA operations | Use the deployed force safely and well | The force: crews, hours, staging, rotation | `get_logistics`, `check_feasibility`, `simulate_plan` | Scattered "show" sorties; anyone over-committing crews |
-| **Air Operations**, APMM and TUDM | Aircraft: what can fly where, how often | Scoop-water sources within range, sortie rates (2015 Palembang precedent), clearance lead times | `get_logistics`, `check_feasibility` | Targets far from scoopable water, whatever their smoke value |
-| **Domestic Fire**, Bomba (JBPM) | Fires on Malaysian soil | Peninsular fires, Bomba peat teams, response times | `get_complexes` filtered to Malaysia, `check_feasibility` | The assumption that the answer is all in Indonesia |
-| **Foreign Affairs**, Wisma Putra | Indonesian consent, ASEAN framing, no appearance of interference | Help was accepted for Kalimantan only (18 September 2026); procedures still being aligned on 7 October; Sumatra or ground crews need a new request; the 2015 refusal then acceptance, the 2019 refusal, the 2023 denial; sensitivities (Malaysian-owned concessions) | `get_consent_and_costs` | High-value targets that are politically unworkable; may veto only by citing a hard constraint |
-| **Health**, KKM | Fewer people breathing unhealthy air, protect the vulnerable | Population per target station area, the school and health lines | `get_target_air`, `get_guidelines` | Air Quality's mean-PM2.5 framing (exposure is people times hours over a line) |
-| **Treasury**, MOF | Keep the plan inside the money set aside, and spend each ringgit where it removes most smoke | Cost per day of each asset (aircraft are the costliest by far) | `get_consent_and_costs`, `simulate_plan` | Marginal sorties with little benefit |
-| **Sarawak**, State Disaster Management Committee | Sarawak's air, which took the worst API this year | Sarawak stations and forecast | `get_target_air` for Sarawak | A KL-only objective; it is the authentic dissenter the research recommends over an assigned devil's advocate |
+| **Chair**, National Disaster Management Committee | Runs the meeting, freezes the criteria, decides by the rule; never proposes | What the Committee will be asked; the working assumption on Indonesia | `get_complexes`, `get_target_air` | none |
+| **Air Quality**, NRES / DOE | Lower the haze over KL and protect the people breathing it | School closures, the target's outlook, the most any plan could clear | complexes, influence, feasibility, simulate, `get_target_air` | Clear the most smoke from KL inside the budget |
+| **Meteorology**, MetMalaysia | Where the smoke goes and how sure that is | The inter-monsoon, how the wind patterns disagree | complexes, influence, feasibility, simulate, `get_wind_outlook` | Hold up in every wind pattern |
+| **Peat Science**, university peat research | What can be put out and what relights | The model under-weights smouldering peat; night burning marks deep peat | complexes, influence, feasibility, simulate | Commit only to fires that can be finished, from the edge |
+| **Fire Operations**, Bomba with NADMA operations | Ground crews at home and abroad: put fires out and keep them out | Bomba's numbers, the task force's three-day airlift, rest and water | complexes, influence, feasibility, simulate, `get_logistics` | Ground crews first, where they can finish the job |
+| **Air Operations**, APMM and TUDM | What can fly where and where it helps | The 2015 Palembang record, the scoop run, smoke grounding aircraft | complexes, influence, feasibility, simulate, `get_logistics` | Aircraft only where they really work |
+| **Treasury**, Ministry of Finance | Keep inside the money and spend each ringgit where it clears most smoke | Daily costs: aircraft by far the dearest | complexes, influence, feasibility, simulate, `get_costs` | The most smoke cleared per ringgit |
+| **Red Cell**, fire and weather | Find how each plan fails | Judged on the failure that matters most | complexes, influence, `stress_plan` | none (pre-mortem only) |
 
-Plus two non-speaking nodes on the graph:
+Plus the Engine (the smoke model) at the centre of the table. Six seats draft; each plan is
+questioned by three seats other than its author, and the Red Cell runs one pre-mortem over the
+shortlist. Feasibility is rated by Fire Operations, Air Operations and Peat Science, cost by
+Treasury; a plan rated below 3 of 10 on feasibility cannot win while another clears it. After the
+decision every member says whether it stands behind it.
 
-- **The Engine** (the smoke model through `06-engine-seam.md`): every simulation request goes to
-  it and every score comes from it. It is drawn at the centre of the table.
-- **The Red Cell: fire and weather.** One more agent, but not a ministry. Its mandate is the
-  adversary's: find how each plan fails, by wind shift, re-ignition, cloud hiding fires, or
-  smoke already in the air. It does the pre-mortem. Unlike a devil's advocate told to disagree,
-  it has its own tool (`stress_plan`, which re-scores a plan under the pessimistic scenario and
-  under each wind member) so its objections arrive with numbers.
-
-## Who proposes, who critiques
-
-- Proposers (draft a plan independently): Air Quality, Meteorology, Peat Science, Force Command,
-  Air Operations, Domestic Fire, Health, Sarawak. Eight independent drafts.
-- Critics only: Foreign Affairs, Treasury, Red Cell. Their objections are constraints, not plans.
-- The Chair neither proposes nor critiques. It sets the criteria and decides by the rule.
+The table below this note in earlier versions of this file, with twelve agents, is in git history.
 
 ## Models
 

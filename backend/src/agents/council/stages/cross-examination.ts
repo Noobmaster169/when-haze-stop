@@ -12,21 +12,21 @@ import { describePlan, type Session } from "./session";
 
 /**
  * Stage 5: sparse, assigned critique (docs/council/05-protocol.md). Each plan
- * gets Foreign Affairs, whose objections no engine can see, and two seats whose
- * mandates pull against it. A critic who thinks a change is better tables it as
+ * gets three seats whose mandates pull against it. A critic who thinks a change is better tables it as
  * a variant and the engine scores it on the spot. The Red Cell runs one
  * pre-mortem over the whole shortlist.
  */
 
-export const CRITIQUE_PROMPT = "v2";
-export const PREMORTEM_PROMPT = "v2";
-const POOL = ["peat_science", "meteorology", "force_command", "air_operations", "treasury", "health", "domestic_fire", "sarawak", "air_quality"];
+export const CRITIQUE_PROMPT = "v3";
+export const PREMORTEM_PROMPT = "v3";
+const POOL = ["peat_science", "meteorology", "fire_operations", "air_operations", "treasury", "air_quality"];
 const MAX_SHORTLIST = 7;
 const log = childLogger({ module: "council.cross-examination" });
 
+/** Three critics a plan, never its author, rotating so every seat questions several plans. */
 function criticsFor(plan: BoardPlan, index: number): string[] {
   const pool = POOL.filter((id) => id !== plan.by);
-  return ["foreign_affairs", pool[(2 * index) % pool.length], pool[(2 * index + 1) % pool.length]];
+  return [0, 1, 2].map((k) => pool[(3 * index + k) % pool.length]);
 }
 
 async function critique(session: Session, plan: BoardPlan, critic: string): Promise<void> {
@@ -84,7 +84,7 @@ async function premortem(session: Session, plans: BoardPlan[]): Promise<void> {
 export async function crossExamine(session: Session): Promise<void> {
   const plans = session.shortlist.map((id) => session.deps.ctx.plan(id)!);
   const jobs = plans.flatMap((plan, index) => criticsFor(plan, index).map((critic) => ({ plan, critic })));
-  await join(session, ["foreign_affairs", "treasury", "red_cell", ...jobs.map((job) => job.critic)]);
+  await join(session, ["red_cell", ...jobs.map((job) => job.critic)]);
   const settled = await Promise.allSettled([...jobs.map((job) => critique(session, job.plan, job.critic)), premortem(session, plans)]);
   for (const result of settled) if (result.status === "rejected") log.warn({ err: String(result.reason) }, "a critique failed");
 }

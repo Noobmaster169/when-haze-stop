@@ -46,9 +46,9 @@ function script(request: LlmRequest): string {
       return JSON.stringify({ action: "tools", gist: "checking a plan", calls: [{ tool: "simulate_plan", args: { assignments: [line("C02", "bomba_domestic", 100)] } }] });
     }
     // Bomba sent abroad: refused by the validator, then repaired.
-    if (seatTitle === "Domestic Fire" && !user.includes("Your plan was refused")) return final(plan("Bomba to Kalimantan", [line("C01", "bomba_domestic", 50)]));
-    if (seatTitle === "Domestic Fire") return final(plan("Bomba at home", [line("C02", "bomba_domestic", 100)]));
-    if (seatTitle === "Air Quality") return final(plan("Ask for Sumatra", [line("C03", "ground_task_force", 150, 7, 14), line("C02", "bomba_domestic", 60)]));
+    if (seatTitle === "Fire Operations" && !user.includes("Your plan was refused")) return final(plan("Bomba to Kalimantan", [line("C01", "bomba_domestic", 50)]));
+    if (seatTitle === "Fire Operations") return final(plan("Bomba at home", [line("C02", "bomba_domestic", 100)]));
+    if (seatTitle === "Air Quality") return final(plan("Task force to Sumatra", [line("C03", "ground_task_force", 150, 3, 14), line("C02", "bomba_domestic", 60)]));
     if (seatTitle === "Peat Science") return final(plan("Crews on Kalimantan peat", [line("C01", "ground_teams", 2, 2, 13)]));
     return final(plan(`${seatTitle} plan`, [line("C01", "cl415", 1), line("C02", "bomba_domestic", 40)]));
   }
@@ -84,7 +84,7 @@ function script(request: LlmRequest): string {
     });
   }
   if (system.includes("whether they stand behind it")) {
-    return final({ headline: seatTitle === "Foreign Affairs" ? "I cannot back asking Jakarta for crews in Jambi." : "I stand behind it.", stance: seatTitle === "Foreign Affairs" ? "dissent" : "support", reason: "From my mandate." });
+    return final({ headline: seatTitle === "Red Cell" ? "I cannot back a plan that leaves the peat near Simpang to relight." : "I stand behind it.", stance: seatTitle === "Red Cell" ? "dissent" : "support", reason: "From my mandate." });
   }
   throw new Error(`the script has no answer for: ${system.slice(0, 80)}`);
 }
@@ -106,7 +106,8 @@ describe("a council run", () => {
     expect(events.at(-1)?.kind).toBe("run_finished");
     expect(Verdict.safeParse(verdict).success).toBe(true);
     expect(verdict.strikeList.length).toBeGreaterThan(0);
-    expect(verdict.baselines.map((item) => item.title)).toContain("Biggest fire first: everything on C01");
+    expect(verdict.baselines.map((item) => item.title)).toContain("Biggest fire first: everything on the fires test, test");
+    expect(verdict.ask).toBeNull();
     // The chosen plan fits the money set aside (8 million by default), and says what it costs.
     expect(verdict.cost?.budget).toBe(8_000_000);
     expect(verdict.cost!.total).toBeLessThanOrEqual(verdict.cost!.budget);
@@ -126,7 +127,7 @@ describe("a council run", () => {
     const refused = events.find((event) => event.kind === "message" && event.actor === "engine" && (event.payload as { act: string }).act === "challenge");
     expect(refused).toBeDefined();
     const screening = events.findIndex((event) => event.kind === "stage" && (event.payload as { stage: string }).stage === "screening");
-    const bomba = events.slice(0, screening).filter((event) => event.kind === "candidate" && (event.payload as { by: string }).by === "domestic_fire");
+    const bomba = events.slice(0, screening).filter((event) => event.kind === "candidate" && (event.payload as { by: string }).by === "fire_operations");
     expect(bomba).toHaveLength(2);
   });
 
@@ -141,7 +142,8 @@ describe("a council run", () => {
     const verdictAt = events.findIndex((event) => event.kind === "verdict");
     const closing = events.slice(0, verdictAt).filter((event) => event.kind === "message" && ["support", "dissent"].includes((event.payload as { act: string }).act) && (event.payload as { to: string[] }).to.includes("chair"));
     expect(closing.some((event) => (event.payload as { act: string }).act === "dissent")).toBe(true);
-    expect(new Set(closing.map((event) => event.actor)).size).toBeGreaterThanOrEqual(10);
+    // Every member but the Chair: seven of them.
+    expect(new Set(closing.map((event) => event.actor)).size).toBe(7);
   });
 
   it("says where KL's coming smoke comes from, by area, adding up to the whole", async () => {

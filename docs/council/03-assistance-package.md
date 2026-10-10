@@ -1,5 +1,12 @@
 # What Malaysia can send
 
+**Working assumption since 10 October 2026 (the user's decision):** Indonesia lets every
+Malaysian aircraft and crew work wherever they are needed, in Sumatra or Kalimantan, with nothing
+to request and no wait. The facts below about what was actually accepted stay as the record; the
+council plans as if every request were granted. Aircraft work from day 1, lance teams from day 2,
+the ground task force from day 3 (airlift). The only limits are the assets, their days and the
+money (`suppression/costs.ts`).
+
 The council plans with a stated package. Its first part is what was actually offered and
 accepted in September 2026; the rest is assumption, marked as such, with what it rests on. Full
 sourcing in `research/02-campaigns-capacity.md`.

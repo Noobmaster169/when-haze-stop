@@ -3,7 +3,7 @@ import type { CouncilContext } from "../context";
 import { checkFeasibility } from "./check-feasibility";
 import { getComplex } from "./get-complex";
 import { getComplexes } from "./get-complexes";
-import { getConsentAndCosts } from "./get-consent-and-costs";
+import { getCosts } from "./get-costs";
 import { getInfluence } from "./get-influence";
 import { getLogistics } from "./get-logistics";
 import { getTargetAir } from "./get-target-air";
@@ -17,7 +17,7 @@ export type { ToolResult } from "./types";
 
 /** The council's tools, and the one place they are named. A seat sees only those its seat lists, plus `load_skill`. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each tool has its own input type; the registry is keyed by name and parses through the tool's own schema.
-const ALL: CouncilTool<any>[] = [getComplexes, getComplex, getInfluence, getWindOutlook, getTargetAir, getLogistics, getConsentAndCosts, checkFeasibility, simulatePlan, stressPlan, loadSkill];
+const ALL: CouncilTool<any>[] = [getComplexes, getComplex, getInfluence, getWindOutlook, getTargetAir, getLogistics, getCosts, checkFeasibility, simulatePlan, stressPlan, loadSkill];
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- as above.
 const TOOLS: ReadonlyMap<string, CouncilTool<any>> = new Map(ALL.map((tool) => [tool.name, tool]));
 

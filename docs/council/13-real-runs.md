@@ -145,8 +145,14 @@ and pump crews cannot work peat without it. The before and after maps were drawn
 Still to fix: two plan codes slipped into the reasoning ("P12", "P28"). The decide prompt is
 tightened again (v4) to forbid codes in every field people read.
 
-## Run 5
+## Run 5 (run id 20), stopped
 
-Queued through `POST /council/runs` at 22:57 MYT (run id 20), as the page's button does, and
-executed by the compose `council` worker: the first run with the closing round, the source
-breakdown and the feasibility and diplomacy bar. Recorded here when read.
+Queued through `POST /council/runs` at 22:57 MYT, as the page's button does, and claimed by the
+compose `council` worker, which proved that path. Stopped minutes later, before its first stage
+finished, because the user simplified the council: Indonesia is assumed to allow everything, and
+only the most relevant seats remain (`04-council-roles.md`). Closed as failed with that reason.
+
+## Run 6
+
+The first run of the simplified council (eight agents, no consent rules, no diplomacy), with
+every fix from the requirements audit and its independent check. Recorded here when read.

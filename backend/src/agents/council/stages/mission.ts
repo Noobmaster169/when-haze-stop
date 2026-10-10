@@ -13,8 +13,8 @@ import type { Session } from "./session";
  * premises must differ: a duplicate falls back to the seat's default.
  */
 
-export const MISSION_PROMPT = "v2";
-const DEFAULT_WEIGHTS: Weights = { klBenefit: 0.45, robustness: 0.2, feasibility: 0.15, diplomacy: 0.1, cost: 0.05, sideBenefits: 0.05 };
+export const MISSION_PROMPT = "v3";
+const DEFAULT_WEIGHTS: Weights = { klBenefit: 0.5, robustness: 0.25, feasibility: 0.15, cost: 0.1 };
 
 function normalised(weights: Weights): Weights {
   const total = Object.values(weights).reduce((sum, value) => sum + value, 0);

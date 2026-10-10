@@ -4,8 +4,8 @@ Working folder for the feature that answers one question: with the limited help 
 send, which fire hotspots should be put out first to clear the haze over Kuala Lumpur and its
 surroundings, and what does the air look like afterwards.
 
-A council of agents who play Malaysian ministers and experts argue the question from the same
-data. Their candidate plans go through the smoke model, and the plan that holds up best becomes
+A council of eight agents who play Malaysian officials and experts argue the question from the same
+data, assuming Indonesia lets every Malaysian aircraft and crew work wherever needed. Their candidate plans go through the smoke model, and the plan that holds up best becomes
 the verdict. The page replays the whole meeting.
 
 Status: design done (`spec.md`), tested on a prototype council (`11`), and built: the suppression core, the engine seam, the store and API, the council itself, and the page at `/council` (`12-build.md`). The nav's Council entry has replaced Simulation; the engine's backtest is still at `/simulation`, linked from the verdict. The requirements checklist against the original brief is `14-requirements-checklist.md`. The smoke model itself is being reworked by a teammate, so everything here reaches it through one seam (`06-engine-seam.md`) and changes nothing inside `backend/src/haze/`.
@@ -31,4 +31,5 @@ Status: design done (`spec.md`), tested on a prototype council (`11`), and built
 | `12-build.md` | What is built, where it lives, how to run it |
 | `13-real-runs.md` | Full council runs on real data, read in full, and what each changed |
 | `14-requirements-checklist.md` | Every requirement in the original brief, with evidence and status |
+| `15-checklist-verification.md` | An independent check of every item in 14 |
 | `spec.md` | The design in one document, for review before building |

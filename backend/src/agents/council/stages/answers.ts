@@ -19,9 +19,7 @@ export const MissionAnswer = z.object({
     klBenefit: z.number().min(0).max(1),
     robustness: z.number().min(0).max(1),
     feasibility: z.number().min(0).max(1),
-    diplomacy: z.number().min(0).max(1),
     cost: z.number().min(0).max(1),
-    sideBenefits: z.number().min(0).max(1),
   }),
   weightReasons: z.string().max(600),
   premises: z.array(z.object({ seat: z.string(), premise: z.string().max(200) })).max(10).default([]),
@@ -69,9 +67,7 @@ export type RatingAnswer = z.infer<typeof RatingAnswer>;
 
 export const DecisionAnswer = z.object({
   headline: Headline,
-  actNow: z.string().max(280).describe("At most 30 plain words: what Malaysia does today with what it controls."),
-  ask: z.string().max(280).describe("At most 30 plain words: what to ask Indonesia for, or that nothing is worth asking."),
-  share: z.string().max(280).describe("At most 30 plain words: what Malaysia tells Indonesia's disaster agency."),
+  actNow: z.string().max(400).describe("At most 50 plain words: the plan, what goes where and when, with the places named."),
   reasoning: z.string().max(800).describe("At most 100 plain words."),
   minorityReport: z.string().max(400),
   replanTrigger: z.string().max(400),

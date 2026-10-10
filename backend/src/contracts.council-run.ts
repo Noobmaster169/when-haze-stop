@@ -120,8 +120,9 @@ export const Verdict = z.object({
   title: z.string(),
   headline: z.string(),
   actNow: z.string(),
-  ask: z.string(),
-  share: z.string(),
+  /** Requests to Indonesia and what to tell it: null since the council assumes Indonesia allows everything; kept for older runs. */
+  ask: z.string().nullable().default(null),
+  share: z.string().nullable().default(null),
   reasoning: z.string(),
   minorityReport: z.string(),
   replanTrigger: z.string(),

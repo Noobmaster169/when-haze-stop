@@ -1,4 +1,4 @@
-import { biggestFirst, greedy, nearestFirst } from "../../../suppression/baselines";
+import { biggestFirst, GREEDY_TITLE, greedy, nearestFirst } from "../../../suppression/baselines";
 import { type BoardPlan, summarise } from "../context";
 import { join } from "./join";
 import { say } from "./say";
@@ -8,9 +8,7 @@ import { councilPlans, type Session } from "./session";
  * Stages 3 and 4, done by code: table the baselines the council must beat,
  * score everything, and keep a shortlist of feasible, distinguishable plans.
  * Two plans that send the same assets to mostly the same complexes are one
- * plan; the better scored stays. The best plan within accepted consent and the
- * best that needs a request both stay, so the verdict can show what asking is
- * worth.
+ * plan; the better scored stays.
  */
 
 const SHORTLIST = 5;
@@ -27,15 +25,13 @@ function overlap(a: BoardPlan, b: BoardPlan): number {
   return shared / Math.max(1, new Set([...x, ...y]).size);
 }
 
-const asks = (plan: BoardPlan) => plan.plan.assignments.some((line) => line.needsConsent !== null);
 
 export async function tableBaselines(session: Session): Promise<void> {
   const { ctx } = session.deps;
   const made = [
     biggestFirst(ctx.attribution.complexes, ctx.budgetRm),
     nearestFirst(ctx.attribution.complexes, ctx.target.centre, ctx.budgetRm),
-    greedy(ctx.attribution, false, ctx.budgetRm),
-    greedy(ctx.attribution, true, ctx.budgetRm),
+    greedy(ctx.attribution, ctx.budgetRm),
   ];
   for (const draft of made) {
     if (!draft) continue;
@@ -67,10 +63,9 @@ export async function screen(session: Session): Promise<void> {
     .sort((a, b) => b.score.expected - a.score.expected);
   const kept: BoardPlan[] = [];
   for (const plan of feasible) if (!kept.some((other) => overlap(plan, other) >= SAME)) kept.push(plan);
-  const must = [kept.find((plan) => !asks(plan)), kept.find(asks)].filter((plan): plan is BoardPlan => plan !== undefined);
-  const top = [...must, ...kept.filter((plan) => !must.includes(plan))].slice(0, SHORTLIST).sort((a, b) => b.score.expected - a.score.expected);
+  const top = kept.slice(0, SHORTLIST);
   // The greedy plans contend too: the council must beat them on the record, or adopt them with its own judgement on what the engine cannot see.
-  const greedy = session.deps.ctx.plans().filter((plan) => plan.baseline && plan.plan.title.startsWith("Greedy") && plan.violations.length === 0);
+  const greedy = session.deps.ctx.plans().filter((plan) => plan.baseline && plan.plan.title === GREEDY_TITLE && plan.violations.length === 0);
   session.shortlist = [...top, ...greedy].map((plan) => plan.id);
   const dropped = councilPlans(session).filter((plan) => !session.shortlist.includes(plan.id));
   await say(session.deps, {

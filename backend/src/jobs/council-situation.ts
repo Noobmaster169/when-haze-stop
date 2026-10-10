@@ -43,7 +43,7 @@ console.table(
     share: shares.map(pct).join(" / "),
   })),
 );
-const plans = [biggestFirst(attribution.complexes), nearestFirst(attribution.complexes, target.centre), greedy(attribution, false), greedy(attribution, true)];
+const plans = [biggestFirst(attribution.complexes), nearestFirst(attribution.complexes, target.centre), greedy(attribution)];
 for (const plan of plans) {
   if (!plan) continue;
   const score = scorePlan(plan, attribution);

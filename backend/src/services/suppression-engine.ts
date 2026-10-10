@@ -130,15 +130,15 @@ export function engineSuppression(deps: EngineDeps): SuppressionEngine {
   };
 }
 
-/** The most influential complexes, every Malaysian one that reaches the target, and the biggest and nearest in Kalimantan, which the baselines use. */
+/** The most influential complexes, every Malaysian one that reaches the target, and the biggest and nearest in Indonesia, which the baselines use. */
 function candidates(complexes: Complex[], share: Map<string, number>, target: TargetArea): string[] {
   const ranked = [...share].sort((a, b) => b[1] - a[1]);
   const chosen = new Set(ranked.slice(0, CANDIDATES).map(([id]) => id));
   for (const [id, value] of ranked) if (value > 0.001 && complexes.find((complex) => complex.id === id)?.place.country === "Malaysia") chosen.add(id);
-  const kalimantan = complexes.filter((complex) => complex.place.area === "kalimantan");
-  const biggest = [...kalimantan].sort((a, b) => b.firePowerMw - a.firePowerMw)[0];
+  const indonesian = complexes.filter((complex) => complex.place.country === "Indonesia");
+  const biggest = [...indonesian].sort((a, b) => b.firePowerMw - a.firePowerMw)[0];
   const km = (complex: Complex) => distanceKm(target.centre.lat, target.centre.lon, complex.lat, complex.lon);
-  const nearest = [...kalimantan].sort((a, b) => km(a) - km(b))[0];
+  const nearest = [...indonesian].sort((a, b) => km(a) - km(b))[0];
   if (biggest) chosen.add(biggest.id);
   if (nearest) chosen.add(nearest.id);
   return [...chosen];

@@ -12,11 +12,11 @@ import { describePlan, type Session } from "./session";
 /**
  * Stage 2: every proposer drafts one plan under its premise, blind to the
  * others. A plan the validator refuses goes back to its author once with the
- * reasons. Six of eight drafts are needed to go on.
+ * reasons. Four of six drafts are needed to go on.
  */
 
-export const DRAFT_PROMPT = "v3";
-const QUORUM = 6;
+export const DRAFT_PROMPT = "v4";
+const QUORUM = 4;
 const log = childLogger({ module: "council.drafts" });
 
 async function table(session: Session, proposer: Seat, draft: DraftAnswer, seen: string[]): Promise<BoardPlan> {

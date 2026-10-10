@@ -1,6 +1,7 @@
 import type { Assignment, StrikeLine, Verdict } from "../../../contracts";
 import { mean, sharesByArea } from "../../../suppression/attribution";
 import { planCost } from "../../../suppression/costs";
+import { arrivalDay } from "../../../suppression/effect";
 import { removedSeries, scorePlan } from "../../../suppression/score";
 import { type BoardPlan, summarise } from "../context";
 import type { DecisionAnswer } from "./answers";
@@ -38,7 +39,8 @@ function strikeList(session: Session, plan: BoardPlan): StrikeLine[] {
         lon: complex.lon,
         peatShare: complex.peatShare,
         assets: lines.map((line) => `${line.units} ${ASSET_WORDS[line.asset]}, days ${line.fromDay} to ${line.toDay}`).join("; "),
-        fromDay: Math.min(...lines.map((line) => line.fromDay)),
+        // The first day work can really begin there: a crew still travelling has not started.
+        fromDay: Math.min(...lines.map(arrivalDay)),
         toDay: Math.max(...lines.map((line) => line.toDay)),
         waitsOn: lines.find((line) => line.needsConsent)?.needsConsent ?? null,
         share: scorePlan({ assignments: lines }, ctx.attribution).expected,
@@ -72,8 +74,9 @@ export function buildVerdict(session: Session, plan: BoardPlan, words: DecisionA
     title: plan.plan.title,
     headline: words.headline,
     actNow: words.actNow,
-    ask: words.ask,
-    share: words.share,
+    // Indonesia is assumed to allow everything, so nothing is asked of it; kept for older runs.
+    ask: null,
+    share: null,
     reasoning: words.reasoning,
     minorityReport: words.minorityReport,
     replanTrigger: words.replanTrigger,

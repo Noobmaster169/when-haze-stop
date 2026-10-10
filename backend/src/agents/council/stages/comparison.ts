@@ -12,21 +12,17 @@ import { describePlan, type Session } from "./session";
  * the scores. The matrix and its weights decide; the mood of the room does not.
  */
 
-export const RATE_PROMPT = "v2";
+export const RATE_PROMPT = "v3";
 const log = childLogger({ module: "council.comparison" });
 
 export const RATERS: Record<Exclude<keyof Weights, "klBenefit" | "robustness">, string[]> = {
-  feasibility: ["force_command", "air_operations", "domestic_fire", "peat_science"],
-  diplomacy: ["foreign_affairs"],
+  feasibility: ["fire_operations", "air_operations", "peat_science"],
   cost: ["treasury"],
-  sideBenefits: ["sarawak", "health"],
 };
 
 const CRITERION_WORDS: Record<keyof typeof RATERS, string> = {
   feasibility: "feasibility and crew risk: can it actually be done, safely, and will what it puts out stay out",
-  diplomacy: "diplomatic acceptability to Indonesia and within ASEAN",
-  cost: "value for money",
-  sideBenefits: "benefit beyond KL: Sarawak, and people's health across the country",
+  cost: "value for money: smoke cleared for each ringgit spent",
 };
 
 function shuffled<T>(items: T[], seed: number): T[] {
@@ -64,11 +60,11 @@ export interface MatrixRow {
   planId: string;
   scores: Record<keyof Weights, number>;
   weighted: number;
-  /** False when the seats that own feasibility or diplomacy rate the plan below the bar: their veto, made by ratings. */
+  /** False when the seats that own feasibility rate the plan below the bar: their veto, made by ratings. */
   eligible: boolean;
 }
 
-/** Below 3 out of 10 on feasibility or diplomacy, a plan cannot win while another clears both (run 3, docs/council/13). */
+/** Below 3 out of 10 on feasibility, a plan cannot win while another clears it (run 3, docs/council/13). */
 export const BAR = 0.3;
 
 /** Every shortlisted plan on every criterion, 0 to 1, and the weighted total. A criterion nobody rated counts as middling. */
@@ -89,12 +85,10 @@ export function matrix(session: Session): MatrixRow[] {
         klBenefit: plan.score.expected / expected,
         robustness: 0.5 * (plan.score.worstWind / worst) + 0.5 * (plan.score.pessimistic / pessimistic),
         feasibility: rated("feasibility"),
-        diplomacy: rated("diplomacy"),
         cost: rated("cost"),
-        sideBenefits: rated("sideBenefits"),
       };
       const weighted = (Object.keys(scores) as (keyof Weights)[]).reduce((sum, key) => sum + weights[key] * scores[key], 0);
-      return { planId: plan.id, scores, weighted, eligible: scores.feasibility >= BAR && scores.diplomacy >= BAR };
+      return { planId: plan.id, scores, weighted, eligible: scores.feasibility >= BAR };
     })
     .sort((a, b) => Number(b.eligible) - Number(a.eligible) || b.weighted - a.weighted);
 }

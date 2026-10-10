@@ -55,6 +55,9 @@ async function execute(run: StoredRun): Promise<void> {
 
 async function loop(): Promise<void> {
   const pool = getPool();
+  // Nothing can be running when the only worker starts: a run still marked so was cut off by a restart.
+  const abandoned = await council.failAbandoned(pool, "the worker restarted before the run finished");
+  if (abandoned.length > 0) log.warn({ runs: abandoned }, "closed runs cut off by a restart");
   for (;;) {
     const run = await council.claimNext(pool);
     if (run) await execute(run);

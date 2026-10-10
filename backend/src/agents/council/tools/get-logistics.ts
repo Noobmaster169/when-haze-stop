@@ -8,7 +8,7 @@ type Input = z.infer<typeof Input>;
 
 export const getLogistics: CouncilTool<Input> = {
   name: "get_logistics",
-  description: "For each complex: whose soil it is, the nearest staging airfield and its distance, and the distance to open sea for the scooper (which needs a 1.3 km open-water run within about 25 km; large rivers are not mapped and must be confirmed).",
+  description: "For each complex: whose soil it is (Bomba at home works in Malaysia, the deployed team in Indonesia), the nearest staging airfield and its distance, and the distance to open sea for the scooper (which needs a 1.3 km open-water run within about 25 km; large rivers are not mapped and must be confirmed).",
   schema: Input,
   run(input, ctx: CouncilContext): ToolResult {
     const lines = input.ids.map((id) => {

@@ -1,11 +1,13 @@
-import type { AssetKind, Consent } from "../contracts.council";
+import type { AssetKind } from "../contracts.council";
 import { TerminalError } from "../lib/errors";
 
 /**
  * What Malaysia can send, as the council plans with it.
  *
  * The first part was offered on 17 September 2026 and accepted by Indonesia on
- * 18 September for Kalimantan; the rest is assumption. Every line says which,
+ * 18 September; the rest is assumption. By the user's decision (10 October
+ * 2026) the council assumes Indonesia lets every aircraft and crew work
+ * wherever it is needed, in Sumatra or Kalimantan, with no request to wait on. Every line says which,
  * and where it comes from, so the page can mark an assumed number as one.
  * Sources and reasoning: docs/council/03-assistance-package.md and
  * docs/council/research/02-campaigns-capacity.md.
@@ -13,8 +15,8 @@ import { TerminalError } from "../lib/errors";
 
 export type Basis = "fact" | "assumption";
 
-/** Where an asset may work without asking Indonesia for anything new. */
-export type Mandate = "kalimantan" | "malaysia";
+/** Where an asset works: the team deployed to Indonesia, or Bomba at home. */
+export type Mandate = "indonesia" | "malaysia";
 
 export interface AssetLine {
   kind: AssetKind;
@@ -23,12 +25,10 @@ export interface AssetLine {
   maxUnits: number;
   /** Most days it can work in the deployment. */
   maxDays: number;
-  /** Where it may work as things stand. */
+  /** Where it works. */
   mandate: Mandate;
-  /** What it needs to work outside its mandate; null where it can never leave it. */
-  consentToLeave: Consent | null;
-  /** The first plan day it can work if its consent is asked for on day 1 and granted. */
-  earliestWithConsent: number;
+  /** The first plan day it can work: aircraft fly in at once, crews need a day to set up, the task force must be flown in. */
+  arrivesDay: number;
   basis: Basis;
   source: string;
 }
@@ -44,20 +44,18 @@ export const PACKAGE = {
       label: "CL-415MP scooper (APMM)",
       maxUnits: 1,
       maxDays: 10,
-      mandate: "kalimantan",
-      consentToLeave: "sumatra",
-      earliestWithConsent: 4,
+      mandate: "indonesia",
+      arrivesDay: 1,
       basis: "fact",
-      source: "Offered 17 Sep and accepted 18 Sep 2026 for Kalimantan; 10 operating days then about 100 hours of maintenance, as in Palembang, Oct 2015",
+      source: "Offered 17 Sep and accepted 18 Sep 2026; 10 operating days then about 100 hours of maintenance, as in Palembang, Oct 2015",
     },
     {
       kind: "helicopters",
       label: "Medium helicopters with buckets (NADMA, APMM, TUDM)",
       maxUnits: 3,
       maxDays: 14,
-      mandate: "kalimantan",
-      consentToLeave: "sumatra",
-      earliestWithConsent: 4,
+      mandate: "indonesia",
+      arrivesDay: 1,
       basis: "fact",
       source: "Three helicopters in the accepted package, type not disclosed; buckets of 1,200 to 1,590 L assumed",
     },
@@ -66,9 +64,8 @@ export const PACKAGE = {
       label: "Lance teams of 6 from the 52 personnel",
       maxUnits: 2,
       maxDays: 13,
-      mandate: "kalimantan",
-      consentToLeave: "sumatra",
-      earliestWithConsent: 5,
+      mandate: "indonesia",
+      arrivesDay: 2,
       basis: "assumption",
       source: "52 personnel accepted, mostly air crew and support; two teams of six is what they can spare",
     },
@@ -78,8 +75,7 @@ export const PACKAGE = {
       maxUnits: 100,
       maxDays: 14,
       mandate: "malaysia",
-      consentToLeave: null,
-      earliestWithConsent: 1,
+      arrivesDay: 1,
       basis: "assumption",
       source: "Bomba has about 15,000 staff already fighting local fires; how many can be spared is assumed",
     },
@@ -88,11 +84,10 @@ export const PACKAGE = {
       label: "Bomba ground task force with pumps",
       maxUnits: 150,
       maxDays: 14,
-      mandate: "kalimantan",
-      consentToLeave: "sumatra",
-      earliestWithConsent: 7,
+      mandate: "indonesia",
+      arrivesDay: 3,
       basis: "assumption",
-      source: "Sized on the 2005 Riau deployment (100 firefighters plus 25 SMART); since 2015 Indonesia has accepted only aircraft, so it is itself a request",
+      source: "Sized on the 2005 Riau deployment (100 firefighters plus 25 SMART), flown in by A400M",
     },
   ] satisfies AssetLine[],
 } as const;

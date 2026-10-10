@@ -92,7 +92,7 @@ export function councilContext(attribution: Attribution, target: TargetArea, bud
   }
   const board: BoardPlan[] = [];
   const tryPlan = (plan: Plan) => {
-    const normalised = normalise(plan, attribution.complexes);
+    const normalised = normalise(plan);
     return { plan: normalised, violations: validate(normalised, attribution.complexes, { budgetRm }), score: scorePlan(normalised, attribution) };
   };
   return {

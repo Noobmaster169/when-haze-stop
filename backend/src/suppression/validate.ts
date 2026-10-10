@@ -1,36 +1,21 @@
-import type { Assignment, Consent, Plan, Violation } from "../contracts.council";
+import type { Plan, Violation } from "../contracts.council";
 import type { Complex } from "./complexes";
 import { planCost, ringgit } from "./costs";
 import { assetLine, PACKAGE } from "./package";
 
 /**
- * Whether a plan can be carried out with what Malaysia has, where it is allowed
- * to work. A model writes the plan, so nothing it says about consent is taken
- * on trust: `normalise` works out what each line needs from the place, and
- * `validate` reports what cannot be done at all.
+ * Whether a plan can be carried out with what Malaysia has and the money set
+ * aside. Indonesia is assumed to let every aircraft and crew work wherever it is
+ * needed, so the only rules about place are that Bomba's home teams stay home
+ * and the deployed team works in Indonesia.
  */
 
 /** A CL-415 scoops from open water; a target further than this from the sea is out of its reach. */
 export const SCOOP_REACH_KM = 25;
 
-/** What a line needs from Indonesia, worked out from where the complex is and what is sent. */
-export function consentFor(assignment: Assignment, complex: Complex): Consent | null {
-  if (assignment.asset === "bomba_domestic") return null;
-  if (complex.place.area === "sumatra") return "sumatra";
-  // Since 2015 Indonesia has accepted only aircraft: a ground task force is a request even in Kalimantan.
-  if (assignment.asset === "ground_task_force") return "ground_crews";
-  return null;
-}
-
-export function normalise(plan: Plan, complexes: Complex[]): Plan {
-  const byId = new Map(complexes.map((complex) => [complex.id, complex]));
-  return {
-    ...plan,
-    assignments: plan.assignments.map((assignment) => {
-      const complex = byId.get(assignment.complexId);
-      return complex ? { ...assignment, needsConsent: consentFor(assignment, complex) } : assignment;
-    }),
-  };
+/** With every request assumed granted, no line waits on Indonesia; whatever a model wrote there is cleared. */
+export function normalise(plan: Plan): Plan {
+  return { ...plan, assignments: plan.assignments.map((assignment) => ({ ...assignment, needsConsent: null })) };
 }
 
 /** Distance from each complex to open water, km; a complex missing from it is not checked for reach. */
@@ -58,9 +43,8 @@ export function validate(plan: Plan, complexes: Complex[], limits: Limits = {}):
 
     const malaysian = complex.place.country === "Malaysia";
     if (line.mandate === "malaysia" && !malaysian) flag(index, "asset_place", `${line.label} work only on Malaysian soil; ${complex.id} is in ${complex.place.province}, ${complex.place.country}`);
-    if (line.mandate === "kalimantan" && malaysian) flag(index, "asset_place", `${line.label} are deployed to Indonesia; ${complex.id} is in Malaysia, which is Bomba's at home`);
-    if (line.mandate === "kalimantan" && complex.place.area !== "kalimantan" && complex.place.area !== "sumatra" && !malaysian) {
-      flag(index, "mandate", `${line.label} have no mandate in ${complex.place.province}, and no request for it is modelled`);
+    if (line.mandate === "indonesia" && complex.place.country !== "Indonesia") {
+      flag(index, "asset_place", `${line.label} are deployed to Indonesia; ${complex.id} is in ${complex.place.country}, which is Bomba's at home`);
     }
     const reach = coastKm.get(complex.id);
     if (assignment.asset === "cl415" && reach !== undefined && reach > SCOOP_REACH_KM) {
