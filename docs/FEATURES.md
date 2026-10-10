@@ -144,7 +144,9 @@ Things to know about each source, learned by using them:
   of Singapore's regions stopped in January 2025 and is left out; NEA is read directly.
 - OpenAQ answers 500 for a few sensors every time. When this was written they were the second
   PM2.5 channel OpenAQ lists for each Thai station, whose first channel answers normally. The job
-  logs the sensor, counts it in `sensorsFailed` and goes on to the rest.
+  logs the sensor, counts it in `sensorsFailed`, names it in `refused` and goes on to the rest. The
+  hourly fetch then leaves a refused sensor alone for 24 hours (`sensorsResting`), so they cost
+  one round of tries a day and not one an hour; the history asks them again on every run.
 
 ### 3.1.1 Screening the fires
 

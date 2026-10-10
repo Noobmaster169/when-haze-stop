@@ -20,6 +20,8 @@ const log = childLogger({ module: "jobs.ingest-openaq" });
 const WINDOW_MS = 40 * 24 * 3_600_000;
 /** Where a sensor with nothing stored starts in the hourly cycle: the history, not the cycle, goes further back. */
 const RECENT_HOURS = 72;
+/** A sensor OpenAQ refused is left alone by the hourly cycle for this long. The ones it refuses, it refuses every time, and each costs three tries. */
+const REFUSED_REST_HOURS = 24;
 
 export interface OpenAqDeps {
   pool: Pool;
@@ -50,8 +52,9 @@ async function fetchSpan(deps: OpenAqDeps, sensor: OpenAqSensor, from: number, t
  * others still run. No answer at all is the link or the whole service, and
  * stops the fetch: the next run picks up where this one got to.
  */
-async function eachSensor(sensors: OpenAqSensor[], work: (sensor: OpenAqSensor) => Promise<void>): Promise<number[]> {
+async function eachSensor(sensors: OpenAqSensor[], work: (sensor: OpenAqSensor) => Promise<void>): Promise<{ done: number[]; refused: number[] }> {
   const done: number[] = [];
+  const refused: number[] = [];
   for (const sensor of sensors) {
     try {
       await work(sensor);
@@ -59,24 +62,27 @@ async function eachSensor(sensors: OpenAqSensor[], work: (sensor: OpenAqSensor) 
     } catch (error) {
       if (!(error instanceof UpstreamError)) throw error;
       log.error({ sensorId: sensor.sensorId, sensor: sensor.name, err: error.message }, "a sensor's hours could not be fetched");
+      refused.push(sensor.sensorId);
     }
   }
-  return done;
+  return { done, refused };
 }
 
 /** The hours each reporting sensor has added since its newest stored one. Returns how many were new. */
 export async function ingestOpenAq(deps: OpenAqDeps, now: Date): Promise<number> {
   const recent = addHours(now, -RECENT_HOURS);
   const detail = await recordFetch(deps.pool, "openaq", async () => {
-    const sensors = (await deps.openaq.sensors()).filter((sensor) => sensor.lastAt !== null && sensor.lastAt > recent);
-    await openaq.upsertSensors(deps.pool, sensors);
+    const resting = new Set((await sourceFetches.succeededBetween(deps.pool, "openaq", addHours(now, -REFUSED_REST_HOURS), now)).flatMap((detail) => String(detail.refused ?? "").split(",")));
+    const reporting = (await deps.openaq.sensors()).filter((sensor) => sensor.lastAt !== null && sensor.lastAt > recent);
+    await openaq.upsertSensors(deps.pool, reporting);
+    const sensors = reporting.filter((sensor) => !resting.has(String(sensor.sensorId)));
     const { newest } = await openaq.spanBySensor(deps.pool);
     const tally = { requests: 0, hours: 0, added: 0 };
-    const done = await eachSensor(sensors, (sensor) => {
+    const { refused } = await eachSensor(sensors, (sensor) => {
       const from = newest.get(sensor.sensorId)?.getTime() ?? recent.getTime();
       return fetchSpan(deps, sensor, from, Math.min(now.getTime(), sensor.lastAt?.getTime() ?? 0), false, tally);
     });
-    return { sensors: sensors.length, sensorsFailed: sensors.length - done.length, ...tally };
+    return { sensors: sensors.length, sensorsResting: reporting.length - sensors.length, sensorsFailed: refused.length, refused: refused.join(","), ...tally };
   });
   log.info(detail, "OpenAQ hours stored");
   return detail.added;
@@ -101,7 +107,7 @@ export async function ingestOpenAqHistory(deps: OpenAqDeps, fromDay: string, now
     const sensors = all.filter((sensor) => !finished.has(String(sensor.sensorId)));
     const { oldest, newest } = await openaq.spanBySensor(deps.pool);
     const tally = { requests: 0, hours: 0, added: 0 };
-    const done = await eachSensor(sensors, async (sensor) => {
+    const { done, refused } = await eachSensor(sensors, async (sensor) => {
       const from = Math.max(first.getTime(), sensor.firstAt?.getTime() ?? 0);
       const last = Math.min(now.getTime(), sensor.lastAt?.getTime() ?? 0);
       await fetchSpan(deps, sensor, from, oldest.get(sensor.sensorId)?.getTime() ?? last, true, tally);
@@ -109,7 +115,7 @@ export async function ingestOpenAqHistory(deps: OpenAqDeps, fromDay: string, now
       const top = newest.get(sensor.sensorId)?.getTime();
       if (top !== undefined) await fetchSpan(deps, sensor, top, last, false, tally);
     });
-    return { feed: "history", from: fromDay, sensors: sensors.length, sensorsFailed: sensors.length - done.length, done: done.join(","), ...tally };
+    return { feed: "history", from: fromDay, sensors: sensors.length, sensorsFailed: refused.length, done: done.join(","), refused: refused.join(","), ...tally };
   });
   log.info(detail, "OpenAQ history stored");
   return detail.added;

@@ -93,3 +93,9 @@ export async function succeeded(db: Queryable, source: string): Promise<FetchDet
   const { rows } = await db.query<{ detail: FetchDetail }>("select detail from source_fetches where source = $1 and ok", [source]);
   return rows.map((row) => row.detail);
 }
+
+/** The same, for the good fetches that started in a window, both ends included. */
+export async function succeededBetween(db: Queryable, source: string, from: Date, to: Date): Promise<FetchDetail[]> {
+  const { rows } = await db.query<{ detail: FetchDetail }>("select detail from source_fetches where source = $1 and ok and started_at between $2 and $3", [source, from, to]);
+  return rows.map((row) => row.detail);
+}

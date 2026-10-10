@@ -105,6 +105,19 @@ describe("the history of what was measured, over what the sources recorded", () 
     const recorded = (await sourceFetches.succeeded(pool, "openaq")).filter((detail) => detail.from === "2025-01-05");
     expect(recorded.at(-1)).toMatchObject({ feed: "history", sensorsFailed: 1 });
     expect(recorded.every((detail) => !String(detail.done).split(",").includes(String(SETIA_ALAM)))).toBe(true);
+    expect(recorded.at(-1)?.refused).toBe(String(SETIA_ALAM));
+  });
+
+  it("lets a sensor OpenAQ has just refused rest for a day in the hourly fetch", async () => {
+    const noon = new Date();
+    // The sensors as the recording has them, still reporting at the moment of the test.
+    const faulty = new FakeOpenAqClient(parseOpenAqSensors(OPENAQ_LOCATIONS_JSON).map((sensor) => ({ ...sensor, lastAt: sensor.sensorId === SENSOR ? noon : sensor.lastAt })), [], [SENSOR]);
+    // The first hourly fetch is refused the sensor and says so; the next one, within the day, does not ask.
+    await ingestOpenAq({ pool, openaq: faulty }, noon);
+    faulty.asked.length = 0;
+    await ingestOpenAq({ pool, openaq: faulty }, noon);
+    expect(faulty.asked).toEqual([]);
+    expect((await sourceFetches.succeeded(pool, "openaq")).at(-1)).toMatchObject({ sensorsResting: 1, sensorsFailed: 0 });
   });
 
   it("keeps Singapore's past hours out of the readings the forecast runs on", async () => {
