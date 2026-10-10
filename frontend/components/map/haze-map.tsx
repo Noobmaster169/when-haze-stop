@@ -9,6 +9,7 @@ import { type Layers, MapCanvas, type MapHandle, type Pick } from "./map-canvas"
 import { Legend, LayerToggles, ZoomButtons } from "./map-controls";
 import { apiAt } from "./map-data";
 import { PlaceSearch } from "./place-search";
+import { PointPanel } from "./point-panel";
 import { type Probe, ProbeTip } from "./probe-tip";
 import { StationPanel } from "./station-panel";
 import { Timeline } from "./timeline";
@@ -36,6 +37,7 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
   // Until the timeline is touched it sits on the newest readings, and moves with them when a new run lands.
   const at = chosenAt ?? data?.asOf ?? 0;
   const station = data?.stations.find((item) => item.id === selected?.id) ?? null;
+  const panelOpen = station !== null || (probe !== null && data !== null);
 
   const asOf = data?.asOf;
   const seek = useCallback((moment: number) => setChosenAt(moment === asOf ? null : moment), [asOf]);
@@ -68,18 +70,32 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
         setProbe(null);
         return;
       }
-      setProbe({ lon: picked.lon, lat: picked.lat, nearest: nearestTo(picked.lon, picked.lat) });
+      setSelected(null);
+      setProbe({ lon: picked.lon, lat: picked.lat, name: null, nearest: nearestTo(picked.lon, picked.lat) });
     },
     [nearestTo],
   );
 
+  /** A station opens its own panel. Anywhere else opens the spot itself, named, with its nearest station one tap away. */
   const choosePlace = useCallback((place: Place) => {
     handle.current?.flyTo(place.lon, place.lat);
-    if (!place.nearest) return;
-    const away = place.nearest.km > 0;
-    setSelected({ id: place.nearest.id, via: away ? `${place.name}, ${place.nearest.km} km away` : null });
-    setProbe(away ? { lon: place.lon, lat: place.lat, nearest: null } : null);
+    if (place.nearest && place.nearest.km === 0) {
+      setSelected({ id: place.nearest.id, via: null });
+      setProbe(null);
+      return;
+    }
+    setSelected(null);
+    setProbe({ lon: place.lon, lat: place.lat, name: place.name, nearest: place.nearest });
   }, []);
+
+  const openStation = useCallback(
+    (id: string) => {
+      const from = probe?.name && probe.nearest ? `${probe.name}, ${probe.nearest.km} km away` : null;
+      setSelected({ id, via: from });
+      setProbe(null);
+    },
+    [probe],
+  );
 
   const followTip = useCallback(() => {
     const element = tip.current;
@@ -109,26 +125,18 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
           <div className="absolute bottom-3 left-3">
             <LayerToggles layers={layers} onChange={setLayers} />
           </div>
-          <div className="absolute bottom-3 right-3 hidden @[640px]:block">
-            <Legend />
-          </div>
-          {probe && data ? (
-            <ProbeTip
-              anchor={tip}
-              api={apiAt(data, at, probe.lon, probe.lat)}
-              at={at}
-              probe={probe}
-              onStation={(id) => {
-                setSelected({ id, via: null });
-                setProbe(null);
-              }}
-            />
+          {!panelOpen ? (
+            <div className="absolute bottom-3 right-3 hidden @[640px]:block">
+              <Legend />
+            </div>
           ) : null}
+          {probe && data ? <ProbeTip anchor={tip} api={apiAt(data, at, probe.lon, probe.lat)} at={at} /> : null}
           {!data ? <p className="absolute inset-x-0 top-1/2 text-center text-small text-ink-tertiary">Loading the map</p> : null}
+          {station ? <StationPanel key={station.id} station={station} at={at} via={selected?.via ?? null} onClose={() => setSelected(null)} /> : null}
+          {!station && probe && data ? <PointPanel data={data} basemap={basemap} probe={probe} at={at} onStation={openStation} onClose={() => setProbe(null)} /> : null}
         </div>
         {data ? <Timeline from={data.times[0]} to={data.times[data.times.length - 1]} now={data.asOf} at={at} playing={playing} onSeek={seek} onPlaying={setPlaying} /> : null}
       </div>
-      {station ? <StationPanel key={station.id} station={station} at={at} via={selected?.via ?? null} onClose={() => setSelected(null)} /> : null}
     </div>
   );
 }

@@ -10,20 +10,14 @@ import { malaysiaWhen } from "@/lib/malaysia-time";
 import { parsedFetcher } from "@/lib/poll";
 
 import { DayTable } from "./day-table";
+import { FLOATING_PANEL } from "./floating-panel";
 import { OutlookChart } from "./outlook-chart";
-import { band, bandKey, type BandKey } from "./scale";
+import { BAND_SWATCH, band, bandKey } from "./scale";
 
 /** One station: what it reads at the moment the timeline is on, its week, and its next days against the official lines. */
 
 const fetcher = parsedFetcher(StationOutlook);
 
-const SWATCH: Record<BandKey, string> = {
-  good: "bg-api-0",
-  moderate: "bg-api-50",
-  unhealthy: "bg-api-150",
-  "very-unhealthy": "bg-api-200",
-  hazardous: "bg-api-300",
-};
 
 /** The stored value nearest a moment, from readings before the forecast starts and from the forecast after. */
 function valueAt(outlook: StationOutlook, at: number): { api: number; forecast: boolean } | null {
@@ -43,7 +37,7 @@ export function StationPanel({ station, at, via, onClose }: { station: Station; 
   const value = outlook ? valueAt(outlook, at) : null;
 
   return (
-    <aside aria-label={`${station.name} station`} className="flex w-full shrink-0 flex-col border-t border-hairline bg-canvas lg:w-[348px] lg:overflow-y-auto lg:border-l lg:border-t-0">
+    <aside aria-label={`${station.name} station`} className={FLOATING_PANEL}>
       <header className="flex items-start gap-2 px-5 pt-4">
         <div className="min-w-0 grow">
           <h2 className="truncate font-display text-[21px] leading-7 text-ink">{station.name}</h2>
@@ -67,7 +61,7 @@ export function StationPanel({ station, at, via, onClose }: { station: Station; 
               <span className="font-display text-display-lg leading-none text-ink">{value.api}</span>
               <div className="pb-0.5">
                 <p className="flex items-center gap-1.5 text-strong font-medium text-ink">
-                  <span aria-hidden="true" className={`h-2.5 w-4 rounded-xs ${SWATCH[bandKey(value.api)]}`} />
+                  <span aria-hidden="true" className={`h-2.5 w-4 rounded-xs ${BAND_SWATCH[bandKey(value.api)]}`} />
                   {band(value.api)}
                 </p>
                 <p className="text-caption text-ink-tertiary">
