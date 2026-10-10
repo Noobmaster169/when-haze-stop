@@ -35,7 +35,7 @@ docker compose up -d --build
 
 Open http://localhost:3000. The map is the home page; ask the dock something about haze.
 
-`compose.yaml` starts six services:
+`compose.yaml` starts seven services:
 
 | Service | What it does | Host port |
 | --- | --- | --- |

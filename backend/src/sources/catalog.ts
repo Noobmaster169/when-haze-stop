@@ -172,7 +172,7 @@ export const SOURCE_CATALOG: readonly SourceEntry[] = [
     provider: "This app's model service",
     what: "Each instrument's peak 24 hour PM2.5 for the next three days, with a band, from a model trained on the stored history. Asked once a day for the 00:00 UTC issue, the one issue time it is trained on, while MODEL_MODE is shadow or live; a failed ask is retried after the next hourly run.",
     endpoint: "http://model:4002/predict",
-    link: "https://github.com/Noobmaster169/when-haze-stop/blob/main/docs/specs/2026-10-10-predictive-model-design.md",
+    link: "https://github.com/Noobmaster169/when-haze-stop/blob/main/docs/MODEL.md",
     cadence: "Once a day, for the 00:00 UTC issue",
     everyHours: 24,
     tracked: true,
