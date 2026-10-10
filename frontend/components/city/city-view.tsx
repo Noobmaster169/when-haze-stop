@@ -77,15 +77,15 @@ export function CityView() {
 
   return (
     <div className="flex min-h-0 grow flex-col">
-      <div className="relative min-h-[320px] grow overflow-hidden bg-sunken">
+      <div className="@container relative min-h-[320px] grow overflow-hidden bg-sunken">
         <canvas ref={canvas} className="block h-full w-full touch-none" aria-label="A 3D model of central Kuala Lumpur under the haze of the chosen hour" />
         {!scene ? <p className="absolute inset-x-0 top-1/2 text-center text-small text-ink-tertiary">Building the city</p> : null}
         {air && city ? (
-          <div className="absolute left-3 top-3">
+          <div className="absolute left-3 top-16 @[900px]:top-3">
             <CityPanel air={air} city={city} estimatedShare={estimatedShare} />
           </div>
         ) : null}
-        <div className="absolute bottom-8 left-3 flex flex-col items-start gap-2 sm:bottom-auto sm:left-auto sm:right-3 sm:top-3 sm:items-end">
+        <div className="absolute bottom-8 left-3 flex flex-col items-start gap-2 sm:bottom-auto sm:left-auto sm:right-3 sm:top-16 sm:items-end">
           <div role="group" aria-label="Where to stand" className="flex rounded-full bg-ink p-1 shadow-overlay">
             {VIEW_KEYS.map((key) => (
               <button
