@@ -37,11 +37,6 @@ export const CHECKS: Check[] = [
     line: "Replayed with the wind as forecast at the time, the smoke model's change lost to no change beyond a day, so stations do not use it.",
   },
   {
-    part: "Fires",
-    headline: "Vegetation only",
-    line: "Hotspots on refineries, towns, mines or water are dropped, using NASA's labels and 10 m land cover; 99.5% of what burns is in Indonesia.",
-  },
-  {
     part: "Readings",
     headline: "100% present",
     line: "68 stations, every hour of the week. A run waits until 80% of stations have posted the hour.",

@@ -15,7 +15,6 @@
     "haze:once": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts once",
     "haze:backfill": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts backfill",
     "haze:history": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts history",
-    "haze:rescreen": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts rescreen",
     "haze:loop": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts loop",
     "haze:evaluate": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts evaluate",
     "council:situation": "node --env-file-if-exists=.env --import tsx src/jobs/council-situation.ts",

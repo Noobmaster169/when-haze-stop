@@ -73,7 +73,7 @@ export async function ingestReadings(deps: IngestDeps, now: Date): Promise<numbe
 export async function ingestFires(deps: IngestDeps): Promise<number> {
   const detail = await recordFetch(deps.pool, "firms", async () => {
     const detections = await deps.fires.recent();
-    const { cells, glint, offshore, fixed, notVegetation, unconfirmed } = burningCells(detections, fixedMask(await fixedSources.sites(deps.pool, FIXED_MIN_DAYS)));
+    const { cells, glint, offshore, fixed, unconfirmed } = burningCells(detections, fixedMask(await fixedSources.sites(deps.pool, FIXED_MIN_DAYS)));
     await fires.upsertMany(deps.pool, cells);
     const days = cells.map((cell) => cell.day).sort();
     return {
@@ -81,7 +81,6 @@ export async function ingestFires(deps: IngestDeps): Promise<number> {
       glintDropped: glint,
       offshoreDropped: offshore,
       fixedDropped: fixed,
-      notVegetationDropped: notVegetation,
       unconfirmedDropped: unconfirmed,
       cellDays: cells.length,
       ...(days.length > 0 ? { firstDay: days[0], lastDay: days[days.length - 1] } : {}),
@@ -104,26 +103,4 @@ export async function ingestWeather(deps: IngestDeps): Promise<number> {
   });
   log.info(detail, "weather stored");
   return detail.hours;
-}
-
-/**
- * Works out the burning part of the days the live files hold again, under the
- * current screen and list of fixed sources, and stores it in place of what was
- * stored. The hourly fetch only ever raises a stored value, so a changed
- * screen reaches days already stored only through here or the archive replay
- * (`pnpm haze:history`, which needs FIRMS_MAP_KEY and covers every day).
- * The oldest day in the files is left alone: they begin part way through it.
- * Only `burning_mw` changes; the fire power as fetched stays as it was.
- */
-export async function rescreenRecentFires(deps: Pick<IngestDeps, "pool" | "fires">): Promise<number> {
-  const detail = await recordFetch(deps.pool, "firms", async () => {
-    const detections = await deps.fires.recent();
-    const oldest = detections.reduce((first, hit) => (hit.day < first ? hit.day : first), "9999-12-31");
-    const { cells, glint, offshore, fixed, notVegetation, unconfirmed } = burningCells(detections, fixedMask(await fixedSources.sites(deps.pool, FIXED_MIN_DAYS)));
-    const whole = cells.filter((cell) => cell.day > oldest);
-    await fires.upsertMany(deps.pool, whole, { rescreen: true });
-    return { detections: detections.length, glintDropped: glint, offshoreDropped: offshore, fixedDropped: fixed, notVegetationDropped: notVegetation, unconfirmedDropped: unconfirmed, cellDays: whole.length, rescreenedFrom: oldest };
-  });
-  log.info(detail, "recent fire days screened again");
-  return detail.cellDays;
 }
