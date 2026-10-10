@@ -26,7 +26,7 @@ The api serves `POST /council/runs`, `GET /council/runs`, `GET /council/runs/:id
 | Engine seam | `backend/src/services/suppression-inputs.ts` (load once), `suppression-engine.ts` (attribution, verdict maps), `fire-complexes.ts` | `06` |
 | Store and API | `backend/db/migrations/007_council.sql`, `repositories/council.repo.ts`, `routes/council.routes.ts` | `08` |
 | Council | `backend/src/agents/council/`: `seats.ts`, `context.ts`, `situation.ts`, `turn.ts`, `fact-check.ts`, `events.ts`, `run.ts`, `stages/*.ts`, `tools/*.ts`, `skills/*/SKILL.md` | `04`, `05`, `07` |
-| Prompts | `backend/src/agents/prompts/council-{mission,draft,critique,premortem,revise,rate,decide}/v1.md` | `05` |
+| Prompts | `backend/src/agents/prompts/council-{mission,draft,critique,premortem,revise,rate,decide}/` (draft, revise and decide at v2) | `05`, `13` |
 | Worker | `backend/src/jobs/council-worker.ts`, `council-situation.ts` | |
 | Page | `frontend/app/(app)/council/page.tsx`; `frontend/components/council/` (pure: `timeline.ts` beats, `scene.ts` scene at time t, `tray.ts`, `caption.ts`, `layout.ts`; UI: `graph.tsx` and `paint.ts` for the animated SVG, `use-playback.ts`, `use-council-run.ts` live polling, `replay.tsx`, `rail.tsx`, `plan-tray.tsx`, `player.tsx`, `start-panel.tsx`, `verdict*.tsx`); `frontend/lib/api/council-*.ts`; route handlers under `frontend/app/api/council/` | `09` |
 | Tests | `backend/test/suppression/`, `test/sources/place-namer.test.ts`, `test/agents/council-run.test.ts`, `test/routes/council.routes.test.ts`; fixtures `recorded-council.ts` (real cells), `council-vector.ts` (a labelled test vector) | |
@@ -49,7 +49,7 @@ The api serves `POST /council/runs`, `GET /council/runs`, `GET /council/runs/:id
 6. `crossExamine`: three critics a plan (Foreign Affairs and two opposed seats) plus the Red
    Cell's pre-mortem; a critic's variant is tabled if the engine scores it higher.
 7. `revision`: authors revise or hold, with the evidence. A second round runs on the top three
-   only if the leader changed and the budget (90 calls) allows.
+   only if the leader changed and the budget (130 calls) allows.
 8. `comparison`: criterion owners rate the shortlist blind, in shuffled order.
 9. `decision`: the matrix picks the plan; the Chair writes the three tracks. Then the engine
    draws the region without and with the plan at the hour the plan helps most.

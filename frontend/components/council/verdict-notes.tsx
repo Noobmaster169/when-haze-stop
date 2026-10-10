@@ -8,6 +8,7 @@ const CAVEATS: { text: string; href: string; link: string }[] = [
   { text: "The package beyond what Indonesia accepted, and every suppression rate, are assumptions.", href: DOC_LINKS.package, link: "What the package rests on" },
   { text: "Past the forecast, the wind is replayed from past windows, so the horizon is a spread of analogues, not a forecast.", href: DOC_LINKS.engine, link: "How a plan is scored" },
   { text: "The engine weighs fires by power, which under-weights smouldering peat by three to six times.", href: DOC_LINKS.questions, link: "What is not settled" },
+  { text: "Every figure rests on the smoke engine, replayed against a week of DOE readings.", href: "/simulation", link: "How the engine was checked" },
 ];
 
 export function VerdictNotes({ verdict }: { verdict: Verdict }) {
@@ -27,7 +28,7 @@ export function VerdictNotes({ verdict }: { verdict: Verdict }) {
         {CAVEATS.map((caveat) => (
           <li key={caveat.href}>
             {caveat.text}{" "}
-            <a href={caveat.href} target="_blank" rel="noreferrer" className="whitespace-nowrap text-ink underline underline-offset-2 hover:text-accent">
+            <a href={caveat.href} {...(caveat.href.startsWith("http") ? { target: "_blank", rel: "noreferrer" } : {})} className="whitespace-nowrap text-ink underline underline-offset-2 hover:text-accent">
               {caveat.link}
             </a>
           </li>
