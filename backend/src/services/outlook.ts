@@ -26,8 +26,14 @@ export async function loadErrors(db: Queryable): Promise<ErrorsFor> {
   };
 }
 
-/** A learned forecast older than this against the run is stale, and the hourly forecast speaks instead. */
-const LEARNED_STALE_HOURS = 24;
+/**
+ * A learned forecast older than this against the run is stale, and the hourly
+ * forecast speaks instead. The model issues once a day at 00:00 UTC, so its
+ * newest forecast is up to 23 hours old by design. When the day's ask fails,
+ * yesterday's issue keeps the outlook until 06:00 UTC while the job retries
+ * each hour, so one missed hour does not drop the model's days.
+ */
+export const LEARNED_STALE_HOURS = 30;
 
 export interface OutlookContext {
   asOf: Date;
@@ -44,7 +50,7 @@ export async function outlookContext(db: Queryable, mode: ModelMode = config.MOD
   return { asOf: new Date(run.asOf), runId: run.id, errorsFor: await loadErrors(db), learned: mode === "live" };
 }
 
-/** The newest learned forecast for a station, empty where there is none or it is older than the run by a day. */
+/** The newest learned forecast for a station, empty where there is none or it is stale. */
 async function learnedDays(db: Queryable, stationId: string, asOf: Date): Promise<Map<string, ModelDay>> {
   const stored = await modelForecasts.latestFor(db, stationId);
   if (!stored || stored.asOf < addHours(asOf, -LEARNED_STALE_HOURS)) return new Map();

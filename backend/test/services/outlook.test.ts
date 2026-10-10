@@ -4,7 +4,8 @@ import { closePool, getPool } from "../../src/db";
 import { pm25ToApi } from "../../src/haze/api-index";
 import { runModelForecast } from "../../src/jobs/model-forecast";
 import { modelForecasts, stations } from "../../src/repositories";
-import { outlookContext, outlookFor } from "../../src/services/outlook";
+import { addHours } from "../../src/haze/grid";
+import { LEARNED_STALE_HOURS, outlookContext, outlookFor } from "../../src/services/outlook";
 import { FakeModelClient } from "../../src/sources/__fakes__/fake.model";
 import { recordedCycle } from "../fixtures/cycle";
 import { CONTRACT_FORECASTS } from "../fixtures/model-contract";
@@ -43,6 +44,22 @@ describe("the station outlook under each model mode", () => {
     const station = await stations.find(pool, "CA21B");
     const context = await outlookContext(pool, "live");
     if (!station || !context) throw new Error("the recorded cycle stored no run or no Klang");
+    const live = await outlookFor(pool, station, context);
+    const off = await outlookFor(pool, station, { ...context, learned: false });
+    expect(live.days).toEqual(off.days);
+  });
+
+  it("falls back to the hourly forecast where the newest learned forecast is older than the bound", async () => {
+    const station = await stations.find(pool, "CA16W");
+    const context = await outlookContext(pool, "live");
+    if (!station || !context) throw new Error("the recorded cycle stored no run or no Cheras");
+    // An issue an hour past the bound, for a day the outlook shows, with a band far from anything the hourly run says.
+    const asOf = addHours(context.asOf, -(LEARNED_STALE_HOURS + 1));
+    const day = "2026-10-11";
+    await modelForecasts.insertMany(pool, [{ asOf, instrumentId: "CA16W", day, p10: 300, p50: 400, p90: 480, modelVersion: "test-outlook-stale" }]);
+    const stored = await modelForecasts.latestFor(pool, "CA16W");
+    expect(stored?.asOf).toEqual(asOf);
+    expect(stored?.days.has(day)).toBe(true);
     const live = await outlookFor(pool, station, context);
     const off = await outlookFor(pool, station, { ...context, learned: false });
     expect(live.days).toEqual(off.days);

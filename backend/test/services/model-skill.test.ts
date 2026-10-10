@@ -43,20 +43,26 @@ describe("the learned model's live score", () => {
     expect(dayAhead?.model).toBeCloseTo(Math.abs(pm25ToApi(90) - peak), 1);
     expect(twoAhead?.cases).toBe(1);
     expect(twoAhead?.model).toBeCloseTo(Math.abs(pm25ToApi(70) - peak), 1);
-    expect(skill.leads.map((lead) => [lead.network, lead.leadDays])).toEqual([["doe", 1], ["doe", 2], ["nea", 1], ["nea", 2]]);
+    // Singapore's readings are PSI, not DOE's index, so only DOE stations are scored.
+    expect(skill.leads.map((lead) => [lead.network, lead.leadDays])).toEqual([["doe", 1], ["doe", 2]]);
     expect(skill.shadowDays).toBe(1);
   });
 
   it("answers with nulls and no pass before any forecast of a version exists", async () => {
-    const skill = await modelSkill(pool, "off", "no-such-version");
-    expect(skill).toMatchObject({ mode: "off", modelVersion: "no-such-version", since: null, shadowDays: 0, gain: null, passed: false });
+    const skill = await modelSkill(pool, "shadow", "no-such-version");
+    expect(skill).toMatchObject({ mode: "shadow", modelVersion: "no-such-version", since: null, shadowDays: 0, gain: null, passed: false });
     expect(skill.leads.every((lead) => lead.cases === 0 && lead.model === null)).toBe(true);
+  });
+
+  it("scores nothing while the model is off, even with an earlier shadow period stored", async () => {
+    expect((await modelSkill(pool, "shadow", VERSION)).cases).toBe(1);
+    const skill = await modelSkill(pool, "off", VERSION);
+    expect(skill).toEqual({ mode: "off", modelVersion: null, since: null, shadowDays: 0, shadowDaysRequired: SHADOW_DAYS, cases: 0, comparedCases: 0, gain: null, gainRequired: SHADOW_GAIN, passed: false, leads: [] });
   });
 
   it("is part of the simulation the api serves", async () => {
     const simulation = Simulation.parse((await request(testApp()).get("/haze/simulation").expect(200)).body);
-    expect(simulation.model.mode).toBe("off");
-    expect(simulation.model.leads).toHaveLength(4);
+    expect(simulation.model).toMatchObject({ mode: "off", modelVersion: null, leads: [] });
   });
 
   it("scores the hourly run on the current grid only, and gates on identical cases", async () => {

@@ -15,7 +15,12 @@ import type { ScoreRow } from "../repositories/model-forecasts.repo";
 
 export const SHADOW_DAYS = 14;
 export const SHADOW_GAIN = 0.1;
-const NETWORKS: Network[] = ["doe", "nea"];
+/**
+ * DOE alone. Singapore's rows in `readings` are PSI, whose PM2.5 bands differ
+ * from DOE's (55 ug/m3 is PSI 100 but about API 150), so scoring them against
+ * the model's PM2.5 turned into DOE's index would mix units.
+ */
+const NETWORKS: Network[] = ["doe"];
 const LEADS = [1, 2];
 
 const round2 = (value: number): number => Math.round(value * 100) / 100;
@@ -48,11 +53,17 @@ function leadSkill(rows: ScoreRow[], network: Network, leadDays: number): ModelL
   };
 }
 
+/** With the model off, rows from an earlier shadow period are not shown: the page says nothing comes from a learned model. */
+function offSkill(): ModelSkill {
+  return { mode: "off", modelVersion: null, since: null, shadowDays: 0, shadowDaysRequired: SHADOW_DAYS, cases: 0, comparedCases: 0, gain: null, gainRequired: SHADOW_GAIN, passed: false, leads: [] };
+}
+
 /** Only current-grid, current-model hourly runs enter the comparison. `version` is the newest stored unless a test names one. */
 export async function modelSkill(db: Queryable, mode: ModelMode, version?: string): Promise<ModelSkill> {
+  if (mode === "off") return offSkill();
   const newest = await modelForecasts.newestVersion(db);
   const modelVersion = version ?? newest?.modelVersion ?? null;
-  const rows = modelVersion ? (await modelForecasts.scorable(db, MODEL_VERSION, GRID_KEY)).filter((row) => row.modelVersion === modelVersion) : [];
+  const rows = modelVersion ? await modelForecasts.scorable(db, modelVersion, MODEL_VERSION, GRID_KEY) : [];
   const leads = NETWORKS.flatMap((network) => LEADS.map((leadDays) => leadSkill(rows, network, leadDays)));
 
   const dayAhead = leads[0];

@@ -34,7 +34,7 @@ describe("the model forecasts repository", () => {
 
   it("offers a forecast for scoring only once its day's readings are all in", async () => {
     // The recorded readings end at 11:00 on 10 October, Malaysian time, so neither the 10th nor any later day is scoreable yet.
-    const rows = (await modelForecasts.scorable(pool, MODEL_VERSION, GRID_KEY)).filter((row) => row.modelVersion === VERSION && row.day >= "2026-10-10");
+    const rows = (await modelForecasts.scorable(pool, VERSION, MODEL_VERSION, GRID_KEY)).filter((row) => row.day >= "2026-10-10");
     expect(rows).toEqual([]);
   });
 
@@ -45,7 +45,10 @@ describe("the model forecasts repository", () => {
     await modelForecasts.insertMany(pool, [{ ...band("2026-10-09", 60, 90, 120), asOf: madeAt }]);
     const ninth = await readings.forStation(pool, "CA24N", new Date("2026-10-08T16:00:00Z"), new Date("2026-10-09T15:00:00Z"));
     const peak = Math.max(...ninth.map((reading) => reading.api));
-    const [row] = (await modelForecasts.scorable(pool, MODEL_VERSION, GRID_KEY)).filter((item) => item.modelVersion === VERSION && item.day === "2026-10-09");
+    const scored = await modelForecasts.scorable(pool, VERSION, MODEL_VERSION, GRID_KEY);
+    expect(scored.length).toBeGreaterThan(0);
+    expect(scored.every((item) => item.modelVersion === VERSION)).toBe(true);
+    const [row] = scored.filter((item) => item.day === "2026-10-09");
     expect(row).toMatchObject({ instrumentId: "CA24N", network: "doe", leadDays: 1, p50: 90, observed: peak, persistence: null });
     expect(peak).toBeGreaterThan(100);
   });

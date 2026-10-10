@@ -63,6 +63,12 @@ export async function latestFor(db: Queryable, instrumentId: string): Promise<In
   return { asOf: rows[0].as_of, modelVersion: rows[0].model_version, days: new Map(rows.map((row) => [row.day, { p10: row.p10, p50: row.p50, p90: row.p90 }])) };
 }
 
+/** Whether a version's forecast issued at this time is already stored, so the hourly job asks the service once per issue. */
+export async function hasIssue(db: Queryable, asOf: Date, modelVersion: string): Promise<boolean> {
+  const { rows } = await db.query<{ one: number }>("select 1 as one from model_forecasts where as_of = $1 and model_version = $2 limit 1", [asOf, modelVersion]);
+  return rows.length > 0;
+}
+
 /** The version stored most recently and when its first forecast was made, or null before any. */
 export async function newestVersion(db: Queryable): Promise<{ modelVersion: string; since: Date } | null> {
   const { rows } = await db.query<{ model_version: string; since: Date }>(
@@ -105,12 +111,15 @@ interface ScoreRowRaw {
 
 /**
  * Every stored forecast for a station whose day has passed, at one and two
- * days ahead, with what happened. A day has passed once the newest reading
- * anywhere is on a later Malaysian day. `runModel` and `grid` name the hourly
- * run's method and grid to compare with: runs of another grid are not
- * comparable and `forecast_runs` holds one per grid for the same hour.
+ * days ahead, with what happened, for one model version. A day has passed
+ * once the newest reading anywhere is on a later Malaysian day. `runModel` and
+ * `grid` name the hourly run's method and grid to compare with: runs of
+ * another grid are not comparable and `forecast_runs` holds one per grid for
+ * the same hour. The day's peak is read over a half-open `observed_at` range,
+ * 16:00 UTC the day before to 16:00 UTC that day, so the
+ * `(station_id, observed_at)` index serves it.
  */
-export async function scorable(db: Queryable, runModel: string, grid: string): Promise<ScoreRow[]> {
+export async function scorable(db: Queryable, modelVersion: string, runModel: string, grid: string): Promise<ScoreRow[]> {
   const { rows } = await db.query<ScoreRowRaw>(
     `with newest as (select max(observed_at) as at from readings),
      f as (
@@ -119,11 +128,13 @@ export async function scorable(db: Queryable, runModel: string, grid: string): P
          from model_forecasts m
          join stations s on s.id = m.instrument_id
          cross join newest n
-        where m.day < ((n.at at time zone 'UTC') + interval '8 hours')::date
+        where m.model_version = $3 and m.day < ((n.at at time zone 'UTC') + interval '8 hours')::date
      )
      select f.as_of, f.instrument_id, f.network, to_char(f.day, 'YYYY-MM-DD') as day, f.lead_days, f.p50, f.model_version,
             (select max(r.api) from readings r
-              where r.station_id = f.instrument_id and ((r.observed_at at time zone 'UTC') + interval '8 hours')::date = f.day) as observed,
+              where r.station_id = f.instrument_id
+                and r.observed_at >= (f.day - interval '8 hours') at time zone 'UTC'
+                and r.observed_at < (f.day + interval '16 hours') at time zone 'UTC') as observed,
             (select r.api from readings r
               where r.station_id = f.instrument_id and r.observed_at <= f.as_of order by r.observed_at desc limit 1) as persistence,
             (select max(x.api) from forecast_runs fr
@@ -134,7 +145,7 @@ export async function scorable(db: Queryable, runModel: string, grid: string): P
        from f
       where f.lead_days between 1 and 2
       order by f.as_of, f.instrument_id, f.day`,
-    [runModel, grid],
+    [runModel, grid, modelVersion],
   );
   return rows.map((row) => ({
     asOf: row.as_of,
