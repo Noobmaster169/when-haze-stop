@@ -1,0 +1,15 @@
+sensor_id,name,provider,reference,lat,lon
+7378800,Setia Alam,AirGradient,False,3.124023,101.455835
+11760952,Taman Tun Dr. Ismail,AirGradient,False,3.1411106257486976,101.6274985267597
+12178404,Setia Eco Park,AirGradient,False,3.1113299,101.476412
+13489161,Damansara Perdana,AirGradient,False,3.165828,101.600871
+14153140,Damansara Perdana,AirGradient,False,3.165828,101.600871
+14197554,KLCC,Clarity,False,3.1564,101.70981
+14198316,Bukit Bintang,Clarity,False,3.14601,101.71021
+15817621,Sejati Residences Cyberjaya,AirGradient,False,2.913,101.640583
+15956119,"FPSK, Serdang",AirGradient,False,2.9785511223627714,101.71745723362872
+17219801,ENVIRO EXCELTECH SDN BHD,AirGradient,False,3.02072,101.714186
+17241860,Mont Kiara,AirGradient,False,3.1696,101.6528
+17523785,Setapak,AirGradient,False,3.1922,101.72318
+17558116,KLCC,AirGradient,False,3.15665,101.70853
+17560799,Airscan.org Kota Damansara,AirGradient,False,3.1657127889452115,101.59940200955491

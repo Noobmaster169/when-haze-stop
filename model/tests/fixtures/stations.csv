@@ -1,0 +1,17 @@
+id,name,lat,lon,network
+CA18B,Kuala Selangor,3.321362,101.256249,doe
+CA19B,Petaling Jaya,3.130875,101.60868,doe
+CA20B,Shah Alam,3.10475,101.556192,doe
+CA21B,Klang,3.014899,101.413136,doe
+CA22B,Banting,2.816668,101.623043,doe
+CA37C,Rompin,2.927699,103.419193,doe
+CA38C,Temerloh,3.470806,102.378663,doe
+CA39C,Jerantut,3.948312,102.366683,doe
+CA40C,Indera Mahkota Kuantan,3.819228,103.296553,doe
+CA41C,Balok Baru Kuantan,3.960669,103.382182,doe
+MCAQM001,JOHAN SETIA,2.978644,101.490107,doe
+SGCENTRAL,Singapore Central,1.35735,103.82,nea
+SGEAST,Singapore East,1.35735,103.94,nea
+SGNORTH,Singapore North,1.41803,103.82,nea
+SGSOUTH,Singapore South,1.29587,103.82,nea
+SGWEST,Singapore West,1.35735,103.7,nea

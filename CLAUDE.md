@@ -6,13 +6,15 @@ proxy that puts the Claude subscription behind the Anthropic wire. Read this fil
 touching code. What each feature does and how is in `docs/FEATURES.md`. Where the work stands and
 what to do next is in `docs/HANDOVER.md`.
 
-Three independent packages. Run commands inside a package, never at the root. The one exception
+Four independent packages. Run commands inside a package, never at the root. The one exception
 is `compose.yaml` at the root, which runs the whole stack with `docker compose up -d --build`.
 
 - `frontend/` Next.js 16. Read `frontend/AGENTS.md` before writing Next code.
 - `backend/` Express + Postgres. Owns the chat agent, its tools and its skills.
 - `proxy/` Python. Anthropic-wire gateway to `claude -p`, run as the `llm-proxy` container of
   the compose stack, logged in by `CLAUDE_CODE_OAUTH_TOKEN`.
+- `model/` Python. The learned forecast: truth, features, training, backtest and the `/predict`
+  service, run as the `model` container. Method and results in `docs/MODEL.md`.
 
 Setup, ports and the API are in `README.md`.
 
@@ -42,6 +44,12 @@ pnpm haze:coverage                  # what is stored of those four, month by mon
 # frontend, inside frontend/
 pnpm dev                            # :3000
 pnpm type-check && pnpm lint && pnpm test
+
+# model, inside model/
+python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+.venv/bin/pytest -q && .venv/bin/ruff check .
+.venv/bin/hazemodel features --from 2025-06-07 --to 2026-10-08   # training rows to model/data/
+.venv/bin/hazemodel serve                                         # :4002
 
 # proxy, inside proxy/
 python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
