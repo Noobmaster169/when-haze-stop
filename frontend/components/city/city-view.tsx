@@ -64,7 +64,6 @@ export function CityView() {
     scene.handle.setLook(lookFor(air, sun, scene.theme.palette), sun);
   }, [scene, air, at, midday, city]);
 
-  const estimatedShare = useMemo(() => (model ? model.buildings.filter((item) => item.e === 1).length / Math.max(1, model.buildings.length) : 0), [model]);
   const seek = useCallback((moment: number) => setPicked(moment), []);
 
   if (error || failure) {
@@ -82,7 +81,7 @@ export function CityView() {
         {!scene ? <p className="absolute inset-x-0 top-1/2 text-center text-small text-ink-tertiary">Building the city</p> : null}
         {air && city ? (
           <div className="absolute left-3 top-16 @[900px]:top-3">
-            <CityPanel air={air} city={city} estimatedShare={estimatedShare} />
+            <CityPanel air={air} city={city} />
           </div>
         ) : null}
         <div className="absolute bottom-8 left-3 flex flex-col items-start gap-2 sm:bottom-auto sm:left-auto sm:right-3 sm:top-16 sm:items-end">

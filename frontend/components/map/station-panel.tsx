@@ -77,7 +77,7 @@ export function StationPanel({ station, at, via, onClose }: { station: Station; 
 
           <div>
             <OutlookChart outlook={outlook} at={at} />
-            <p className="text-caption text-ink-tertiary">Black is what DOE read. Blue dashes are the forecast.</p>
+            <p className="text-caption text-ink-tertiary">Black is what DOE read, blue dashes the forecast.</p>
           </div>
 
           {outlook.days.length > 0 ? (
@@ -87,7 +87,7 @@ export function StationPanel({ station, at, via, onClose }: { station: Station; 
                 <DayTable days={outlook.days} />
               </div>
               <p className="mt-2 text-caption leading-[17px] text-ink-tertiary">
-                The range covers 8 in 10 past errors. In its first test this forecast was about as accurate as assuming no change.{" "}
+                Ranges cover 8 in 10 past errors.{" "}
                 <Link href="/accuracy" className="text-accent underline-offset-2 hover:underline">
                   Track record
                 </Link>

@@ -72,12 +72,12 @@ export default async function SourcesPage({ searchParams }: PageProps<"/sources"
             <header className="pt-20 pb-6">
               <h1 className="font-display text-display text-ink">Sources</h1>
               <p className="mt-2 max-w-[62ch] text-body text-ink-secondary">
-                The map is built from three kinds of data. An hourly job fetches each one and records every fetch. Times are Malaysian time.
+                Three kinds of data feed the map, each fetched on a schedule. Times are Malaysian time.
               </p>
             </header>
 
             {report === null ? (
-              <p className="text-small text-fault">The backend could not be reached, so there is nothing to show. Check that the api is running.</p>
+              <p className="text-small text-fault">The backend could not be reached.</p>
             ) : (
               <>
                 <div className="sticky top-14 z-10 lg:hidden">
@@ -92,7 +92,7 @@ export default async function SourcesPage({ searchParams }: PageProps<"/sources"
                   <h2 id="where" className="font-display text-[22px] leading-7 text-ink">
                     Where it comes from
                   </h2>
-                  <p className="mt-1 mb-4 max-w-[62ch] text-body text-ink-secondary">Every source is public and needs no key. The last three are not fetched on a schedule.</p>
+                  <p className="mt-1 mb-4 max-w-[62ch] text-body text-ink-secondary">All public, no key needed.</p>
                   <WhereTable sources={report.sources} />
                 </section>
               </>

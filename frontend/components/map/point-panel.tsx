@@ -87,13 +87,13 @@ export function PointPanel({ data, basemap, probe, at, onStation, onClose }: { d
 
         <div>
           <SeriesChart known={known} ahead={ahead} at={at} label={`Modelled API at ${coordinates(lat, lon)} over the past week and the next three days`} />
-          <p className="text-caption text-ink-tertiary">Black is the model pulled towards the readings. Blue dashes are its forecast.</p>
+          <p className="text-caption text-ink-tertiary">Black is the model, blue dashes its forecast.</p>
         </div>
 
         <p className="text-caption leading-[17px] text-ink-tertiary">
           {nearest && nearest.km > FAR_KM
-            ? `The nearest station is ${nearest.km} km away, so this is mostly the smoke model with little correction from readings.`
-            : "There is no station on this spot. Its value is the smoke model, pulled towards what the stations around it read."}
+            ? `Mostly the model: the nearest station is ${nearest.km} km away.`
+            : "No station here: this is the model, corrected by nearby readings."}
         </p>
       </div>
     </aside>

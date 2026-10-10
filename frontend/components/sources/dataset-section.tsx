@@ -7,7 +7,7 @@ import { FetchHistory } from "./fetch-history";
 import { FetchStrip } from "./fetch-strip";
 import { ago, lastAttempt, nextFetch, STATE_TONE, worstState } from "./source-state";
 
-/** One kind of data: what it is, its numbers from the newest fetch, when it arrives, how, and its history. */
+/** One kind of data: what it is, its numbers from the newest fetch, when it arrives, and its history. */
 
 export function DatasetSection({ dataset, sources, page, params, now }: { dataset: Dataset; sources: readonly SourceStatus[]; page: SourceFetchPage | null; params: Record<string, string>; now: Date }) {
   const members = sources.filter((source) => dataset.members.includes(source.id));
@@ -64,11 +64,6 @@ export function DatasetSection({ dataset, sources, page, params, now }: { datase
         ) : null}
       </div>
       {main ? <FetchStrip marks={main.marks} now={now} /> : null}
-
-      <p className="mt-5 max-w-[68ch] text-small text-ink-secondary">
-        <span className="font-medium text-ink">How it is fetched. </span>
-        {dataset.how}
-      </p>
 
       <FetchHistory dataset={dataset} page={page} params={params} />
     </section>

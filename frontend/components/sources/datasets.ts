@@ -21,7 +21,6 @@ export interface Dataset {
   title: string;
   icon: IconName;
   what: string;
-  how: string;
   members: string[];
   history: string;
   stats(detailOf: (source: string) => FetchDetail | null): Stat[];
@@ -51,8 +50,7 @@ export const DATASETS: readonly Dataset[] = [
     key: "air",
     title: "Air quality readings",
     icon: "pin",
-    what: "The official Air Pollutant Index from every DOE station. The station dots show it, and the haze map is pulled towards it.",
-    how: "Every hour at 20 past: one request per state for the 24 hours before. After a gap it reaches back up to 7 days, which is all DOE keeps.",
+    what: "The official index from every DOE station.",
     members: ["doe-stations", "doe-readings"],
     history: "doe-readings",
     stats: (detailOf) => {
@@ -70,8 +68,7 @@ export const DATASETS: readonly Dataset[] = [
     key: "fires",
     title: "Fire detections",
     icon: "flame",
-    what: "Hotspots seen from space. They are where the model releases smoke.",
-    how: "Every 3 hours: three 7-day files from NASA, one per satellite. Sun glint and offshore gas flares are removed before anything is stored.",
+    what: "Hotspots seen from space, where the smoke starts.",
     members: ["firms"],
     history: "firms",
     stats: (detailOf) => {
@@ -89,8 +86,7 @@ export const DATASETS: readonly Dataset[] = [
     key: "weather",
     title: "Wind and rain",
     icon: "wind",
-    what: "The wind that carries smoke about a kilometre up, and the rain that washes it out.",
-    how: "Every hour at 20 past: 15 requests, one per row of a 1 degree grid, each covering 8 days back and 5 ahead.",
+    what: "The wind that carries the smoke, and the rain that clears it.",
     members: ["open-meteo"],
     history: "open-meteo",
     stats: (detailOf) => {
