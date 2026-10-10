@@ -36,7 +36,7 @@ export interface CycleOptions {
 export async function runCycle(deps: IngestDeps, now: Date, options: CycleOptions): Promise<void> {
   await attempt("readings", () => ingestReadings(deps, now));
   if (options.fires) await attempt("fires", () => ingestFires(deps));
-  await attempt("weather", () => ingestWeather(deps));
+  await attempt("weather", () => ingestWeather(deps, now));
   await attempt("metar", () => ingestMetars(deps));
   await attempt("nea", () => ingestSingapore(deps, now));
   const sensors = deps.openaq;

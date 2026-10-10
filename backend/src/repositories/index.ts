@@ -15,3 +15,4 @@ export * as sourceFetches from "./source-fetches.repo";
 export * as statements from "./statements.repo";
 export * as stations from "./stations.repo";
 export * as weather from "./weather.repo";
+export * as weatherForecasts from "./weather-forecasts.repo";
