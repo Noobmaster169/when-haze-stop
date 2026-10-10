@@ -23,12 +23,12 @@ Checked on the compose stack with `MODEL_MODE=live` after `docker compose up -d 
 | Jerantut panel, line against rows | Mon 12 Oct line peak 92 = row 92; Tue 13 Oct 103 = 103; today and Thu labelled hourly |
 | Why line under a learned day | "Little simulated smoke reaches here", because the run on screen predates migration 009 and stored no `physics`; the next run stores it and the sentence can name the peak hour and wind |
 | Map source, caption | learned, version 2026-10-11-c88cac5a, trial, backtest 15.48 against 17.53 |
-| Map frames corrected (`learnedFrom`) | Not yet at the time of writing: the newest complete DOE hour already had a run from before the rebuild, and runs are never remade. The first cycle that makes a new live run writes `learned_version` and the caption switches from "hourly forecast" to the model past midnight Malaysian time. Confirm with `select id, as_of, learned_version from forecast_runs order by id desc limit 1` |
+| Map frames corrected (`learnedFrom`) | Confirmed at the next cycle: run 64 (23:00 UTC 10 Oct) carries `learned_version`, the map's `learnedFrom` is 2026-10-11T18:00Z (02:00 Monday Malaysian time). Measured at Jerantut for Monday 14:00: uncorrected run 26.8 ug/m3, corrected 51.1, target 44.3. The correction overshoots because the inverse-distance average at a station mixes in its many neighbours' deltas; the fix (solve for point corrections so the spread field hits every target exactly) is in hand, see the git log after b9806a3 |
 | `/haze/model` | source learned, 0 days checked, next check 2026-10-11T16:00Z, six watched DOE stations, empty ledger |
 | `/model` page | Renders the live record first, then the published figures |
 
 So `MODEL_MODE=live` works end to end on the compose stack for the panel, the alerts, the
-assistant and the Model page; the map's future frames follow at the next new run. The chat was
+assistant, the Model page and, from run 64 on, the map's future frames. The chat was
 not exercised against a real model call here; prompt `v5.md` and `haze-decision` version 5 are
 what it reads.
 
