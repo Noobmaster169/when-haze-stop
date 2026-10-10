@@ -3,7 +3,8 @@
 A haze map, forecast, alerts and assistant for Malaysia, built on an AI application starter: a
 Next.js frontend with a chat dock on every page, an Express backend that runs the agent, and a
 proxy that puts the Claude subscription behind the Anthropic wire. Read this file fully before
-touching code. What each feature does and how is in `docs/FEATURES.md`.
+touching code. What each feature does and how is in `docs/FEATURES.md`. Where the work stands and
+what to do next is in `docs/HANDOVER.md`.
 
 Three independent packages. Run commands inside a package, never at the root.
 
