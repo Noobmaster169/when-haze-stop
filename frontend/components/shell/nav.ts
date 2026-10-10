@@ -12,7 +12,8 @@ export const DESTINATIONS: Destination[] = [
   { key: "map", label: "Map", href: "/map", icon: "map" },
   { key: "city", label: "KL in 3D", href: "/city", icon: "city" },
   { key: "alerts", label: "Alerts", href: "/alerts", icon: "bell" },
-  { key: "simulation", label: "Simulation", href: "/simulation", icon: "chart" },
+  // The council replaced the Simulation page in the nav; the engine's backtest is still at /simulation, linked from the verdict.
+  { key: "council", label: "Council", href: "/council", icon: "chart" },
   { key: "model", label: "Model", href: "/model", icon: "grid" },
   { key: "sources", label: "Sources", href: "/sources", icon: "database" },
 ];

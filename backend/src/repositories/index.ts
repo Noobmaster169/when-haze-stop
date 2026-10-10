@@ -2,6 +2,7 @@
 export * as air from "./air.repo";
 export * as alerts from "./alerts.repo";
 export * as chat from "./chat.repo";
+export * as council from "./council.repo";
 export * as fires from "./fires.repo";
 export * as fixedSources from "./fixed-sources.repo";
 export * as forecasts from "./forecasts.repo";

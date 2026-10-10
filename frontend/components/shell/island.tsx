@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { TONE } from "@/components/alerts/alert-tone";
+import { useReplayLine } from "@/components/alerts/demo/replay-player";
 import { Icon } from "@/components/ui/icons";
 
 import { useUnseenAlert } from "./island-alert";
@@ -18,7 +19,8 @@ import { DESTINATIONS } from "./nav";
  * Alerts icon, where wider screens hang its line under the pill.
  */
 export function Island({ active }: { active: string | null }) {
-  const { alert } = useUnseenAlert();
+  const { alert: unseen } = useUnseenAlert();
+  const alert = useReplayLine() ?? unseen;
   return (
     <nav
       aria-label="Primary"

@@ -19,7 +19,10 @@
     "haze:coverage": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts coverage",
     "haze:dataset": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts dataset",
     "haze:evaluate": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts evaluate",
-    "haze:hindcast": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts hindcast"
+    "haze:hindcast": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts hindcast",
+    "council:situation": "node --env-file-if-exists=.env --import tsx src/jobs/council-situation.ts",
+    "council:worker": "node --env-file-if-exists=.env --import tsx src/jobs/council-worker.ts loop",
+    "council:run": "node --env-file-if-exists=.env --import tsx src/jobs/council-worker.ts once"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

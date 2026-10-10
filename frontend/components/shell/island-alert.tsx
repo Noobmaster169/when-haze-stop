@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import useSWR from "swr";
 
 import { TONE } from "@/components/alerts/alert-tone";
+import { REPLAY_DATE } from "@/components/alerts/demo/replay";
+import { dismissReplayLine, useReplayLine } from "@/components/alerts/demo/replay-player";
 import { useSessionId } from "@/components/alerts/session";
 import { Icon } from "@/components/ui/icons";
 import { type AlertEvent, AlertFeed } from "@/lib/api/alert-schemas";
@@ -59,15 +61,20 @@ export function useUnseenAlert(): { alert: AlertEvent | null; dismiss(): void } 
 
 /** The line under the island. Below 900px the map's search sits there, so the island's Alerts icon carries a dot instead. */
 export function IslandAlert() {
-  const { alert: newest, dismiss } = useUnseenAlert();
+  const { alert: unseen, dismiss: dismissUnseen } = useUnseenAlert();
+  // A demo replay, while it plays, stands in for the real alert and says it is a replay.
+  const replay = useReplayLine();
+  const newest = replay ?? unseen;
   if (!newest) return null;
   const tone = TONE[newest.kind];
+  const dismiss = replay ? dismissReplayLine : dismissUnseen;
 
   return (
     <div role="status" className="hidden h-9 max-w-[min(560px,calc(100vw-24px))] animate-[island-drop_400ms_var(--ease-island)] items-center gap-2 rounded-full bg-ink pr-1 pl-3.5 shadow-overlay min-[900px]:flex">
       <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${tone.dot}`} />
       <Link href="/alerts" className="min-w-0 truncate text-strong text-ink-inverse hover:underline">
         <span className="sr-only">{tone.label}: </span>
+        {replay ? <span className="mr-2 rounded-sm bg-ink-inverse/15 px-1.5 py-px text-caption font-semibold">Replay, {REPLAY_DATE}</span> : null}
         {newest.message}
       </Link>
       <button type="button" onClick={dismiss} aria-label="Mark this alert seen" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-inverse/55 hover:bg-ink-inverse/10 hover:text-ink-inverse">

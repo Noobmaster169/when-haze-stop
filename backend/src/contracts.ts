@@ -9,6 +9,8 @@ import { z } from "zod";
 
 export * from "./contracts.alerts";
 export * from "./contracts.chat";
+export * from "./contracts.council";
+export * from "./contracts.council-run";
 export * from "./contracts.haze";
 export * from "./contracts.model";
 export * from "./contracts.simulation";
