@@ -2,7 +2,7 @@ import numpy as np
 
 from hazemodel.train import feature_columns, fit_quantiles, load_params, predict_frame, train_artifact
 
-SMALL = {"num_leaves": 4, "min_data_in_leaf": 2, "num_boost_round": 20, "learning_rate": 0.1}
+SMALL = {"num_leaves": 4, "min_data_in_leaf": 2, "num_boost_round": 20, "learning_rate": 0.1, "num_threads": 1}
 
 
 def test_feature_columns_exclude_targets_and_weights(frame):
@@ -36,6 +36,27 @@ def test_predict_frame_sorted_quantiles_and_version(frame):
     out = predict_frame(artifact, frame)
     assert (out["p10_d1"] <= out["p50_d1"]).all() and (out["p50_d1"] <= out["p90_d1"]).all()
     assert (out["p10_d1"] >= 0).all()
+    assert (out["p10_d2"] <= out["p50_d2"]).all() and (out["p50_d2"] <= out["p90_d2"]).all()
+    assert (out["p10_d2"] >= 0).all()
     assert len(artifact.version.split("-")) == 4
     again, _ = train_artifact(frame, params)
     assert again.version == artifact.version
+
+
+def test_kind_code_is_categorical_in_the_booster(frame):
+    params = {**load_params(), **SMALL}
+    boosters, _ = fit_quantiles(frame, 1, feature_columns(frame), params)
+    model = boosters["d1_q50"].dump_model()
+    assert model["feature_infos"]["kind_code"]["values"]
+    assert model["feature_infos"]["level"]["values"] == []
+
+
+def test_zero_weights_leave_the_row_count(frame):
+    params = {**load_params(), **SMALL}
+    features = feature_columns(frame)
+    _, used = fit_quantiles(frame, 1, features, params)
+    lighter = frame.copy()
+    eligible = lighter.index[lighter["peak_d1"].notna() & (lighter["weight_d1"] > 0)]
+    lighter.loc[eligible[:5], "weight_d1"] = 0.0
+    _, fewer = fit_quantiles(lighter, 1, features, params)
+    assert fewer == used - 5

@@ -41,11 +41,9 @@ def fit_quantiles(
     categorical = [features.index("kind_code")] if "kind_code" in features else []
     rounds = int(params.get("num_boost_round", 600))
     settings = {k: v for k, v in params.items() if k != "num_boost_round"}
+    dataset = lgb.Dataset(x, y, weight=w, feature_name=features, categorical_feature=categorical, free_raw_data=False)
     boosters = {}
     for q in QUANTILES:
-        dataset = lgb.Dataset(
-            x, y, weight=w, feature_name=features, categorical_feature=categorical, free_raw_data=False
-        )
         quantile = {**settings, "objective": "quantile", "alpha": q / 100, "verbose": -1}
         boosters[f"d{day}_q{q}"] = lgb.train(quantile, dataset, rounds)
     return boosters, int(len(rows))
