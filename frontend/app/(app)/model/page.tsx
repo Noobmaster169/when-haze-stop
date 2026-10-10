@@ -8,18 +8,21 @@ import { LimitsChapter } from "@/components/model/limits-chapter";
 import { ModelChapter } from "@/components/model/model-chapter";
 import { Scorecard } from "@/components/model/scorecard";
 import { VerdictChapter } from "@/components/model/verdict-chapter";
+import { LiveChapter } from "@/components/model-live/live-chapter";
+import { loadModelLive } from "@/components/model-live/load-live";
 import { Contents } from "@/components/simulation/contents";
 import { MODEL_PERFORMANCE } from "@/lib/model-performance";
 
 /**
- * The learned forecast, scored, as eight figures beside the Simulation page.
- * Every figure comes from the model's published report, bundled at build
- * time, so the page needs no backend and changes only when a new report is
- * committed.
+ * The learned forecast, scored, as figures beside the Simulation page. The
+ * first chapter is the live record, read from the backend on each visit; every
+ * other figure comes from the model's published report, bundled at build
+ * time, so it changes only when a new report is committed.
  */
 
-export default function ModelPage() {
+export default async function ModelPage() {
   const data = MODEL_PERFORMANCE;
+  const live = await loadModelLive();
   return (
     <main className="flex min-w-0 grow flex-col">
       <div id={MODEL_SCROLL_ID} className="min-h-0 grow overflow-y-auto px-4 pt-20 pb-8 md:px-10">
@@ -35,6 +38,7 @@ export default function ModelPage() {
           </aside>
 
           <div className="min-w-0 max-w-[900px]">
+            <ModelChapter id="live">{live ? <LiveChapter live={live} /> : <p className="text-small text-fault">The live record could not be read from the backend.</p>}</ModelChapter>
             <DataChapter data={data} />
             <VerdictChapter data={data} />
             <FunctionChapter />

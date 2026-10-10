@@ -10,6 +10,7 @@ import type { Chapter } from "@/components/simulation/chapters";
 export const MODEL_SCROLL_ID = "model-scroll";
 
 export const MODEL_CHAPTERS: Chapter[] = [
+  { id: "live", title: "Live record", summary: "Whose forecast is showing, how it is scoring as days come due, the stations it puts highest tomorrow, and every scored forecast." },
   {
     id: "data",
     title: "What is being forecast",

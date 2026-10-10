@@ -4,8 +4,8 @@ import { MODEL_CHAPTERS } from "./chapters";
 import { GLOSSARY } from "./glossary";
 
 describe("the Model page's opening", () => {
-  it("opens on what is being forecast, before the verdict", () => {
-    expect(MODEL_CHAPTERS.map((chapter) => chapter.id).slice(0, 2)).toEqual(["data", "verdict"]);
+  it("opens on the live record, then what is being forecast, before the verdict", () => {
+    expect(MODEL_CHAPTERS.map((chapter) => chapter.id).slice(0, 3)).toEqual(["live", "data", "verdict"]);
   });
 
   it("defines the thirteen words the charts use, each once", () => {
