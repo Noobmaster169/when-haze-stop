@@ -8,10 +8,14 @@ from hazemodel.truth.sensors import correct_sensors
 from hazemodel.truth.visibility import airport_series
 
 
-def assemble_truth(data: SourceData, table: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+def assemble_truth(
+    data: SourceData, table: pd.DataFrame, decisions: dict[str, pd.DataFrame] | None = None
+) -> tuple[pd.DataFrame, dict]:
+    """With `decisions` (keys "sensors" and "airports") the corrections are applied as frozen, not fitted."""
+    frozen = decisions or {}
     reference = reference_series(data)
-    corrected, sensor_decisions = correct_sensors(reference, table)
-    airports, airport_decisions = airport_series(data, reference, table)
+    corrected, sensor_decisions = correct_sensors(reference, table, frozen.get("sensors"))
+    airports, airport_decisions = airport_series(data, reference, table, frozen.get("airports"))
     corrected["censored"] = False
     series = pd.concat([corrected, airports], ignore_index=True)
     series = series.sort_values(["instrument_id", "observed_at"]).reset_index(drop=True)

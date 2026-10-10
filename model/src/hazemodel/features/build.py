@@ -53,9 +53,11 @@ def build_rows(
     issue_times: pd.DatetimeIndex,
     with_targets: bool,
     from_forecast: int = 0,
+    decisions: dict[str, pd.DataFrame] | None = None,
 ) -> tuple[pd.DataFrame, dict]:
+    """`decisions` freezes the sensor and airport corrections to a trained artifact's; None fits them here."""
     table = instruments(data)
-    series, decisions = assemble_truth(data, table)
+    series, decisions = assemble_truth(data, table, decisions)
     air = air_features(series, table, issue_times)
     fires = fire_features(data, table, issue_times)
     weather = weather_features(data, table, region, fires, issue_times, from_forecast)

@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
-from hazemodel.artifacts import Artifact, save_artifact, set_live
+from hazemodel.artifacts import Artifact, load_artifact, save_artifact, set_live
 from hazemodel.features.build import build_rows
 from hazemodel.predict import predict_rows
 from hazemodel.region import region_from_env
@@ -18,7 +18,7 @@ ISSUE = pd.Timestamp("2026-10-08T00:00:00Z")
 
 
 def fit_on_fixture(data: SourceData) -> Artifact:
-    frame, _ = build_rows(
+    frame, decisions = build_rows(
         data, region_from_env(), pd.DatetimeIndex([ISSUE - pd.Timedelta(days=1), ISSUE]), with_targets=True
     )
     features = [
@@ -40,6 +40,7 @@ def fit_on_fixture(data: SourceData) -> Artifact:
         trained_at=dt.datetime(2026, 10, 10, tzinfo=dt.timezone.utc),
         features=features,
         boosters=boosters,
+        decisions=decisions,
     )
 
 
@@ -72,6 +73,7 @@ def test_predict_with_live_artifact(app_env, data):
     artifact = fit_on_fixture(data)
     save_artifact(app_env, artifact)
     set_live(app_env, artifact.version)
+    assert set(load_artifact(app_env, artifact.version).decisions) == {"sensors", "airports"}
     client = TestClient(create_app())
     health = client.get("/health").json()
     assert health["modelVersion"] == artifact.version

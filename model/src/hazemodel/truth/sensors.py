@@ -13,6 +13,16 @@ from hazemodel.instruments import distance_km
 ACCEPT_CORRELATION = 0.8
 # Five full days of shared hours: DOE stations hold one week, so 200 is out of reach.
 ACCEPT_HOURS = 120
+DECISION_COLUMNS = [
+    "instrument_id",
+    "reference_id",
+    "distance_km",
+    "hours",
+    "correlation",
+    "intercept",
+    "slope",
+    "accepted",
+]
 
 
 def nearest_reference(
@@ -45,19 +55,13 @@ def fit_line(x: pd.Series, y: pd.Series) -> tuple[float, float, float, int]:
     return float(intercept), float(slope), float(np.corrcoef(xs, ys)[0, 1]), len(shared)
 
 
-def correct_sensors(series: pd.DataFrame, table: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    by_id = {key: group.set_index("observed_at")["pm25_24h"] for key, group in series.groupby("instrument_id")}
-    corrected = series.copy()
+def _fit_sensors(by_id: dict[str, pd.Series], table: pd.DataFrame) -> pd.DataFrame:
     decisions = []
     for instrument_id in table[table["kind"] == "openaq"]["instrument_id"]:
         reference_id, distance = nearest_reference(table, instrument_id, by_id)
         raw = by_id.get(instrument_id, pd.Series(dtype=float))
         ref = by_id.get(reference_id, pd.Series(dtype=float))
         intercept, slope, correlation, hours = fit_line(raw, ref)
-        accepted = correlation >= ACCEPT_CORRELATION and hours >= ACCEPT_HOURS
-        if accepted:
-            mask = corrected["instrument_id"] == instrument_id
-            corrected.loc[mask, "pm25_24h"] = intercept + slope * corrected.loc[mask, "pm25_24h"]
         decisions.append(
             {
                 "instrument_id": instrument_id,
@@ -67,7 +71,25 @@ def correct_sensors(series: pd.DataFrame, table: pd.DataFrame) -> tuple[pd.DataF
                 "correlation": correlation,
                 "intercept": intercept,
                 "slope": slope,
-                "accepted": accepted,
+                "accepted": correlation >= ACCEPT_CORRELATION and hours >= ACCEPT_HOURS,
             }
         )
-    return corrected, pd.DataFrame(decisions)
+    return pd.DataFrame(decisions, columns=DECISION_COLUMNS)
+
+
+def correct_sensors(
+    series: pd.DataFrame, table: pd.DataFrame, decisions: pd.DataFrame | None = None
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Fit and apply each sensor's line, or apply the frozen `decisions` of a trained artifact unchanged.
+
+    Serving applies the decisions its artifact was trained with, because a refit on a shorter window can
+    unaccept a sensor the trees learned from and move its level by tens of ug/m3.
+    """
+    if decisions is None:
+        by_id = {key: group.set_index("observed_at")["pm25_24h"] for key, group in series.groupby("instrument_id")}
+        decisions = _fit_sensors(by_id, table)
+    corrected = series.copy()
+    for row in decisions[decisions["accepted"].astype(bool)].itertuples():
+        mask = corrected["instrument_id"] == row.instrument_id
+        corrected.loc[mask, "pm25_24h"] = row.intercept + row.slope * corrected.loc[mask, "pm25_24h"]
+    return corrected, decisions

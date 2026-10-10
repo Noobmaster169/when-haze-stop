@@ -7,8 +7,11 @@ import pathlib
 from dataclasses import dataclass
 
 import lightgbm as lgb
+import pandas as pd
 
 KEYS = ["d1_q10", "d1_q50", "d1_q90", "d2_q10", "d2_q50", "d2_q90"]
+# The sensor and airport corrections the artifact was trained on, frozen so serving never refits them.
+DECISIONS = ("sensors", "airports")
 
 
 @dataclass
@@ -17,6 +20,7 @@ class Artifact:
     trained_at: dt.datetime
     features: list[str]
     boosters: dict[str, lgb.Booster]
+    decisions: dict[str, pd.DataFrame] | None = None
 
 
 def artifacts_dir() -> pathlib.Path:
@@ -35,7 +39,16 @@ def save_artifact(directory: pathlib.Path, artifact: Artifact) -> pathlib.Path:
     )
     for key, booster in artifact.boosters.items():
         booster.save_model(str(folder / f"{key}.txt"))
+    for name, frame in (artifact.decisions or {}).items():
+        frame.to_csv(folder / f"decisions-{name}.csv", index=False)
     return folder
+
+
+def _read_decisions(folder: pathlib.Path) -> dict[str, pd.DataFrame] | None:
+    paths = {name: folder / f"decisions-{name}.csv" for name in DECISIONS}
+    ids = {"instrument_id": str, "reference_id": str}
+    found = {name: pd.read_csv(path, dtype=ids) for name, path in paths.items() if path.exists()}
+    return found or None
 
 
 def load_artifact(directory: pathlib.Path, version: str) -> Artifact:
@@ -49,6 +62,7 @@ def load_artifact(directory: pathlib.Path, version: str) -> Artifact:
         trained_at=dt.datetime.fromisoformat(meta["trained_at"]),
         features=meta["features"],
         boosters=boosters,
+        decisions=_read_decisions(folder),
     )
 
 

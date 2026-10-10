@@ -126,3 +126,31 @@ def test_from_forecast_reaches_the_column(data):
     for flag in (0, 1):
         frame, _ = build_rows(data, region_from_env(), ISSUES, with_targets=False, from_forecast=flag)
         assert (frame["from_forecast"] == flag).all()
+
+
+def _last_two_days(data):
+    # Test vector: every observation table cut to its final two days, the window a short refit would see.
+    names = ("readings", "nea_hours", "openaq_hours", "metar_obs")
+    end = max(getattr(data, name)["observed_at"].max() for name in names)
+    start = end - pd.Timedelta(days=2)
+    cut = {name: getattr(data, name)[getattr(data, name)["observed_at"] >= start] for name in names}
+    return type(data)(**{**data.__dict__, **cut})
+
+
+def test_frozen_decisions_survive_a_short_window(data):
+    issue = pd.DatetimeIndex([pd.Timestamp("2026-10-10T00:00:00Z")])
+    full, fitted = build_rows(data, region_from_env(), issue, with_targets=False)
+    short = _last_two_days(data)
+    _, refitted = build_rows(short, region_from_env(), issue, with_targets=False)
+    assert refitted["sensors"]["accepted"].sum() < fitted["sensors"]["accepted"].sum()  # the refit would unaccept
+    frame, frozen = build_rows(short, region_from_env(), issue, with_targets=False, decisions=fitted)
+    for name in ("sensors", "airports"):
+        pd.testing.assert_frame_equal(frozen[name], fitted[name])
+    present = set(full.index.get_level_values("instrument_id"))
+    accepted = [i for i in fitted["sensors"][fitted["sensors"]["accepted"]]["instrument_id"] if i in present]
+    assert accepted
+    assert (frame.loc[accepted, "reference_weight"] == KIND_WEIGHT["openaq"]).all()
+    pd.testing.assert_series_equal(frame.loc[accepted, "level"], full.loc[accepted, "level"])
+    airports = [i for i in fitted["airports"]["instrument_id"] if i in present]
+    assert airports
+    pd.testing.assert_series_equal(frame.loc[airports, "level"], full.loc[airports, "level"])

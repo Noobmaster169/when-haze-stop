@@ -70,7 +70,14 @@ def create_app() -> FastAPI:
         if artifact is None:
             return JSONResponse(status_code=503, content={"error": "no live model"})
         # The hours ahead of the ask are the newest fetch's forecast, never the analysis training mostly saw.
-        frame, _ = build_rows(_source(as_of), region, pd.DatetimeIndex([as_of]), with_targets=False, from_forecast=1)
+        frame, _ = build_rows(
+            _source(as_of),
+            region,
+            pd.DatetimeIndex([as_of]),
+            with_targets=False,
+            from_forecast=1,
+            decisions=artifact.decisions,
+        )
         out = predict_rows(artifact, frame)
         forecasts = [
             {

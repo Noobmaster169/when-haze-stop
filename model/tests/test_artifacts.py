@@ -2,8 +2,11 @@ import datetime as dt
 
 import lightgbm as lgb
 import numpy as np
+import pandas as pd
 
 from hazemodel.artifacts import Artifact, live_version, load_artifact, save_artifact, set_live
+from hazemodel.instruments import instruments
+from hazemodel.truth.assemble import assemble_truth
 
 KEYS = ["d1_q10", "d1_q50", "d1_q90", "d2_q10", "d2_q50", "d2_q90"]
 
@@ -37,3 +40,16 @@ def test_save_load_and_live_pointer(tmp_path):
     assert back.trained_at == artifact.trained_at
     x = np.array([[3.0, 0.0]])
     assert abs(back.boosters["d1_q50"].predict(x)[0] - artifact.boosters["d1_q50"].predict(x)[0]) < 1e-9
+    assert back.decisions is None
+
+
+def test_frozen_decisions_round_trip(tmp_path, data):
+    _, decisions = assemble_truth(data, instruments(data))
+    artifact = tiny_artifact()
+    artifact.decisions = decisions
+    folder = save_artifact(tmp_path, artifact)
+    assert {"decisions-sensors.csv", "decisions-airports.csv"} <= {path.name for path in folder.iterdir()}
+    back = load_artifact(tmp_path, artifact.version)
+    assert set(back.decisions) == {"sensors", "airports"}
+    for name in ("sensors", "airports"):
+        pd.testing.assert_frame_equal(back.decisions[name], decisions[name])
