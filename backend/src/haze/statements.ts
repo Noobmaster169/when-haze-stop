@@ -1,0 +1,189 @@
+import type { Statement, StatementAction, StatementIssuer, StatementKind, StatementStatus } from "../contracts";
+import { flatten } from "./statement-text";
+
+/**
+ * Which statements are one, which are still in force, and which areas they
+ * cover. Pure: the service hands in what is stored and today's date.
+ */
+
+/** A verified statement as stored, one per fetched item. */
+export interface StoredStatement {
+  id: number;
+  url: string;
+  channel: string;
+  outlet: string;
+  publishedAt: Date;
+  issuer: StatementIssuer;
+  issuerName: string;
+  kind: StatementKind;
+  action: StatementAction;
+  audience: string;
+  states: string[];
+  districts: string[];
+  nationwide: boolean;
+  threshold: number | null;
+  sustainedDays: number | null;
+  effectiveFrom: string | null;
+  effectiveUntil: string | null;
+  summary: string;
+  quote: string;
+}
+
+/** Advice and a lift have no end of their own; they are news for this many days. */
+const NEWS_DAYS = 2;
+/**
+ * A closure with no stated end runs "until further notice", and a reopening is
+ * reported less than a closing. Past this many days without a word it is no
+ * longer called in force.
+ */
+const OPEN_ORDER_DAYS = 7;
+const ORIGINALS = new Set(["moe-statements", "doe-statements"]);
+
+function addDays(day: string, days: number): string {
+  return new Date(Date.parse(`${day}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+}
+
+function malaysianDay(at: Date): string {
+  return new Date(at.getTime() + 8 * 3_600_000).toISOString().slice(0, 10);
+}
+
+/**
+ * Reports of one decision are one statement. A rule is its line. An order is
+ * who decided what for which day: "schools close on 9 October" reached the
+ * press as five headlines each naming some of the states, and is one decision
+ * covering all of them.
+ */
+function sameKey(statement: StoredStatement): string {
+  const { issuer, kind, action } = statement;
+  if (kind === "rule") return [issuer, kind, action, statement.threshold, statement.sustainedDays ?? 1].join("|");
+  return [issuer, kind, action, statement.effectiveFrom ?? malaysianDay(statement.publishedAt)].join("|");
+}
+
+function union(lists: string[][]): string[] {
+  return [...new Set(lists.flat())];
+}
+
+/** The group's areas, every report's together. */
+function merged(group: StoredStatement[]): StoredStatement {
+  const first = group[0];
+  const districts = new Map(group.flatMap((item) => item.districts).map((district) => [flatten(district), district]));
+  const ends = group.map((item) => item.effectiveUntil);
+  return {
+    ...first,
+    nationwide: group.some((item) => item.nationwide),
+    states: union(group.map((item) => item.states)),
+    districts: [...districts.values()],
+    // One report naming no end means the end is not agreed: it runs until further notice.
+    effectiveUntil: ends.every((end) => end !== null) ? (ends.sort().at(-1) ?? null) : null,
+  };
+}
+
+function covering(later: StoredStatement, earlier: StoredStatement): boolean {
+  if (later.nationwide) return true;
+  if (earlier.nationwide) return false;
+  return earlier.states.every((state) => later.states.includes(state)) && earlier.districts.every((district) => later.districts.map(flatten).includes(flatten(district)));
+}
+
+function overlaps(a: StoredStatement, b: StoredStatement): boolean {
+  if (a.nationwide || b.nationwide) return true;
+  return a.states.some((state) => b.states.includes(state)) || a.districts.some((district) => b.districts.map(flatten).includes(flatten(district)));
+}
+
+function statusOf(statement: StoredStatement, later: StoredStatement[], today: string): StatementStatus {
+  const { kind, action, issuer } = statement;
+  if (kind === "rule") {
+    const replaced = later.some((other) => other.kind === "rule" && other.issuer === issuer && other.action === action && (other.sustainedDays ?? 1) === (statement.sustainedDays ?? 1));
+    if (replaced) return "replaced";
+  }
+  if (kind === "order") {
+    // "Schools reopen on Monday" ends the closure on Monday, not on the day it was said.
+    const lifted = later.some((other) => (other.kind === "lift" || other.action === "reopen") && overlaps(other, statement) && (other.effectiveFrom ?? malaysianDay(other.publishedAt)) <= today);
+    if (lifted) return "ended";
+    if (later.some((other) => other.kind === "order" && other.action === action && covering(other, statement))) return "replaced";
+  }
+  const from = statement.effectiveFrom;
+  if (from && from > today) return "upcoming";
+  const start = from ?? malaysianDay(statement.publishedAt);
+  const fallback = kind === "advice" || kind === "lift" ? addDays(start, NEWS_DAYS) : kind === "order" ? addDays(start, OPEN_ORDER_DAYS) : null;
+  const until = statement.effectiveUntil ?? fallback;
+  return until && until < today ? "ended" : "in-force";
+}
+
+/** Every statement once, newest first, each with its status on `today` (a Malaysian `YYYY-MM-DD`). */
+export function resolveStatements(stored: StoredStatement[], today: string): Statement[] {
+  const groups = new Map<string, StoredStatement[]>();
+  for (const statement of [...stored].sort((a, b) => a.publishedAt.getTime() - b.publishedAt.getTime() || a.id - b.id)) {
+    const key = sameKey(statement);
+    groups.set(key, [...(groups.get(key) ?? []), statement]);
+  }
+  const firsts = [...groups.values()].map(merged);
+
+  const resolved = [...groups.values()].map((group, index): Statement => {
+    const first = firsts[index];
+    const later = firsts.filter((other) => other !== first && other.publishedAt > first.publishedAt);
+    // The ministry's own copy when one was fetched, else the report that names the most areas.
+    const widest = [...group].sort((a, b) => b.states.length + b.districts.length - (a.states.length + a.districts.length))[0];
+    const link = group.find((item) => ORIGINALS.has(item.channel)) ?? widest;
+    return {
+      id: first.id,
+      issuer: first.issuer,
+      issuerName: first.issuerName,
+      kind: first.kind,
+      action: first.action,
+      summary: link.summary,
+      quote: link.quote,
+      states: first.states,
+      districts: first.districts,
+      nationwide: first.nationwide,
+      threshold: first.threshold,
+      sustainedDays: first.sustainedDays,
+      effectiveFrom: first.effectiveFrom,
+      effectiveUntil: first.effectiveUntil,
+      publishedAt: first.publishedAt.toISOString(),
+      url: link.url,
+      outlet: link.outlet,
+      reports: group.length,
+      status: statusOf(first, later, today),
+    };
+  });
+  return resolved.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt) || b.id - a.id);
+}
+
+export interface Place {
+  name: string;
+  state: string;
+  lat: number;
+  lon: number;
+}
+
+/** Where a district is, from the gazetteer, or null when it is not known. */
+export type DistrictCentre = (name: string) => { lat: number; lon: number } | null;
+
+const DISTRICT_KM = 40;
+
+function km(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
+  const rad = Math.PI / 180;
+  const x = (b.lon - a.lon) * rad * Math.cos(((a.lat + b.lat) / 2) * rad);
+  const y = (b.lat - a.lat) * rad;
+  return Math.sqrt(x * x + y * y) * 6371;
+}
+
+/** The statement names this place's state, its district, or the whole country. */
+export function covers(statement: Pick<Statement, "nationwide" | "states" | "districts">, place: Place, centre: DistrictCentre): boolean {
+  if (statement.nationwide || statement.states.includes(place.state)) return true;
+  return statement.districts.some((district) => {
+    if (flatten(district) === flatten(place.name)) return true;
+    const at = centre(district);
+    return at !== null && km(at, place) <= DISTRICT_KM;
+  });
+}
+
+/** The actions worth an alert: they change what a person does tomorrow. */
+export const ACTING: ReadonlySet<StatementAction> = new Set(["schools-close", "outdoor-stop", "emergency", "work-from-home"]);
+
+/** Orders that cover a place and are in force or about to be. */
+export function ordersFor(statements: Statement[], place: Place, centre: DistrictCentre): Statement[] {
+  return statements.filter(
+    (statement) => statement.kind === "order" && ACTING.has(statement.action) && (statement.status === "in-force" || statement.status === "upcoming") && covers(statement, place, centre),
+  );
+}

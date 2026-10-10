@@ -5,10 +5,11 @@ import { forecasts, readings } from "../repositories";
 import { evaluateAlerts } from "./alerts";
 import { runForecast } from "./forecast";
 import { type IngestDeps, ingestFires, ingestReadings, ingestWeather } from "./ingest";
+import { ingestStatements } from "./statements";
 
 /**
- * One turn of the crank: fetch, run the model on the newest reading, raise
- * alerts. A source that fails is logged and stepped past, because a model run
+ * One turn of the crank: fetch, read new official statements, run the model on
+ * the newest reading, raise alerts. A source that fails is logged and stepped past, because a model run
  * on an hour-old wind is worth more than no run at all.
  */
 
@@ -34,6 +35,8 @@ export async function runCycle(deps: IngestDeps, now: Date, options: CycleOption
   await attempt("readings", () => ingestReadings(deps, now));
   if (options.fires) await attempt("fires", () => ingestFires(deps));
   await attempt("weather", () => ingestWeather(deps));
+  const reading = deps.statements;
+  if (reading) await attempt("statements", () => ingestStatements({ pool: deps.pool, ...reading }));
 
   const asOf = newestCompleteHour(await readings.stationsPerHour(deps.pool, COVERAGE_HOURS));
   if (!asOf) {
@@ -41,7 +44,7 @@ export async function runCycle(deps: IngestDeps, now: Date, options: CycleOption
     return;
   }
   await attempt("forecast", () => runForecast(deps.pool, asOf, "live"));
-  await attempt("alerts", () => evaluateAlerts(deps.pool));
+  await attempt("alerts", () => evaluateAlerts(deps.pool, deps.push ?? null, now));
 }
 
 const BACKFILL_EVERY_HOURS = 6;

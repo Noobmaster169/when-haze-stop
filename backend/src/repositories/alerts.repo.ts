@@ -67,6 +67,46 @@ export async function close(db: Queryable, ids: number[]): Promise<void> {
   await db.query("update alert_events set open = false where id = any($1)", [ids]);
 }
 
+/** The open alert of each of these stations, at most one each since only one is raised at a time. */
+export async function openEvents(db: Queryable, stationIds: string[]): Promise<AlertEvent[]> {
+  if (stationIds.length === 0) return [];
+  const { rows } = await db.query<EventRow>(
+    `select ${EVENT} from alert_events e join stations s on s.id = e.station_id
+      where e.open and e.kind <> 'observed' and e.station_id = any($1) order by e.id desc`,
+    [stationIds],
+  );
+  return rows.map(toEvent);
+}
+
+export interface PushTarget {
+  sessionId: string;
+  stationId: string;
+  push: PushSubscription;
+}
+
+/** The devices that asked to be notified about these stations. */
+export async function pushTargets(db: Queryable, stationIds: string[]): Promise<PushTarget[]> {
+  if (stationIds.length === 0) return [];
+  const { rows } = await db.query<{ session_id: string; station_id: string; push: PushSubscription }>(
+    "select session_id, station_id, push from alert_subscriptions where push is not null and station_id = any($1)",
+    [stationIds],
+  );
+  return rows.map((row) => ({ sessionId: row.session_id, stationId: row.station_id, push: row.push }));
+}
+
+/**
+ * Sets the device a session notifies, on every area it follows; null turns it
+ * off. A push subscription is the browser's, so it is the same for all of them.
+ */
+export async function setPush(db: Queryable, sessionId: string, push: PushSubscription | null): Promise<void> {
+  await db.query("update alert_subscriptions set push = $2 where session_id = $1", [sessionId, push ? JSON.stringify(push) : null]);
+}
+
+/** The push service said this device is gone. */
+export async function forgetPush(db: Queryable, endpoint: string): Promise<void> {
+  await db.query("update alert_subscriptions set push = null where push->>'endpoint' = $1", [endpoint]);
+}
+
 /** Newest first. With a session, only the stations it follows; without one, every station. */
 export async function feed(db: Queryable, options: { sessionId?: string; afterId?: number; limit?: number }): Promise<AlertEvent[]> {
   const { rows } = await db.query<EventRow>(

@@ -8,14 +8,24 @@ import { RetryableError, UpstreamError } from "../lib/errors";
  * ask again anyway.
  */
 export async function fetchText(url: string, what: string, timeoutMs: number): Promise<string> {
+  return (await get(url, what, timeoutMs)).text();
+}
+
+/** The same, for a file read as bytes: a PDF. */
+export async function fetchBytes(url: string, what: string, timeoutMs: number): Promise<Uint8Array> {
+  return new Uint8Array(await (await get(url, what, timeoutMs)).arrayBuffer());
+}
+
+async function get(url: string, what: string, timeoutMs: number): Promise<Response> {
   let response: Response;
   try {
-    response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs), headers: { accept: "application/json, text/csv, */*" } });
+    // Some government sites refuse a request that does not name a browser-like agent.
+    response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs), headers: { accept: "application/json, text/csv, */*", "user-agent": "Mozilla/5.0 (compatible; WhenHazeStop/1.0)" } });
   } catch (error) {
     throw new RetryableError(`${what} did not answer`, { cause: error });
   }
   if (!response.ok) throw new UpstreamError(response.status, `${what} answered ${response.status}`);
-  return response.text();
+  return response;
 }
 
 export function pause(ms: number): Promise<void> {

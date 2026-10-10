@@ -2,9 +2,11 @@ import { Router } from "express";
 import type { Pool } from "pg";
 import { z } from "zod";
 
-import type { AlertFeed, SubscriptionList } from "../contracts";
-import { NewSubscription } from "../contracts";
+import { config } from "../config";
+import type { AlertFeed, AreaList, PushKey, SubscriptionList } from "../contracts";
+import { NewSubscription, PushRegistration } from "../contracts";
 import { alerts, stations } from "../repositories";
+import { areaCards } from "../services/areas";
 
 /**
  * Following a station and reading what was said about it.
@@ -29,6 +31,31 @@ export function alertsRouter(deps: { pool: Pool }): Router {
     }
     const body: AlertFeed = { events: await alerts.feed(deps.pool, { sessionId: session?.data, afterId: after.data }) };
     res.json(body);
+  });
+
+  router.get("/areas", async (req, res) => {
+    const session = SessionId.safeParse(req.query.session);
+    if (!session.success) {
+      res.status(400).json({ error: "bad session" });
+      return;
+    }
+    const body: AreaList = { areas: await areaCards(deps.pool, session.data, new Date()) };
+    res.json(body);
+  });
+
+  router.get("/push-key", (_req, res) => {
+    const body: PushKey = { publicKey: config.VAPID_PUBLIC_KEY && config.VAPID_PRIVATE_KEY ? config.VAPID_PUBLIC_KEY : null };
+    res.json(body);
+  });
+
+  router.put("/push", async (req, res) => {
+    const body = PushRegistration.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({ error: "invalid push registration", issues: body.error.issues });
+      return;
+    }
+    await alerts.setPush(deps.pool, body.data.sessionId, body.data.push);
+    res.status(204).end();
   });
 
   router.get("/subscriptions", async (req, res) => {

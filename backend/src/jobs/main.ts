@@ -1,6 +1,8 @@
+import { proxyLlmClient } from "../agents";
+import { config } from "../config";
 import { closePool, getPool } from "../db";
 import { childLogger } from "../lib/logger";
-import { doeClient, firmsClient, openMeteoClient } from "../sources";
+import { doeClient, doeStatementsClient, firmsClient, moeStatementsClient, newsStatementsClient, openMeteoClient, type PushSender, webPushSender } from "../sources";
 import { backfill, runCycle } from "./cycle";
 import { evaluate, formatScores } from "./evaluate";
 import type { IngestDeps } from "./ingest";
@@ -52,9 +54,23 @@ async function loop(deps: IngestDeps): Promise<void> {
   }
 }
 
+function pushSender(): PushSender | null {
+  const { VAPID_PUBLIC_KEY: publicKey, VAPID_PRIVATE_KEY: privateKey, VAPID_SUBJECT: subject } = config;
+  if (publicKey && privateKey) return webPushSender({ publicKey, privateKey, subject });
+  log.warn("no VAPID keys are set, so alerts show in the app and no device is notified");
+  return null;
+}
+
 async function main(): Promise<void> {
   const command = process.argv[2] ?? "once";
-  const deps: IngestDeps = { pool: getPool(), doe: doeClient(), fires: firmsClient(), weather: openMeteoClient() };
+  const deps: IngestDeps = {
+    pool: getPool(),
+    doe: doeClient(),
+    fires: firmsClient(),
+    weather: openMeteoClient(),
+    statements: { channels: [moeStatementsClient(), doeStatementsClient(), newsStatementsClient()], llm: proxyLlmClient({ maxConcurrency: config.LLM_MAX_CONCURRENCY }) },
+    push: pushSender(),
+  };
   try {
     if (command === "once") await runCycle(deps, new Date(), { fires: true });
     else if (command === "backfill") await backfill(deps);

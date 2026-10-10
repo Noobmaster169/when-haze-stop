@@ -2,7 +2,12 @@ import { getPool } from "../../src/db";
 import type { Detection } from "../../src/haze/fires";
 import { runCycle } from "../../src/jobs/cycle";
 import { FakeDoeClient, FakeFiresClient, FakeWeatherClient } from "../../src/sources/__fakes__/fake.sources";
+import { FakeStatementsClient } from "../../src/sources/__fakes__/fake.statements";
+import { parseMoeList } from "../../src/sources/moe-statements";
+import { parseNewsRss } from "../../src/sources/news-statements";
 import { FIRE_CELLS, LAST_HOUR, READINGS, STATIONS } from "./recorded";
+import { MOE_LIST_HTML, MOE_PDF_TEXT, NEWS_RSS } from "./recorded-statements";
+import { statementReader } from "./statement-readings";
 import { steadyWind } from "./steady-wind";
 
 /**
@@ -29,8 +34,19 @@ const WEATHER_START = new Date("2026-10-06T00:00:00Z");
  */
 export async function recordedCycle(): Promise<FakeDoeClient> {
   const doe = new FakeDoeClient(STATIONS, READINGS);
+  const moe = parseMoeList(MOE_LIST_HTML);
+  const channels = [
+    new FakeStatementsClient("moe-statements", moe, { [moe[0].url]: MOE_PDF_TEXT }),
+    new FakeStatementsClient("news-statements", parseNewsRss(NEWS_RSS)),
+  ];
   await runCycle(
-    { pool: getPool(), doe, fires: new FakeFiresClient(DETECTIONS), weather: new FakeWeatherClient(steadyWind(WEATHER_START, 200, 3, 3)) },
+    {
+      pool: getPool(),
+      doe,
+      fires: new FakeFiresClient(DETECTIONS),
+      weather: new FakeWeatherClient(steadyWind(WEATHER_START, 200, 3, 3)),
+      statements: { channels, llm: statementReader() },
+    },
     new Date(LAST_HOUR.getTime() + 20 * 60_000),
     { fires: true },
   );

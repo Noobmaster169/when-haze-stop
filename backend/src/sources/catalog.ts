@@ -4,7 +4,7 @@
  * page joins those records to this list.
  */
 
-export const TRACKED_SOURCES = ["doe-stations", "doe-readings", "firms", "open-meteo"] as const;
+export const TRACKED_SOURCES = ["doe-stations", "doe-readings", "firms", "open-meteo", "moe-statements", "doe-statements", "news-statements"] as const;
 export type SourceId = (typeof TRACKED_SOURCES)[number];
 
 export interface SourceEntry {
@@ -60,6 +60,39 @@ export const SOURCE_CATALOG: readonly SourceEntry[] = [
     what: "Hourly wind at 925 and 850 hPa and rain on a 1 degree grid, 8 days back and 5 days ahead, one grid row per request.",
     endpoint: "https://api.open-meteo.com/v1/forecast",
     link: "https://open-meteo.com/",
+    cadence: "Every hour, at 20 past",
+    everyHours: 1,
+    tracked: true,
+  },
+  {
+    id: "moe-statements",
+    name: "Education Ministry statements",
+    provider: "Ministry of Education Malaysia (KPM)",
+    what: "Press statements about the haze, read from the statement PDF: school closing rules and closures.",
+    endpoint: "https://www.moe.gov.my/kenyataan-media",
+    link: "https://www.moe.gov.my/kenyataan-media",
+    cadence: "Every hour, at 20 past",
+    everyHours: 1,
+    tracked: true,
+  },
+  {
+    id: "doe-statements",
+    name: "DOE statements",
+    provider: "Department of Environment Malaysia (JAS)",
+    what: "DOE posts of the last 30 days that mention the haze.",
+    endpoint: "https://www.doe.gov.my/wp-json/wp/v2/posts?search=jerebu",
+    link: "https://www.doe.gov.my/kenyataan-media/",
+    cadence: "Every hour, at 20 past",
+    everyHours: 1,
+    tracked: true,
+  },
+  {
+    id: "news-statements",
+    name: "Orders in the news",
+    provider: "Google News search",
+    what: "Headlines of the last 7 days that announce a closure, emergency or decree, for authorities that post nowhere we can fetch.",
+    endpoint: "https://news.google.com/rss/search?q=jerebu+when:7d",
+    link: "https://news.google.com/",
     cadence: "Every hour, at 20 past",
     everyHours: 1,
     tracked: true,
