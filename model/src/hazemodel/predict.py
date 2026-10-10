@@ -20,7 +20,7 @@ def _quantiles(artifact: Artifact, prefix: str, x: np.ndarray) -> np.ndarray:
     return np.sort(np.maximum(out, 0.0), axis=1)
 
 
-def _rolled(frame: pd.DataFrame, median: np.ndarray) -> pd.DataFrame:
+def rolled(frame: pd.DataFrame, median: np.ndarray) -> pd.DataFrame:
     rolled = frame.copy()
     rolled["lag72"] = rolled["lag48"]
     rolled["lag48"] = rolled["lag24"]
@@ -43,9 +43,9 @@ def predict_rows(artifact: Artifact, frame: pd.DataFrame) -> pd.DataFrame:
     ids = frame.index.get_level_values("instrument_id")
     issue_days = (frame.index.get_level_values("issue_at") + MALAYSIA_OFFSET).date
     q1 = _score(artifact, "d1", frame)
-    rolled_once = _rolled(frame, q1[:, 1])
+    rolled_once = rolled(frame, q1[:, 1])
     q2 = _score(artifact, "d2", frame) if "d2_q50" in artifact.boosters else _score(artifact, "d1", rolled_once)
-    q3 = _score(artifact, "d1", _rolled(rolled_once, q2[:, 1]))
+    q3 = _score(artifact, "d1", rolled(rolled_once, q2[:, 1]))
     rows = []
     for d, q in ((1, q1), (2, q2), (3, q3)):
         rows.append(

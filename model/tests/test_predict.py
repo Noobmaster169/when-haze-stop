@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from hazemodel.artifacts import Artifact
-from hazemodel.predict import _rolled, predict_rows
+from hazemodel.predict import rolled, predict_rows
 
 FEATURES = ["level", "lag24", "lag48", "lag72", "d24", "d48", "slope3h", "peak24"]
 
@@ -75,8 +75,8 @@ def test_d1_only_artifact_rolls_once_for_day_two_and_twice_for_day_three():
 
 
 def test_roll_shifts_the_lag_chain():
-    rolled = _rolled(frame(), np.array([7.0]))
-    row = rolled.iloc[0]
+    shifted = rolled(frame(), np.array([7.0]))
+    row = shifted.iloc[0]
     assert (row["level"], row["lag24"], row["lag48"], row["lag72"]) == (7.0, 10.0, 20.0, 30.0)
     assert row["d24"] == -3.0 and row["d48"] == -13.0
     assert row["peak24"] == 7.0 and row["peak24"] >= row["level"]

@@ -1,17 +1,24 @@
 """The command line: one subcommand per job, each registered by its own module's add_<name>(subparsers)."""
 
 import argparse
+import os
 import pathlib
 
 import pandas as pd
 import uvicorn
 
+from hazemodel.commands import backtest_command, promote_command, retrain_command, search_command, train_command
 from hazemodel.features.air import HISTORY_DAYS
 from hazemodel.features.build import build_rows, write_parquet
 from hazemodel.region import region_from_env
 from hazemodel.store import connect, load_source_data
 
 TARGET_LOOKAHEAD_DAYS = 3
+
+
+def _data_dir() -> str:
+    """MODEL_DATA overrides the source-tree folder, which an installed package (the image) does not have."""
+    return os.environ.get("MODEL_DATA", str(pathlib.Path(__file__).resolve().parents[2] / "data"))
 
 
 def features_command(args) -> pathlib.Path:
@@ -44,7 +51,7 @@ def add_features(subparsers) -> None:
     parser.add_argument("--from", dest="start", required=True)
     parser.add_argument("--to", dest="end", required=True)
     parser.add_argument("--hindcast-model", default="v2-analysis")
-    parser.add_argument("--out", default=str(pathlib.Path(__file__).resolve().parents[2] / "data"))
+    parser.add_argument("--out", default=_data_dir())
     parser.set_defaults(run=features_command)
 
 
@@ -55,10 +62,42 @@ def add_serve(subparsers) -> None:
     parser.set_defaults(run=serve_command)
 
 
+def add_training(subparsers) -> None:
+    backtest = subparsers.add_parser("backtest", help="walk-forward backtest, scenarios, leaks, report")
+    backtest.add_argument("parquet")
+    backtest.add_argument("--freq", default="M")
+    backtest.add_argument("--min-train-blocks", type=int, default=1)
+    backtest.add_argument("--ablation", action="store_true")
+    backtest.set_defaults(run=backtest_command)
+    train = subparsers.add_parser("train", help="fit on the whole parquet and save the artifact")
+    train.add_argument("parquet")
+    train.add_argument("--with-backtest", action="store_true")
+    train.add_argument("--freq", default="M")
+    train.add_argument("--min-train-blocks", type=int, default=1)
+    train.set_defaults(run=train_command)
+    promote = subparsers.add_parser("promote", help="make a version live if its score is not worse")
+    promote.add_argument("version")
+    promote.set_defaults(run=promote_command)
+    search = subparsers.add_parser("search", help="hyperparameter search on the first months")
+    search.add_argument("parquet")
+    search.add_argument("--freq", default="M")
+    search.add_argument("--months", type=int, default=6)
+    search.add_argument("--draws", type=int, default=20)
+    search.add_argument("--write", action="store_true")
+    search.set_defaults(run=search_command)
+    retrain = subparsers.add_parser("retrain", help="features, train with backtest, promote; --loop repeats weekly")
+    retrain.add_argument("--from", dest="start", default="2025-06-07")
+    retrain.add_argument("--hindcast-model", default="v2-analysis")
+    retrain.add_argument("--out", default=_data_dir())
+    retrain.add_argument("--loop", action="store_true")
+    retrain.set_defaults(run=retrain_command)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="hazemodel")
     subparsers = parser.add_subparsers(required=True)
     add_features(subparsers)
     add_serve(subparsers)
+    add_training(subparsers)
     args = parser.parse_args()
     args.run(args)

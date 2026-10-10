@@ -80,6 +80,30 @@ Open http://localhost:3000 and go through this list:
 4. Run `pnpm build` in `frontend/`.
 5. Push `haze-product` and merge.
 
+The learned forecast (11 October 2026, track D). The package is `model/`; its document is
+`docs/MODEL.md`, whose section 6 holds the first results. Inside `model/`, with the compose
+database's `PG_*` variables set:
+
+```sh
+.venv/bin/hazemodel features --from 2025-06-07 --to <yesterday> --hindcast-model v2-analysis
+.venv/bin/hazemodel backtest data/features-<span>-<hash>.parquet --freq M --min-train-blocks 1 --ablation
+.venv/bin/hazemodel train data/features-<span>-<hash>.parquet --with-backtest
+.venv/bin/hazemodel promote <version>   # moves `live` only if not worse than the live score
+```
+
+The `model-train` compose service runs `hazemodel retrain --loop` weekly. The live version is
+`2026-10-11-c88cac5a` (reference hazy-day MAE 15.48 at day +1), promoted into the local
+`model/artifacts/`, which is not committed. It missed the 24 hour target (15% below persistence's
+17.53) and its band is too narrow. The shadow rule stands: the model forecasts every cycle and
+nothing shows it; `MODEL_MODE=live` only after 14 days with a 24 hour score at least 10% better
+than v2 on DOE stations. Next, in order:
+
+1. Run the smoke hindcast of the live issue day before any promotion to live. Every training row
+   carries the physics group, so a live row without `smoke_hindcasts` for its day is a row the
+   model has never seen.
+2. After 14 days of shadow data, read the model block of the Simulation page before considering
+   `MODEL_MODE=live`.
+
 After that, the backlog is section 10 of `docs/FEATURES.md`: Web Push, counting three days above
 150, storing weather by fetch time, trying to beat persistence.
 
