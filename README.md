@@ -20,6 +20,7 @@ through a Claude Code OAuth token instead of an API key.
 frontend/   Next.js 16, React 19, Tailwind 4          :3000
 backend/    Express 5, TypeScript, Postgres, zod      :8091
 proxy/      Python gateway to `claude -p` (container) :4001 on the host
+model/      Python learned forecast, `/predict` service (container) :4002 on the host
 ```
 
 ## Run it
@@ -40,6 +41,7 @@ Open http://localhost:3000. The map is the home page; ask the dock something abo
 | --- | --- | --- |
 | `postgres` | The database | 5433 |
 | `llm-proxy` | `claude -p` behind the Anthropic wire | 4001 |
+| `model` | The learned forecast's `/predict` service, described in `docs/MODEL.md` | 4002 |
 | `migrate` | Applies the migrations, then exits | |
 | `api` | The Express api | 8091 |
 | `jobs` | One data cycle, a backfill of the stored week, then every hour | |

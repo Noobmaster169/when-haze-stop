@@ -277,6 +277,13 @@ What to know before fitting anything to it:
   cell-day is the largest satellite's sum either way.
 - **Nothing here is interpolated or filled.** A day with no row had no data from that source.
 
+### 3.5 The learned forecast
+
+A LightGBM model trained on the history of 3.4 predicts each instrument's peak 24 hour PM2.5 for
+the next two days. Its method, tests and results are in `docs/MODEL.md`; its code is `model/`;
+it reaches the app through `backend/src/sources/model.ts` and the `model_forecasts` table, and
+shows nothing to a person until the shadow rule in `docs/MODEL.md` is met.
+
 ## 4. Feature 1: the haze map and forecast
 
 ### 4.1 What the person sees
