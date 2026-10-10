@@ -120,3 +120,35 @@ export async function latestEach(db: Queryable, since: Date): Promise<Observatio
   );
   return rows.map(toObservation);
 }
+
+export interface AirportDay {
+  icao: string;
+  day: string;
+  reports: number;
+  /** Reports with no rain, showers, thunder, drizzle, mist or fog in them: the ones whose visibility can be read as smoke. */
+  dryReports: number;
+  /** Shortest and median prevailing visibility over the dry reports, metres, or null with none. 10000 is ten kilometres or more. */
+  minM: number | null;
+  medianM: number | null;
+  /** Reports in which the observer called it haze or smoke. */
+  hazeReports: number;
+}
+
+const WET = "RA|SH|TS|DZ|BR|FG";
+
+/** Every airport's visibility for each UTC day from `fromDay`. */
+export async function dailyVisibility(db: Queryable, fromDay: string): Promise<AirportDay[]> {
+  const { rows } = await db.query<{ icao: string; day: string; reports: string; dry: string; min_m: number | null; median_m: number | null; haze: string }>(
+    `select icao, to_char(day, 'YYYY-MM-DD') as day, count(*) as reports, count(*) filter (where dry) as dry,
+            min(visibility_m) filter (where dry) as min_m,
+            percentile_cont(0.5) within group (order by visibility_m) filter (where dry) as median_m,
+            count(*) filter (where weather ~ 'HZ|FU') as haze
+       from (
+         select icao, (observed_at at time zone 'UTC')::date as day, visibility_m, weather,
+                visibility_m is not null and (weather is null or weather !~ '${WET}') as dry
+           from metar_obs where observed_at >= $1::date
+       ) seen group by icao, day order by day, icao`,
+    [fromDay],
+  );
+  return rows.map((row) => ({ icao: row.icao, day: row.day, reports: Number(row.reports), dryReports: Number(row.dry), minM: row.min_m, medianM: row.median_m, hazeReports: Number(row.haze) }));
+}

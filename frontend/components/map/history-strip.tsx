@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { type PointerEvent, useEffect, useRef } from "react";
 
 import type { StoredDay } from "@/lib/api/haze-schemas";
 import { dayName } from "@/lib/malaysia-time";
@@ -11,8 +11,10 @@ import { BAND_SWATCH } from "./scale";
 /**
  * Every stored day as one column of four marks: a bar of fire power, then
  * whether its wind is stored, how many airports reported haze, and the PM2.5
- * that was measured. Pressing a column puts that day on the map; Live goes
- * back to now. The days are UTC days, as the satellites' files count them.
+ * that was measured. Pressing a column puts that day on the map, dragging
+ * along the strip runs through the days, and Live goes back to now. The day
+ * marked is the one the timeline is in. The days are UTC days, as the
+ * satellites' files count them.
  *
  * The strip scrolls, a fixed width a day, and opens on the newest days: two
  * years of days do not fit across a screen.
@@ -36,9 +38,25 @@ export function HistoryStrip({ days, day, onChoose }: Props) {
     if (element) element.scrollLeft = element.scrollWidth;
   }, [newest]);
 
+  // The timeline can walk the day out of sight; the strip follows it.
+  const index = days.findIndex((entry) => entry.day === day);
+  useEffect(() => {
+    const element = scroller.current;
+    if (!element || index < 0) return;
+    const left = index * DAY_PX;
+    if (left < element.scrollLeft || left > element.scrollLeft + element.clientWidth - DAY_PX) element.scrollLeft = left - element.clientWidth / 2;
+  }, [index]);
+
+  /** A mouse held down and drawn along the strip chooses each day it passes. Touch scrolls the strip instead. */
+  const scrub = (event: PointerEvent<HTMLDivElement>): void => {
+    if (event.pointerType !== "mouse" || event.buttons !== 1) return;
+    const passed = days[Math.floor((event.clientX - event.currentTarget.getBoundingClientRect().left) / DAY_PX)];
+    if (passed && passed.day !== day) onChoose(passed.day);
+  };
+
   if (days.length === 0) return null;
   const largest = Math.max(...days.map((entry) => entry.frpMw), 1);
-  const chosen = days.find((entry) => entry.day === day) ?? null;
+  const chosen = days[index] ?? null;
 
   return (
     <div className="shrink-0 border-t border-hairline bg-canvas px-4 py-2 md:px-6">
@@ -74,7 +92,7 @@ export function HistoryStrip({ days, day, onChoose }: Props) {
                 </span>
               ))}
             </div>
-            <div className="flex" role="group" aria-label="Choose a past day">
+            <div className="flex" role="group" aria-label="Choose a past day" onPointerMove={scrub}>
               {days.map((entry) => {
                 const on = entry.day === day;
                 const band = airBand(entry);

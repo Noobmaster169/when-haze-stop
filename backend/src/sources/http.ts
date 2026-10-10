@@ -40,8 +40,23 @@ async function get(url: string, what: string, timeoutMs: number, headers: Record
   } catch (error) {
     throw new RetryableError(`${what} did not answer`, { cause: error });
   }
-  if (!response.ok) throw new UpstreamError(response.status, `${what} answered ${response.status}`);
+  if (!response.ok) throw new UpstreamError(response.status, `${what} answered ${response.status}${await reasonOf(response)}`);
   return response;
+}
+
+/**
+ * What a refusal says for itself, where it says it briefly: Open-Meteo's
+ * hourly and daily limits are both a 429 and differ only in this sentence. A
+ * page of HTML is left out.
+ */
+async function reasonOf(response: Response): Promise<string> {
+  let body: string;
+  try {
+    body = (await response.text()).trim();
+  } catch (error) {
+    return `, and its body could not be read (${error instanceof Error ? error.message : String(error)})`;
+  }
+  return body === "" || body.startsWith("<") || body.length > 300 ? "" : `: ${body}`;
 }
 
 /** Six tries with a longer wait each time rides out a link that is down for about five minutes. */
@@ -63,6 +78,8 @@ export async function fetchPatiently(url: string, what: string, timeoutMs: numbe
     try {
       return await fetchText(url, what, timeoutMs, headers);
     } catch (error) {
+      // A limit counted by the day lifts tomorrow, and no wait here is that long.
+      if (error instanceof UpstreamError && error.status === 429 && /daily/i.test(error.message)) throw error;
       const limited = error instanceof UpstreamError && error.status === 429;
       const answered = error instanceof UpstreamError && !limited;
       const transient = error instanceof RetryableError || (error instanceof UpstreamError && isTransient(error));

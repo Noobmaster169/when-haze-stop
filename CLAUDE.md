@@ -38,6 +38,7 @@ pnpm haze:backfill                  # replay the model over the stored week
 pnpm haze:loop                      # haze:once now, then every hour
 pnpm haze:history                   # fires, wind, airport visibility and PM2.5 back to HISTORY_FROM (2025-01-01); name parts to run only those
 pnpm haze:coverage                  # what is stored of those four, month by month; writes nothing
+pnpm haze:dataset                   # the history as five CSV tables for training, into backend/dataset/
 
 # frontend, inside frontend/
 pnpm dev                            # :3000

@@ -21,7 +21,11 @@ interface Props {
   playing: boolean;
   /** Says what the map is showing, in place of the live wording, when looking back at a past day. */
   caption?: string;
+  /** The span moves on when play reaches its end, so play is not stopped there: the page stops it where the past ends. */
+  rolls?: boolean;
   onSeek(at: number): void;
+  /** The slider was let go, by pointer or key, at this moment. */
+  onRelease?(at: number): void;
   onPlaying(playing: boolean): void;
 }
 
@@ -39,7 +43,7 @@ function describe(at: number, now: number): string {
   return hours < 0 ? "Past readings" : `Forecast, ${hours} h ahead`;
 }
 
-export function Timeline({ from, to, now, at, playing, caption, onSeek, onPlaying }: Props) {
+export function Timeline({ from, to, now, at, playing, caption, rolls = false, onSeek, onRelease, onPlaying }: Props) {
   const position = useRef(at);
   useEffect(() => {
     position.current = at;
@@ -53,7 +57,7 @@ export function Timeline({ from, to, now, at, playing, caption, onSeek, onPlayin
       last = time;
       if (next >= to) {
         onSeek(to);
-        onPlaying(false);
+        if (!rolls) onPlaying(false);
         return;
       }
       position.current = next;
@@ -61,7 +65,7 @@ export function Timeline({ from, to, now, at, playing, caption, onSeek, onPlayin
       request = requestAnimationFrame(tick);
     });
     return () => cancelAnimationFrame(request);
-  }, [playing, to, onSeek, onPlaying]);
+  }, [playing, to, rolls, onSeek, onPlaying]);
 
   const [focused, setFocused] = useState(false);
   const fraction = (moment: number): number => Math.min(1, Math.max(0, (moment - from) / (to - from)));
@@ -95,7 +99,7 @@ export function Timeline({ from, to, now, at, playing, caption, onSeek, onPlayin
             <div className="absolute inset-x-0 top-2 h-1 rounded-full bg-hairline-strong" style={{ right: `calc(100% - ${share(now)})` }} />
             <div className="absolute top-2 h-1 rounded-r-full" style={{ left: share(now), right: 0, backgroundImage: FORECAST_DASHES }} />
             <div className="absolute left-0 top-2 h-1 rounded-l-full bg-accent" style={{ width: share(Math.min(at, now)) }} />
-            <div className="absolute -top-6 bottom-0 flex flex-col items-center" style={{ left: share(now), transform: `translateX(${pillShift(now)})` }}>
+            <div className={`absolute -top-6 bottom-0 flex-col items-center ${now > to ? "hidden" : "flex"}`} style={{ left: share(now), transform: `translateX(${pillShift(now)})` }}>
               <span className="flex items-center gap-1 rounded-full bg-accent px-1.5 text-micro font-semibold leading-4 text-ink-inverse shadow-overlay">
                 <span className="relative flex h-1.5 w-1.5">
                   <span className="absolute inset-0 animate-ping rounded-full bg-ink-inverse opacity-75 motion-reduce:hidden" />
@@ -104,7 +108,7 @@ export function Timeline({ from, to, now, at, playing, caption, onSeek, onPlayin
                 Now
               </span>
             </div>
-            <div className="absolute -top-1 bottom-0 w-0.5 -translate-x-1/2 rounded-full bg-accent" style={{ left: share(now) }} />
+            <div className={`absolute -top-1 bottom-0 w-0.5 -translate-x-1/2 rounded-full bg-accent ${now > to ? "hidden" : ""}`} style={{ left: share(now) }} />
             <div
               className="absolute top-0.5 h-4 w-4 -translate-x-1/2 rounded-full border-2 border-accent bg-canvas shadow-overlay"
               style={{ left: share(at), boxShadow: focused ? "var(--focus-ring)" : undefined }}
@@ -120,6 +124,8 @@ export function Timeline({ from, to, now, at, playing, caption, onSeek, onPlayin
               onPlaying(false);
               onSeek(Number(event.target.value));
             }}
+            onPointerUp={(event) => onRelease?.(Number(event.currentTarget.value))}
+            onKeyUp={(event) => onRelease?.(Number(event.currentTarget.value))}
             onFocus={(event) => setFocused(event.currentTarget.matches(":focus-visible"))}
             onBlur={() => setFocused(false)}
             aria-label="Time"

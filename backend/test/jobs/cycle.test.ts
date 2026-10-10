@@ -48,6 +48,8 @@ describe("one cycle, then what the api serves", () => {
     expect(map.frames.some((frame) => !frame.observed)).toBe(true);
     expect(map.wind.length).toBeGreaterThan(0);
     expect(map.fires[0].frpMw).toBeGreaterThan(1000);
+    // Each cell says which day it burned on, and the week behind the run is all there for the timeline to walk through.
+    expect([...new Set(map.fires.map((fire) => fire.day))].sort()).toEqual(["2026-10-07", "2026-10-08", "2026-10-09"]);
   });
 
   it("explains the run and replays the stored readings against no change", async () => {

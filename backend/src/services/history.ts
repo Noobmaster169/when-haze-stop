@@ -19,14 +19,16 @@ const NOTHING = { cells: 0, frpMw: 0, windHours: 0, airports: 0, hazeAirports: 0
 /**
  * Every day from the first with anything stored to today, each with what it
  * holds of the four kinds of data. The wind's forecast days ahead are left
- * out: a day that has not happened is not one to look back at.
+ * out: a day that has not happened is not one to look back at. With `fromDay`
+ * the calendar starts no earlier than it, which keeps out the few hours of the
+ * evening before that a source counting days in its own time zone brings.
  */
-export async function hazeDays(db: Queryable, now = new Date()): Promise<HazeDays> {
+export async function hazeDays(db: Queryable, now = new Date(), fromDay: string | null = null): Promise<HazeDays> {
   const [burning, wind, seen, measured, hazeFrom] = await Promise.all([fires.byDay(db), weather.hoursByDay(db), metar.byDay(db), air.airByDay(db), forecasts.earliestFrameAt(db)]);
   const today = now.toISOString().slice(0, 10);
   const days = new Map<string, StoredDay>();
   const put = (day: string, part: Partial<StoredDay>): void => {
-    if (day <= today) days.set(day, { ...(days.get(day) ?? { day, ...NOTHING }), ...part });
+    if (day <= today && (fromDay === null || day >= fromDay)) days.set(day, { ...(days.get(day) ?? { day, ...NOTHING }), ...part });
   };
   for (const row of burning) put(row.day, { cells: row.cells, frpMw: row.frpMw });
   for (const row of wind) put(row.day, { windHours: row.hours });

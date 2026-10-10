@@ -99,7 +99,8 @@ wind, the 29 airports' weather reports from Iowa State's METAR archive, and meas
 Singapore's past days and from OpenAQ's sensors (migration `007_openaq.sql`, key `OPENAQ_API_KEY`).
 OpenAQ is also fetched in the hourly cycle. The History strip under the map shows every day with
 one mark for each of the four, and a past day draws its airports and its PM2.5 instruments, with a
-panel for each instrument. `pnpm haze:coverage` prints what is stored by month. The model does not
+panel for each instrument. `pnpm haze:coverage` prints what is stored by month, and
+`pnpm haze:dataset` writes it as five CSV tables for training. The model does not
 read any of it yet: `docs/FEATURES.md` section 3.4 says what the data is and what to know before
 training on it. What that leaves to do:
 
@@ -109,16 +110,18 @@ training on it. What that leaves to do:
 3. Extend `haze:backfill` and `haze:evaluate` to replay the model over 2025 and score it against
    those two, separately. The past PSI of Singapore was kept out of `readings` on purpose, because
    `backfill` starts at the oldest reading and would otherwise replay 650 days on five stations.
-4. Export the seed again (`pnpm db:export-seed`) once the stations file carries `network`: today a
-   Singapore region loaded from the seed would arrive as a DOE station until the first cycle.
+The seed was exported again with the history in it: the stations carry their network, the fires
+go back to 1 January 2025, and OpenAQ's sensors and hours are two new files. Export it weekly as
+before.
 
 ## Things that will surprise you
 
 - **Two backend processes.** `pnpm dev` only serves. `pnpm haze:loop` is what fetches and runs the
   model. With only the first, the map says "No forecast has been made yet".
-- **The wind history is slow on purpose.** Open-Meteo allows one address 5,000 calls an hour and
-  counts each row of the grid as 25, so a first `pnpm haze:history wind` takes about five hours.
-  Going faster gets the hourly fetch refused too, and then the live map has no wind.
+- **The wind history is slow on purpose, and takes two days.** Open-Meteo allows one address
+  5,000 calls an hour and 10,000 a day and counts each row of the grid as 25, so a first
+  `pnpm haze:history wind` runs about five hours and stops once at the daily limit. The loop asks
+  for the history again every 24 hours, so it finishes without anyone starting it.
 - **A slow link fails every source at once.** Node gives each address of a host a quarter of a
   second to connect. `sources/http.ts` raises that to five seconds; without it every fetch dies
   in under a second with a timeout that the request's own timeout never explains.

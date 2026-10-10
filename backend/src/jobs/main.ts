@@ -19,6 +19,7 @@ import {
 } from "../sources";
 import { coverage } from "./coverage";
 import { backfill, runCycle } from "./cycle";
+import { writeDataset } from "./dataset";
 import { evaluate, formatScores } from "./evaluate";
 import { type HistoryPart, HISTORY_PARTS, isHistoryPart, runHistory } from "./history";
 import type { IngestDeps } from "./ingest";
@@ -34,6 +35,7 @@ import type { IngestDeps } from "./ingest";
  *                        measured PM2.5 (OpenAQ needs OPENAQ_API_KEY) and wind. Name parts to run only those:
  *                        pnpm haze:history fires visibility air wind
  *   pnpm haze:coverage   what is stored of those four, month by month; writes nothing
+ *   pnpm haze:dataset    the history as flat tables for training, into ./dataset or the folder named
  *   pnpm haze:evaluate   replay the stored week and score it against no change; writes nothing
  *                        (optional: hours between runs, default 6; an ISO instant to score from)
  */
@@ -51,6 +53,17 @@ function msToNextRun(now: Date): number {
   return next.getTime() - now.getTime();
 }
 
+/** The history is asked for again once a day while the loop runs: a source that was down or over its limit has usually recovered by then, and a complete history costs a minute to confirm. */
+const HISTORY_EVERY_HOURS = 24;
+
+async function history(deps: IngestDeps, parts: HistoryPart[]): Promise<void> {
+  await runHistory(
+    { pool: deps.pool, archive: config.FIRMS_MAP_KEY ? firmsArchiveClient(config.FIRMS_MAP_KEY) : null, metarArchive: metarArchiveClient(), nea: deps.nea, openaq: deps.openaq ?? null, weather: deps.weather },
+    { from: config.HISTORY_FROM, parts },
+    new Date(),
+  );
+}
+
 async function loop(deps: IngestDeps): Promise<void> {
   let stopping = false;
   let wake: (() => void) | undefined;
@@ -64,6 +77,13 @@ async function loop(deps: IngestDeps): Promise<void> {
     await runCycle(deps, new Date(), { fires: turn % FIRES_EVERY_HOURS === 0 });
     // After a start the stored week may have hours no run covers. Backfill skips the ones that have a run, so this is cheap after the first time.
     if (turn === 0 && !stopping) await backfill(deps);
+    if (turn > 0 && turn % HISTORY_EVERY_HOURS === 0 && !stopping) {
+      try {
+        await history(deps, []);
+      } catch (error) {
+        log.error({ err: error instanceof Error ? error.message : String(error) }, "the daily history pass is incomplete and will be tried again tomorrow");
+      }
+    }
     if (stopping) break;
     const wait = msToNextRun(new Date());
     log.info({ minutes: Math.round(wait / 60_000) }, "sleeping until the next cycle");
@@ -105,18 +125,18 @@ async function main(): Promise<void> {
     else if (command === "backfill") await backfill(deps);
     else if (command === "loop") await loop(deps);
     else if (command === "history") {
-      await runHistory(
-        { pool: deps.pool, archive: config.FIRMS_MAP_KEY ? firmsArchiveClient(config.FIRMS_MAP_KEY) : null, metarArchive: metarArchiveClient(), nea: deps.nea, openaq: deps.openaq ?? null, weather: deps.weather },
-        { from: config.HISTORY_FROM, parts: historyParts(process.argv.slice(3)) },
-        new Date(),
-      );
+      await history(deps, historyParts(process.argv.slice(3)));
     } else if (command === "coverage") {
-      process.stdout.write(`${await coverage(deps.pool, new Date())}\n`);
+      process.stdout.write(`${await coverage(deps.pool, new Date(), config.HISTORY_FROM)}\n`);
+    } else if (command === "dataset") {
+      const dir = process.argv[3] ?? "dataset";
+      const counts = await writeDataset(deps.pool, dir, config.HISTORY_FROM, new Date());
+      process.stdout.write(`${Object.entries(counts).map(([name, rows]) => `${dir}/${name}.csv.gz  ${rows.toLocaleString("en-GB")} rows`).join("\n")}\n`);
     } else if (command === "evaluate") {
       const from = process.argv[4] ? new Date(process.argv[4]) : undefined;
       const rows = await evaluate(deps.pool, { everyHours: Number(process.argv[3] ?? 6), from });
       process.stdout.write(`${formatScores(rows)}\n`);
-    } else throw new Error(`unknown command "${command}". Use once, backfill, loop, history, coverage or evaluate.`);
+    } else throw new Error(`unknown command "${command}". Use once, backfill, loop, history, coverage, dataset or evaluate.`);
   } finally {
     await closePool();
   }

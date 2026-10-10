@@ -45,6 +45,15 @@ export async function insertHours(db: Queryable, hours: OpenAqHour[]): Promise<n
   return rowCount ?? 0;
 }
 
+/** Every sensor that has at least one stored hour. */
+export async function withHours(db: Queryable): Promise<StoredSensor[]> {
+  const { rows } = await db.query<{ sensor_id: string; name: string; provider: string; reference: boolean; lat: number; lon: number }>(
+    `select sensor_id, name, provider, reference, lat, lon from openaq_sensors s
+      where exists (select 1 from openaq_hours h where h.sensor_id = s.sensor_id) order by sensor_id`,
+  );
+  return rows.map((row) => ({ sensorId: Number(row.sensor_id), name: row.name, provider: row.provider, reference: row.reference, lat: row.lat, lon: row.lon }));
+}
+
 /** Each sensor's oldest and newest stored hour: where its history and its next hourly fetch pick up. */
 export async function spanBySensor(db: Queryable): Promise<{ oldest: Map<number, Date>; newest: Map<number, Date> }> {
   const { rows } = await db.query<{ sensor_id: string; oldest: Date; newest: Date }>(

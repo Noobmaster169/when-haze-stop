@@ -40,3 +40,31 @@ export async function airByDay(db: Queryable): Promise<{ day: string; monitors: 
   );
   return rows.map((row) => ({ day: row.day, monitors: Number(row.monitors), pm25: Math.round(row.pm25 * 10) / 10 }));
 }
+
+export interface InstrumentDay {
+  /** The source and the instrument's id there: `doe:CA01R`, `nea:east`, `openaq:11760952`. */
+  instrumentId: string;
+  day: string;
+  /** Mean and largest of the day's values, ug/m3. For a DOE station each value is itself a 24 hour mean. */
+  mean: number;
+  max: number;
+  hours: number;
+}
+
+/** Every instrument's PM2.5 for each UTC day from `fromDay`, the rows a model is trained and scored on. */
+export async function dailyByInstrument(db: Queryable, fromDay: string): Promise<InstrumentDay[]> {
+  const { rows } = await db.query<{ id: string; day: string; mean: number; max: number; hours: string }>(
+    `select id, to_char(day, 'YYYY-MM-DD') as day, mean, max, hours from (
+       select 'openaq:' || sensor_id as id, ${DAY_OF} as day, avg(pm25) as mean, max(pm25) as max, count(*) as hours
+         from openaq_hours where pm25 <= ${PM25_CEILING} group by 1, 2
+       union all
+       select 'nea:' || region, ${DAY_OF}, avg(pm25_hourly), max(pm25_hourly), count(*)
+         from nea_hours where pm25_hourly is not null group by 1, 2
+       union all
+       select 'doe:' || station_id, ${DAY_OF}, avg(${PM25_OF_API}), max(${PM25_OF_API}), count(*)
+         from readings r join stations s on s.id = r.station_id where s.network = 'doe' group by 1, 2
+     ) daily where day >= $1 order by day, id`,
+    [fromDay],
+  );
+  return rows.map((row) => ({ instrumentId: row.id, day: row.day, mean: row.mean, max: row.max, hours: Number(row.hours) }));
+}

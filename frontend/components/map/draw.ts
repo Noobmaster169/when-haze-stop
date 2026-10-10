@@ -1,5 +1,6 @@
 import { drawAirports } from "./airports";
 import type { Basemap } from "./basemap";
+import { firesAt } from "./fires";
 import { REGION, type Size, toX, toY, type View } from "./geo";
 import { apiAt, type MapData } from "./map-data";
 import { drawMonitors } from "./monitors";
@@ -106,7 +107,7 @@ export function drawMarks(context: CanvasRenderingContext2D, scene: Scene, marks
   context.clearRect(0, 0, size.width, size.height);
 
   if (marks.fires) {
-    for (const fire of marks.data.fires) {
+    for (const fire of firesAt(marks.data, marks.at)) {
       const x = toX(view, size, fire.lon);
       const y = toY(view, size, fire.lat);
       if (!onCanvas(size, x, y, 6)) continue;

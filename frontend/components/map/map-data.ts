@@ -1,4 +1,4 @@
-import type { AirMonitor, Airport, FieldGrid, FireCell, HazeDay, HazeMap, Station, VisibilityReport } from "@/lib/api/haze-schemas";
+import type { AirMonitor, Airport, DatedFireCell, FieldGrid, FireCell, HazeDay, HazeMap, Station, VisibilityReport } from "@/lib/api/haze-schemas";
 
 import { bracket, decodeBytes, sampleField, sampleWind } from "./field";
 
@@ -13,7 +13,10 @@ export interface MapData {
   windTimes: number[];
   winds: Int8Array[];
   stations: Station[];
+  /** A past day's fires. On the live map the fires change along the timeline and `firesAt` reads them from `firesByDay`. */
   fires: FireCell[];
+  /** Each UTC day's fires over the live map's span. Empty on a past day. */
+  firesByDay: Map<string, FireCell[]>;
   airports: UnpackedAirport[];
   /** The instruments that measured PM2.5 on a past day. Empty on the live map, where the stations stand for them. */
   monitors: AirMonitor[];
@@ -37,11 +40,18 @@ export function unpackMap(map: HazeMap): MapData | null {
     windTimes: map.wind.map((frame) => Date.parse(frame.validAt)),
     winds: map.wind.map((frame) => new Int8Array(decodeBytes(frame.uv).buffer)),
     stations: map.stations,
-    fires: map.fires,
+    fires: [],
+    firesByDay: byDay(map.fires),
     airports: map.airports.map(unpackAirport),
     monitors: [],
     dayStart: null,
   };
+}
+
+function byDay(fires: DatedFireCell[]): Map<string, FireCell[]> {
+  const days = new Map<string, FireCell[]>();
+  for (const fire of fires) days.set(fire.day, [...(days.get(fire.day) ?? []), fire]);
+  return days;
 }
 
 function unpackAirport(airport: Airport): UnpackedAirport {
@@ -84,6 +94,7 @@ export function unpackDay(day: HazeDay): MapData {
     winds: day.wind.map((frame) => new Int8Array(decodeBytes(frame.uv).buffer)),
     stations: [],
     fires: day.fires,
+    firesByDay: new Map(),
     airports: day.airports.map(unpackAirport),
     monitors: day.monitors,
     dayStart,

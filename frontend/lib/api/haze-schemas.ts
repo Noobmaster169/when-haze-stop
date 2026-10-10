@@ -33,6 +33,9 @@ export type WindFrame = z.infer<typeof WindFrame>;
 export const FireCell = z.object({ lat: z.number(), lon: z.number(), frpMw: z.number() });
 export type FireCell = z.infer<typeof FireCell>;
 
+export const DatedFireCell = FireCell.extend({ day: z.string() });
+export type DatedFireCell = z.infer<typeof DatedFireCell>;
+
 export const RunSummary = z.object({
   id: z.number().int(),
   asOf: z.string(),
@@ -55,7 +58,7 @@ export const HazeMap = z.object({
   stations: z.array(Station),
   frames: z.array(Frame),
   wind: z.array(WindFrame),
-  fires: z.array(FireCell),
+  fires: z.array(DatedFireCell),
   airports: z.array(Airport),
 });
 export type HazeMap = z.infer<typeof HazeMap>;

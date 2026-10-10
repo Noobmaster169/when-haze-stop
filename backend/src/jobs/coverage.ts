@@ -49,6 +49,6 @@ export function formatCoverage(rows: MonthRow[]): string {
   return lines.join("\n");
 }
 
-export async function coverage(pool: Pool, now: Date): Promise<string> {
-  return formatCoverage(byMonth((await hazeDays(pool, now)).days));
+export async function coverage(pool: Pool, now: Date, fromDay: string): Promise<string> {
+  return formatCoverage(byMonth((await hazeDays(pool, now, fromDay)).days));
 }

@@ -55,6 +55,10 @@ export type WindFrame = z.infer<typeof WindFrame>;
 export const FireCell = z.object({ lat: z.number(), lon: z.number(), frpMw: z.number() });
 export type FireCell = z.infer<typeof FireCell>;
 
+/** A fire cell with the UTC day it burned on, so a map can show the fires of the moment its timeline is on. */
+export const DatedFireCell = FireCell.extend({ day: z.string() });
+export type DatedFireCell = z.infer<typeof DatedFireCell>;
+
 export const RunSummary = z.object({
   id: z.number().int(),
   /** The newest reading the run was allowed to see. */
@@ -94,7 +98,8 @@ export const HazeMap = z.object({
   stations: z.array(Station),
   frames: z.array(Frame),
   wind: z.array(WindFrame),
-  fires: z.array(FireCell),
+  /** Each day's strongest cells over the map's past week and the days a fire is drawn for before it. */
+  fires: z.array(DatedFireCell),
   /** The visibility layer: every airport with its reports over the map's past week. */
   airports: z.array(Airport),
 });

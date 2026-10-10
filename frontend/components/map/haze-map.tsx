@@ -17,14 +17,15 @@ import { PointPanel } from "./point-panel";
 import { nearestStation, type Probe, ProbeTip } from "./probe-tip";
 import { StationPanel } from "./station-panel";
 import { Timeline } from "./timeline";
-import { useHazeDay } from "./use-haze-day";
+import { useHazeDay, useStoredDays } from "./use-haze-day";
 import { useHazeMap } from "./use-haze-map";
+import { useTimeTravel } from "./use-time-travel";
 import { saveLocation, useMyLocation } from "./my-location";
 
 /**
  * The map page: the map, what is laid over it, the timeline under it and the
- * station beside it. It holds the three things the parts share: the moment
- * the timeline is on, the station chosen, and the layers shown.
+ * station beside it. It holds what the parts share: the station chosen and
+ * the layers shown. The moment the timeline is on comes from `useTimeTravel`.
  */
 
 const ALL_LAYERS: Layers = { haze: true, stations: true, fires: true, wind: true, visibility: true };
@@ -32,27 +33,22 @@ const ALL_LAYERS: Layers = { haze: true, stations: true, fires: true, wind: true
 /** Keyed by the page on `initialStation`, so a link to another station starts it on that one. */
 export function HazeMapView({ initialStation }: { initialStation: string | null }) {
   const { map, data: liveData, basemap, error } = useHazeMap();
-  const history = useHazeDay();
+  const days = useStoredDays();
+  const { at, past, day, playing, setPlaying, seek, release, chooseDay: travelTo } = useTimeTravel(liveData, days[0]?.day);
+  const dayData = useHazeDay(day);
   // Looking back replaces what the map draws, and nothing else: the same canvas, layers and timeline.
-  const data = history.day ? history.data : liveData;
+  const data = day ? dayData : liveData;
   const handle = useRef<MapHandle | null>(null);
   const tip = useRef<HTMLDivElement | null>(null);
-  const [chosenAt, setChosenAt] = useState<number | null>(null);
-  const [playing, setPlaying] = useState(false);
   const [layers, setLayers] = useState(ALL_LAYERS);
   const [selected, setSelected] = useState<{ id: string; via: string | null } | null>(initialStation ? { id: initialStation, via: null } : null);
   const [monitorId, setMonitorId] = useState<string | null>(null);
   const [probe, setProbe] = useState<Probe | null>(null);
   const [preview, setPreview] = useState<Place | null>(null);
 
-  // Until the timeline is touched it sits on the newest readings, and moves with them when a new run lands.
-  const at = chosenAt ?? data?.asOf ?? 0;
   const station = data?.stations.find((item) => item.id === selected?.id) ?? null;
   // An instrument of a past day. The same sensor on another day keeps its panel; a day it did not report closes it.
   const monitor = data?.monitors.find((item) => item.id === monitorId) ?? null;
-
-  const asOf = data?.asOf;
-  const seek = useCallback((moment: number) => setChosenAt(moment === asOf ? null : moment), [asOf]);
 
   const flown = useRef<string | null>(null);
   useEffect(() => {
@@ -66,13 +62,11 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
   const nearestTo = useCallback((lon: number, lat: number) => nearestStation(data?.stations ?? [], lon, lat), [data]);
 
   const chooseDay = useCallback(
-    (day: string | null) => {
-      history.choose(day);
-      setPlaying(false);
+    (chosen: string | null) => {
+      travelTo(chosen);
       setProbe(null);
-      setChosenAt(day ? Date.parse(`${day}T12:00:00Z`) : null);
     },
-    [history],
+    [travelTo],
   );
 
   const hasField = (data?.fields.length ?? 0) > 0;
@@ -171,7 +165,7 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
             <LayerToggles layers={layers} onChange={setLayers} />
           </div>
           <div className="absolute bottom-3 right-3 hidden @[640px]:block">
-            <Legend past={history.day !== null} />
+            <Legend past={day !== null} />
           </div>
           {probe && data && hasField ? <ProbeTip anchor={tip} api={apiAt(data, at, probe.lon, probe.lat)} at={at} /> : null}
           {data && location === null ? (
@@ -184,11 +178,11 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
           {monitor && data?.dayStart != null ? <MonitorPanel monitor={monitor} dayStart={data.dayStart} at={at} onClose={() => setMonitorId(null)} /> : null}
           {!station && !monitor && probe && data && hasField ? <PointPanel data={data} basemap={basemap} probe={probe} at={at} onStation={openStation} onClose={() => setProbe(null)} /> : null}
         </div>
-        <HistoryStrip days={history.days} day={history.day} onChoose={chooseDay} />
-        {data && history.day ? (
-          <Timeline from={data.asOf - 86_400_000} to={data.asOf} now={data.asOf} at={at} playing={playing} caption={hasField ? "Past day" : "Past day, as measured"} onSeek={setChosenAt} onPlaying={setPlaying} />
-        ) : data ? (
-          <Timeline from={data.times[0]} to={data.times[data.times.length - 1]} now={data.asOf} at={at} playing={playing} onSeek={seek} onPlaying={setPlaying} />
+        <HistoryStrip days={days} day={day} onChoose={chooseDay} />
+        {past && liveData ? (
+          <Timeline from={past.from} to={past.to} now={liveData.asOf} at={at} playing={playing} caption={hasField ? "Past day" : "Past day, as measured"} rolls onSeek={seek} onRelease={release} onPlaying={setPlaying} />
+        ) : liveData ? (
+          <Timeline from={liveData.times[0]} to={liveData.times[liveData.times.length - 1]} now={liveData.asOf} at={at} playing={playing} onSeek={seek} onRelease={release} onPlaying={setPlaying} />
         ) : null}
       </div>
     </div>

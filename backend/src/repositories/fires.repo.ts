@@ -1,4 +1,4 @@
-import type { FireCell } from "../contracts";
+import type { DatedFireCell, FireCell } from "../contracts";
 import type { Queryable } from "../db";
 import type { FireCellDay, StoredCellDay } from "../haze/fires";
 
@@ -58,6 +58,19 @@ export async function strongest(db: Queryable, fromDay: string, limit: number, t
   );
   // The cell's centre, which is where a dot for it belongs.
   return rows.map((row) => ({ lat: row.lat10 / 10 + 0.05, lon: row.lon10 / 10 + 0.05, frpMw: Math.round(row.frp_mw) }));
+}
+
+/** Each day's strongest cells from a day on, strongest first, for a map whose fires follow its timeline. */
+export async function strongestByDay(db: Queryable, fromDay: string, perDay: number): Promise<DatedFireCell[]> {
+  const { rows } = await db.query<FireRow>(
+    `select day, lat10, lon10, frp_mw from (
+       select to_char(fire_cells.day, 'YYYY-MM-DD') as day, lat10, lon10, ${BURNING} as frp_mw,
+              row_number() over (partition by fire_cells.day order by ${BURNING} desc) as place
+         from fire_cells where fire_cells.day >= $1 and ${BURNING} > 0
+     ) ranked where place <= $2 order by frp_mw desc`,
+    [fromDay, perDay],
+  );
+  return rows.map((row) => ({ day: row.day, lat: row.lat10 / 10 + 0.05, lon: row.lon10 / 10 + 0.05, frpMw: Math.round(row.frp_mw) }));
 }
 
 /** The newest UTC day with any detection, or null before the first fetch. */

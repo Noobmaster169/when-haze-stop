@@ -182,10 +182,14 @@ again for every day the live archive still serves.
 
 ### 3.1.2 Shared data: the seed
 
-Every developer runs their own Postgres, and three things in it cannot simply be fetched again:
-DOE serves one week of readings, the fire archive needs a key, and the fixed sources take a two
-year replay. So they are kept in the repository, in `backend/db/seed/` (four gzipped tab-separated
-files, under 1 MB together): `stations`, `readings`, `fixed_source_days`, `fire_cells`.
+Every developer runs their own Postgres, and some things in it cannot simply be fetched again:
+DOE serves one week of readings, the fire archive and OpenAQ need a key, and the fixed sources take
+a two year replay. So they are kept in the repository, in `backend/db/seed/` (six gzipped
+tab-separated files, about 3 MB together): `stations` (with the network each belongs to),
+`readings`, `fixed_source_days`, `fire_cells` from 1 January 2025, `openaq_sensors` and
+`openaq_hours`. A teammate with no key therefore starts with the fires and the sensors' PM2.5 of
+the whole history, and `pnpm haze:history` fetches the three kinds that need none: airport
+reports, Singapore's hours and the wind.
 
 - `node db/seed.mjs` (`pnpm db:seed`) loads them. The compose `migrate` service runs it after the
   migrations. It only adds rows, records each file's hash in `seed_files`, and loads a file again
@@ -193,8 +197,8 @@ files, under 1 MB together): `stations`, `readings`, `fixed_source_days`, `fire_
 - `pnpm db:export-seed` writes them from the local database. Run it on the machine that has been
   fetching longest and commit the result, at least once a week: a teammate who starts more than 7
   days after the last export has a gap in the readings that DOE can no longer fill.
-- Wind is not in the seed (too large). The jobs service fetches it for the seeded days by itself,
-  with no key, on its first start (about 7 minutes).
+- Wind is not in the seed (too large). The jobs service fetches it for the whole history by
+  itself, with no key, from its first start (section 8 says how long that takes and why).
 
 ### 3.2 The region and the two grids
 
@@ -277,6 +281,39 @@ What to know before fitting anything to it:
   cell-day is the largest satellite's sum either way.
 - **Nothing here is interpolated or filled.** A day with no row had no data from that source.
 
+`pnpm haze:dataset [folder]` (`jobs/dataset.ts`) writes the history as five gzipped CSV tables,
+into `backend/dataset/` unless a folder is named, for training outside this codebase. It reads
+only; the folder is not committed. From 1 January 2025 to 10 October 2026 it took 15 seconds and
+wrote 2 MB:
+
+| File | One row is | Columns | Rows on 10 October 2026 |
+| --- | --- | --- | --- |
+| `instruments.csv.gz` | An instrument: a DOE station, a Singapore region, an OpenAQ sensor or an airport | `instrument_id, kind, name, provider, reference, averaging, lat, lon` | 181 |
+| `pm25_daily.csv.gz` | Ground truth: an instrument's PM2.5 over one UTC day | `instrument_id, day, pm25_mean, pm25_max, hours` | 21,099 |
+| `visibility_daily.csv.gz` | Ground truth: an airport's reports over one UTC day | `instrument_id, day, reports, dry_reports, min_m, median_m, haze_reports` | 18,712 |
+| `fires_daily.csv.gz` | Input: fire power in one 0.1 degree cell on one UTC day, at the cell's centre | `day, lat, lon, frp_mw` | 106,887 |
+| `wind_daily.csv.gz` | Input: the transport wind and rain at each instrument over one UTC day | `instrument_id, day, u_ms, v_ms, rain_mm, hours` | 117,288 |
+
+`instrument_id` joins the tables: `doe:CA01R`, `nea:east`, `openaq:11760952`, `airport:WMKK`. The
+visibility columns are over dry reports only (no rain, showers, thunder, drizzle, mist or fog), and
+`haze_reports` counts the reports in which the observer called it haze or smoke. The wind is the
+same bilinear blend of the grid the transport model moves its particles by (`haze/wind-at.ts`).
+
+That the tables train was checked once, on 11 October 2026, with a deliberately plain fit: a
+linear model of the next day's value from today's value, the fire power the day's wind carries
+toward the instrument, the wind speed and the rain, trained on the days before 1 July 2026 and
+tested on the days from it.
+
+| Target | Training rows | Test rows | Upwind fire against next day, rank correlation | MAE, the fit | MAE, no change |
+| --- | --- | --- | --- | --- | --- |
+| Mean PM2.5, 151 instruments | 16,657 | 4,056 | 0.65 | 10.3 ug/m3 | 9.3 ug/m3 |
+| Airport extinction (3.912 / median dry visibility in km), 29 airports | 15,222 | 2,881 | 0.42 | 0.1 | 0.1 |
+
+So the four kinds join into a frame of tens of thousands of rows and the fire and wind carry real
+signal out of sample, and a plain linear fit does not beat "no change": on hazy days (35 ug/m3 or
+more, 1,525 test rows) it was off by 19.9 ug/m3 against 15.8. Beating it is the work of the
+learned model designed in `docs/specs/2026-10-10-predictive-model-design.md`, not of this check.
+
 ## 4. Feature 1: the haze map and forecast
 
 ### 4.1 What the person sees
@@ -329,10 +366,24 @@ the top. Pressing a column puts that day on the map:
 - the haze field, where one exists. Days before the first DOE reading (3 October 2026) have none,
   and the timeline says "Past day, as measured".
 
-The timeline then spans that one day. Live goes back to now. Files: `history-strip.tsx`,
-`history-days.ts` (how a day is read, pure), `monitors.ts`, `monitor-panel.tsx`, `pick.ts`,
-`use-haze-day.ts`, `unpackDay` and `pm25At` in `map-data.ts`; backend `services/history.ts` and
-`services/day-air.ts`.
+One timeline reaches all of it. While looking back the timeline spans a week of the past with the
+chosen day in the middle, and the day on the map is the one the timeline's moment falls in, so
+dragging through the week walks through its days and every layer follows. Letting the slider go at
+an end of the week moves the week on, and playing runs from one week into the next and stops at
+the newest reading. Letting it go at the left end of the live timeline goes into the past the same
+way, and at the newest reading of a past week it goes back to live. The strip marks the day the
+timeline is in and scrolls to keep it in view; a mouse held down and drawn along the strip runs
+through the days, keeping the hour. The days either side of the one shown are fetched ahead, and
+the last day stays on the map until the next has loaded. Live goes back to now.
+
+On the live map the fires follow the timeline too: `/haze/map` gives each fire cell its UTC day,
+and a moment shows the cells seen that day and the two before, each at its strongest. A forecast
+hour shows the fires the run knew of.
+
+Files: `history-strip.tsx`, `history-days.ts` (how a day is read, pure), `use-time-travel.ts` (the
+moment, live or looking back), `time-window.ts` (the week, pure), `fires.ts` (the fires at a
+moment, pure), `monitors.ts`, `monitor-panel.tsx`, `pick.ts`, `use-haze-day.ts`, `unpackDay` and
+`pm25At` in `map-data.ts`; backend `services/history.ts` and `services/day-air.ts`.
 
 Page `/sources` lists every outside source: what it gives, the endpoint, how often it is asked, and
 its newest good and failed fetch with what came back (stations, readings added, detections, weather
@@ -718,8 +769,8 @@ Change both together.
 
 | Method | Path | Returns |
 | --- | --- | --- |
-| GET | `/haze/map` | `HazeMap`: latest run, both grids, stations with newest reading, frames for 7 days back and 84 hours ahead, wind at each frame, strongest 1500 fire cells of 2 days |
-| GET | `/haze/days` | `HazeDays`: every UTC day from the first with anything stored to today, each with what it holds of the four kinds of data (burning cells and fire power, hours of wind, airports reporting and reporting haze, PM2.5 instruments and their median), and the first hour a haze field exists for |
+| GET | `/haze/map` | `HazeMap`: latest run, both grids, stations with newest reading, frames for 7 days back and 84 hours ahead, wind at each frame, each day's strongest 1500 fire cells, dated, from 9 days back |
+| GET | `/haze/days` | `HazeDays`: every UTC day from the first with anything stored, and no earlier than `HISTORY_FROM`, to today, each with what it holds of the four kinds of data (burning cells and fire power, hours of wind, airports reporting and reporting haze, PM2.5 instruments and their median), and the first hour a haze field exists for |
 | GET | `/haze/days/:day` | `HazeDay`: one past day for the map: strongest 1500 fire cells, wind every 3 hours, the airports' reports, every PM2.5 instrument's 24 hours, and the frames of that day (empty before the first readings) |
 | GET | `/haze/stations/:id` | `StationOutlook`: station, a week of readings, 84 hours of forecast, the day outlooks |
 | GET | `/haze/accuracy` | `Accuracy`: error by lead for model and persistence, current method's runs |
@@ -808,7 +859,12 @@ fixed sources, 65 for the airports, 1,300 for Singapore, a few hundred for OpenA
 wind. Fires, visibility and PM2.5 take about an hour together. The wind takes about five: Open-Meteo
 counts two weeks of one 25 point row as 25 calls and allows one address 5,000 an hour, so the
 history spaces its requests to use about 3,750 and leave the rest to the hourly fetch, and waits
-out the limit if it is reached anyway. A run that is stopped can be started again. The model does not read the data before the first DOE reading yet: it is there to train and
+out the limit if it is reached anyway. There is also a limit of 10,000 a day, which the whole wind
+history (about 17,600) cannot fit under: on the day it is reached the wind part stops with
+"Daily API request limit exceeded" and the rest is fetched the next day. Nobody has to remember
+to: while `pnpm haze:loop` runs, it asks for the whole history again every 24 hours, which costs a
+minute when nothing is missing. The live wind is a different service with its own count and is not
+affected. A run that is stopped can be started again. The model does not read the data before the first DOE reading yet: it is there to train and
 check a forecast against, which section 3.4 describes.
 
 What the loop does each hour (`jobs/cycle.ts`): fetch readings (as many days back as needed to
@@ -840,8 +896,10 @@ Frontend: `cd frontend && pnpm test`.
 | `test/haze/fire-confirm.test.ts` | The two-pass or 10 MW rule on recorded detections |
 | `test/haze/fixed-sources.test.ts` | Reading the archive, and the fixed source screen on recorded rows of the Kerteh gas complex |
 | `test/jobs/history.test.ts` | The fire and wind history into the database: sites, screened fires, the standard product before the live feed, picking up where it stopped, wind with no hole |
+| `test/jobs/dataset.test.ts`, `test/jobs/coverage.test.ts` | The wind at one place; the five training tables read back from disk; the coverage table |
 | `test/jobs/history-observations.test.ts` | Reading the METAR archive and OpenAQ; the airport, Singapore and OpenAQ history into the database; a past day served with all four kinds of data |
 | `frontend/components/map/history.test.ts` | How the History strip reads a day, PM2.5 as an index, an instrument's hour |
+| `frontend/components/map/time.test.ts` | The fires at a moment of the timeline; the week the timeline spans while looking back |
 | `test/jobs/cycle.test.ts` | One whole cycle into the database, then every haze and alert endpoint |
 | `test/agents/haze-tools.test.ts` | Every assistant tool over that cycle |
 | `frontend/components/map/map.test.ts` | Frame decoding, colour scale, projection, Malaysian time |

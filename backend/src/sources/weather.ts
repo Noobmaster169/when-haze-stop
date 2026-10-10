@@ -140,7 +140,8 @@ async function fetchHistoryRow(url: string, what: string): Promise<string> {
     try {
       return await fetchPatiently(url, what, TIMEOUT_MS);
     } catch (error) {
-      if (!(error instanceof UpstreamError) || error.status !== 429 || waited >= LIMIT_WAITS) throw error;
+      // The daily limit lifts tomorrow, which is the next run's business, not a wait.
+      if (!(error instanceof UpstreamError) || error.status !== 429 || /daily/i.test(error.message) || waited >= LIMIT_WAITS) throw error;
       await pause(LIMIT_WAIT_MS);
     }
   }

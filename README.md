@@ -51,13 +51,15 @@ takes longer. Until the cycle finishes the map says "No forecast has been made y
 are up. Without the token the map and alerts work and the chat does not.
 
 Everyone starts from the same data. `backend/db/seed/` holds the readings since 3 October 2026,
-the fires since 1 July 2026 already screened, and the list of fixed heat sources (gas flares,
-industry, volcanoes). The `migrate` service loads it, and the `jobs` service then fetches the wind
+the fires since 1 January 2025 already screened, the list of fixed heat sources (gas flares,
+industry, volcanoes) and the PM2.5 of OpenAQ's sensors since 1 January 2025. The `migrate` service
+loads it, and the `jobs` service then fetches the wind, the airport reports and Singapore's hours
 for those months by itself. The History strip under the map shows any of those days.
 
 To keep teammates in step, whoever has been running longest exports and commits the seed about
-once a week: `cd backend && pnpm db:export-seed`. A NASA key in `FIRMS_MAP_KEY` is optional: with
-it the jobs service also replays the fire archive itself instead of relying on the seed.
+once a week: `cd backend && pnpm db:export-seed`. The two keys, `FIRMS_MAP_KEY` and
+`OPENAQ_API_KEY`, are optional: with them the jobs service fetches the fires and the sensors
+itself, and keeps them current, instead of relying on the seed.
 
 ### The history: four kinds of data back to 1 January 2025
 
@@ -77,12 +79,15 @@ smoke, how far airport observers could see, and the PM2.5 that was measured. `pn
 cd backend
 pnpm haze:history                    # all four
 pnpm haze:history wind               # or only the parts named: fires, wind, visibility, air
+pnpm haze:coverage                   # what is stored of each, month by month
+pnpm haze:dataset                    # the history as five CSV tables for training, into backend/dataset/
 HISTORY_FROM=2024-01-01 pnpm haze:history
 ```
 
 A first run is about 2,700 requests. Fires, visibility and PM2.5 take about an hour together; the
-wind takes about five, because Open-Meteo allows one address 5,000 calls an hour and the fetch
-paces itself under that. It can be stopped and started again: every part records what came back in
+wind takes about five spread over two days, because Open-Meteo allows one address 5,000 calls an
+hour and 10,000 a day: the fetch paces itself under the first, stops at the second, and the hourly
+loop picks the rest up the next day by itself. It can be stopped and started again: every part records what came back in
 `source_fetches` and asks only for what is missing, and a part that fails leaves the others
 running. `pnpm haze:coverage` prints what is stored of each, month by month. Without a key the part that needs
 it is skipped and says so. Put the two keys in the root `.env` for compose, or in `backend/.env`

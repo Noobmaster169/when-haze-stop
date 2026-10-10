@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { Pool } from "pg";
 import { z } from "zod";
 
+import { config } from "../config";
 import type { Accuracy, GuidelineList, PlaceList } from "../contracts";
 import { GUIDELINES } from "../haze/guidelines";
 import { scores } from "../repositories";
@@ -33,7 +34,7 @@ export function hazeRouter(deps: HazeRouteDeps): Router {
   });
 
   router.get("/days", async (_req, res) => {
-    res.json(await hazeDays(deps.pool));
+    res.json(await hazeDays(deps.pool, new Date(), config.HISTORY_FROM));
   });
 
   router.get("/days/:day", async (req, res) => {

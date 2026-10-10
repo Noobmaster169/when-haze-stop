@@ -17,6 +17,7 @@
     "haze:history": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts history",
     "haze:loop": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts loop",
     "haze:coverage": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts coverage",
+    "haze:dataset": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts dataset",
     "haze:evaluate": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts evaluate"
   },
   "dependencies": {

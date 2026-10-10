@@ -7,6 +7,7 @@ import { fires, forecasts, metar, stations, weather } from "../repositories";
 /** Everything the map draws, in one read: the week behind, the days ahead, the stations, the fires and the wind. */
 
 const HISTORY_DAYS = 7;
+/** A fire is drawn for this long after it was seen, so the map needs this much before its first frame. */
 const FIRE_DAYS = 2;
 const FIRE_LIMIT = 1500;
 /** Metres a second times eight fits a signed byte up to 15.9 m/s, which no transport wind here reaches. */
@@ -42,7 +43,7 @@ export async function hazeMap(db: Queryable): Promise<HazeMap> {
   const asOf = new Date(run.asOf);
   const stored = await forecasts.timeline(db, addHours(asOf, -24 * HISTORY_DAYS), addHours(asOf, HORIZON_HOURS));
   const winds = await weather.windAt(db, stored.map((frame) => frame.validAt));
-  const fireFrom = addHours(asOf, -24 * FIRE_DAYS).toISOString().slice(0, 10);
+  const fireFrom = addHours(asOf, -24 * (HISTORY_DAYS + FIRE_DAYS)).toISOString().slice(0, 10);
 
   return {
     run,
@@ -51,7 +52,7 @@ export async function hazeMap(db: Queryable): Promise<HazeMap> {
     stations: all,
     frames: stored.map((frame) => ({ validAt: frame.validAt.toISOString(), observed: frame.validAt <= asOf, field: frame.field.toString("base64") })),
     wind: winds.map((hour) => ({ validAt: hour.validAt.toISOString(), uv: packWind(hour.u, hour.v) })),
-    fires: await fires.strongest(db, fireFrom, FIRE_LIMIT),
+    fires: await fires.strongestByDay(db, fireFrom, FIRE_LIMIT),
     airports: await airportsBetween(db, addHours(asOf, -24 * HISTORY_DAYS), null),
   };
 }
