@@ -406,7 +406,9 @@ Fetched by the jobs process every cycle (`jobs/statements.ts`), from three chann
   "nationwide" (`usable` in `haze/statements.ts`).
 - `haze/statements.ts` decides what is in force, at read time:
   - Reports of one decision are one statement: a rule by its issuer, action and line; an order by
-    its issuer, action and start day, with every report's areas joined. The ministry's own copy
+    its issuer, action and start day where the reports share a place, with every report's areas
+    joined. Johor closing its schools the evening the ministry closed Selangor's stays a second
+    decision; a later report naming places from both of two groups joins them. The ministry's own copy
     is the link when there is one.
   - A later rule of the same issuer, action and length replaces an earlier one (180 replaced 200).
   - An order ends on its stated last day, on a later lift or reopening for its areas, or a week

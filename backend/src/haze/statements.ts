@@ -132,14 +132,24 @@ export function usable(statement: StoredStatement): boolean {
 
 /** Every statement once, newest first, each with its status on `today` (a Malaysian `YYYY-MM-DD`). */
 export function resolveStatements(stored: StoredStatement[], today: string): Statement[] {
-  const groups = new Map<string, StoredStatement[]>();
+  const groups: { key: string; items: StoredStatement[] }[] = [];
   for (const statement of stored.filter(usable).sort((a, b) => a.publishedAt.getTime() - b.publishedAt.getTime() || a.id - b.id)) {
     const key = sameKey(statement);
-    groups.set(key, [...(groups.get(key) ?? []), statement]);
+    // Reports of one order share a place. Johor closing its schools the evening the ministry closed Selangor's is a second decision.
+    const matching = groups.filter((item) => item.key === key && (statement.kind === "rule" || item.items.some((other) => overlaps(other, statement))));
+    if (matching.length === 0) {
+      groups.push({ key, items: [statement] });
+      continue;
+    }
+    // A report naming places from two groups shows they were one decision: they become one.
+    const [into, ...rest] = matching;
+    into.items.push(...rest.flatMap((item) => item.items), statement);
+    into.items.sort((a, b) => a.publishedAt.getTime() - b.publishedAt.getTime() || a.id - b.id);
+    for (const item of rest) groups.splice(groups.indexOf(item), 1);
   }
-  const firsts = [...groups.values()].map(merged);
+  const firsts = groups.map((group) => merged(group.items));
 
-  const resolved = [...groups.values()].map((group, index): Statement => {
+  const resolved = groups.map(({ items: group }, index): Statement => {
     const first = firsts[index];
     const later = firsts.filter((other) => other !== first && other.publishedAt > first.publishedAt);
     // The ministry's own copy when one was fetched, else the report that names the most areas.

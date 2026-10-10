@@ -69,12 +69,13 @@ describe("which statements are one, and which are still in force", () => {
     expect(resolveStatements([NEGERI_SEMBILAN, reopen], "2026-10-13").find((item) => item.id === 6)?.status).toBe("ended");
   });
 
-  it("makes the headlines of one day's closures one decision covering every area they name", () => {
-    const closure = byId(6);
-    expect(byId(7)).toBeUndefined();
-    expect(closure).toMatchObject({ reports: 2, districts: ["Rompin"], status: "in-force" });
-    expect(closure?.states.sort()).toEqual(["Melaka", "Negeri Sembilan", "Selangor", "WP Kuala Lumpur", "WP Putrajaya"]);
-    expect(resolved[0].id).toBe(6);
+  it("makes the headlines of one day's closures one decision once a report links their places", () => {
+    // Negeri Sembilan's report and the KL, Putrajaya and Rompin one share no place until this headline of 8 October names both sides.
+    const linking = statement(9, { states: ["Negeri Sembilan", "Melaka", "Selangor"], effectiveFrom: "2026-10-09", publishedAt: new Date("2026-10-08T15:13:00Z") });
+    expect(resolveStatements([NEGERI_SEMBILAN, ROMPIN], "2026-10-10")).toHaveLength(2);
+    const joined = resolveStatements([NEGERI_SEMBILAN, linking, ROMPIN], "2026-10-10").find((item) => item.id === 6);
+    expect(joined).toMatchObject({ reports: 3, districts: ["Rompin"], status: "in-force" });
+    expect(joined?.states.sort()).toEqual(["Melaka", "Negeri Sembilan", "Selangor", "WP Kuala Lumpur", "WP Putrajaya"]);
   });
 
   it("stops calling a closure with no stated end in force after a week without word", () => {
@@ -183,5 +184,15 @@ describe("the second live run", () => {
     const centre = () => ({ lat: 1.85, lon: 102.93 });
     expect(covers(batuPahat, { name: "Kluang", state: "Johor", lat: 2.03, lon: 103.32 }, centre)).toBe(false);
     expect(covers(batuPahat, { name: "Batu Pahat", state: "Johor", lat: 1.86, lon: 102.94 }, centre)).toBe(true);
+  });
+});
+
+describe("two closures announced the same evening", () => {
+  it("stay two decisions when they share no place", () => {
+    // The evening of 8 October 2026: the ministry's closures in the centre, and Johor's own.
+    const centre = statement(50, { states: ["Selangor", "Melaka", "WP Kuala Lumpur", "WP Putrajaya"], publishedAt: new Date("2026-10-08T14:32:00Z") });
+    const johor = statement(51, { states: ["Johor"], publishedAt: new Date("2026-10-08T15:10:00Z") });
+    const resolved = resolveStatements([centre, johor], "2026-10-10");
+    expect(resolved.map((item) => item.states)).toEqual([["Johor"], ["Selangor", "Melaka", "WP Kuala Lumpur", "WP Putrajaya"]]);
   });
 });
