@@ -72,3 +72,12 @@ def test_write_report_accepts_numpy_scalars(tmp_path):
     path = write_report(tmp_path, "v", payload)
     saved = json.loads((path.parent / "scores.json").read_text())
     assert saved["backtest"] == {"promotion_score": None, "rows": 3}
+
+
+def test_reports_dir_follows_model_reports(monkeypatch, tmp_path):
+    from hazemodel.report import REPORTS_PATH, reports_dir
+
+    monkeypatch.delenv("MODEL_REPORTS", raising=False)
+    assert reports_dir() == REPORTS_PATH
+    monkeypatch.setenv("MODEL_REPORTS", str(tmp_path))
+    assert reports_dir() == tmp_path

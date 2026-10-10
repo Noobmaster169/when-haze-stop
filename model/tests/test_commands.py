@@ -62,3 +62,10 @@ def test_train_command_keeps_an_existing_scored_report(tmp_path, monkeypatch, pa
     commands.train_command(_args(path))
     assert scores.read_text() == '{"backtest": {"promotion_score": 1.0}}'
     assert "kept the existing scored report" in capsys.readouterr().out
+
+
+def test_features_out_follows_model_data(monkeypatch, tmp_path):
+    from hazemodel import cli
+
+    monkeypatch.setenv("MODEL_DATA", str(tmp_path))
+    assert cli._data_dir() == str(tmp_path)

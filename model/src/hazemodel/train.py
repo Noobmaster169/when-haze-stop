@@ -3,6 +3,7 @@
 import datetime as dt
 import hashlib
 import json
+import os
 import pathlib
 
 import lightgbm as lgb
@@ -17,12 +18,17 @@ EXCLUDED_PREFIXES = ("peak_", "weight_", "censored_")
 PARAMS_PATH = pathlib.Path(__file__).resolve().parents[2] / "params.json"
 
 
+def params_path() -> pathlib.Path:
+    """MODEL_PARAMS overrides the source-tree file, which an installed package (the image) does not have."""
+    return pathlib.Path(os.environ.get("MODEL_PARAMS", PARAMS_PATH))
+
+
 def feature_columns(frame: pd.DataFrame) -> list[str]:
     return [c for c in frame.columns if c not in EXCLUDED and not c.startswith(EXCLUDED_PREFIXES)]
 
 
 def load_params(path: pathlib.Path | None = None) -> dict:
-    return json.loads((path or PARAMS_PATH).read_text())
+    return json.loads((path or params_path()).read_text())
 
 
 def _eligible(frame: pd.DataFrame, day: int) -> pd.DataFrame:

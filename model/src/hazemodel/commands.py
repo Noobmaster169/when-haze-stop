@@ -121,7 +121,8 @@ def promote_command(args) -> None:
 
 def search_command(args) -> None:
     out = search(_load(args.parquet), freq=args.freq, months=args.months, draws=args.draws)
-    print(pd.DataFrame(out["draws"]).sort_values("hazy_mae").to_string())
+    print(f"criterion: {out['criterion']}")
+    print(pd.DataFrame(out["draws"]).sort_values(out["criterion"]).to_string())
     if args.write:
         write_params(out["params"])
         print("written to params.json")

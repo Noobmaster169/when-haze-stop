@@ -7,11 +7,16 @@ WORKDIR /app
 COPY pyproject.toml ./
 COPY src ./src
 RUN pip install --no-cache-dir .
+# The installed package cannot see the source tree, so the committed parameters travel as a file.
+COPY params.json ./params.json
 
-RUN useradd --create-home --uid 10002 hazemodel && mkdir -p /app/artifacts && chown hazemodel /app/artifacts
+RUN useradd --create-home --uid 10002 hazemodel && mkdir -p /app/artifacts /app/reports /app/data && chown hazemodel /app/artifacts /app/reports /app/data
 USER hazemodel
 
 ENV MODEL_ARTIFACTS=/app/artifacts \
+    MODEL_PARAMS=/app/params.json \
+    MODEL_REPORTS=/app/reports \
+    MODEL_DATA=/app/data \
     PYTHONUNBUFFERED=1
 
 EXPOSE 4002

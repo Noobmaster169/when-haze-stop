@@ -60,3 +60,10 @@ def test_zero_weights_leave_the_row_count(frame):
     lighter.loc[eligible[:5], "weight_d1"] = 0.0
     _, fewer = fit_quantiles(lighter, 1, features, params)
     assert fewer == used - 5
+
+
+def test_load_params_follows_model_params(monkeypatch, tmp_path):
+    path = tmp_path / "params.json"
+    path.write_text('{"num_leaves": 9}')
+    monkeypatch.setenv("MODEL_PARAMS", str(path))
+    assert load_params() == {"num_leaves": 9}

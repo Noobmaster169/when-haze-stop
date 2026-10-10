@@ -10,7 +10,7 @@ import pandas as pd
 from hazemodel.backtest import embargo
 from hazemodel.scores import score
 from hazemodel.splits import walk_forward
-from hazemodel.train import PARAMS_PATH, feature_columns, load_params
+from hazemodel.train import feature_columns, load_params, params_path
 
 SPACE = {
     "num_leaves": (15, 63),
@@ -19,6 +19,7 @@ SPACE = {
     "feature_fraction": (0.6, 0.9),
 }
 MAX_ROUNDS = 2000
+SCORE_COLUMNS = ("hazy_mae", "mae", "criterion")
 
 
 def _draw(rng: np.random.Generator) -> dict:
@@ -66,6 +67,12 @@ def _fit_with_stopping(
     return booster, max(int(booster.best_iteration), 1)
 
 
+def _criterion(table: list[dict]) -> str:
+    """Hazy-day MAE when any draw has one; otherwise the search months held no hazy reference day, and every draw
+    is judged on all-day MAE, so the winner is never picked by a NaN tie."""
+    return "hazy_mae" if any(not np.isnan(row["hazy_mae"]) for row in table) else "mae"
+
+
 def search(frame: pd.DataFrame, freq: str = "M", months: int = 6, draws: int = 20, seed: int = 7) -> dict:
     blocks = list(walk_forward(frame, freq=freq, min_train_blocks=1))[: months - 1]
     features = feature_columns(frame)
@@ -85,14 +92,18 @@ def search(frame: pd.DataFrame, freq: str = "M", months: int = 6, draws: int = 2
             predicted = np.maximum(booster.predict(test[features].to_numpy(dtype=float)), 0)
             forecasts.append(pd.DataFrame({"p50_d1": predicted}, index=test.index))
         if not tests:
-            table.append({**candidate, "hazy_mae": float("nan")})
+            table.append({**candidate, "hazy_mae": float("nan"), "mae": float("nan")})
             continue
-        hazy_mae = score(pd.concat(tests), pd.concat(forecasts), 1)["reference"]["hazy_mae"]
-        table.append({**candidate, "num_boost_round": int(np.median(rounds)), "hazy_mae": hazy_mae})
-    best = min(table, key=lambda row: np.inf if np.isnan(row["hazy_mae"]) else row["hazy_mae"])
-    params = {k: v for k, v in best.items() if k != "hazy_mae"}
-    return {"params": params, "draws": table}
+        reference = score(pd.concat(tests), pd.concat(forecasts), 1)["reference"]
+        scored = {"hazy_mae": reference["hazy_mae"], "mae": reference["mae"]}
+        table.append({**candidate, "num_boost_round": int(np.median(rounds)), **scored})
+    criterion = _criterion(table)
+    for row in table:
+        row["criterion"] = criterion
+    best = min(table, key=lambda row: np.inf if np.isnan(row[criterion]) else row[criterion])
+    params = {k: v for k, v in best.items() if k not in SCORE_COLUMNS}
+    return {"params": params, "draws": table, "criterion": criterion}
 
 
-def write_params(params: dict, path: pathlib.Path = PARAMS_PATH) -> None:
-    path.write_text(json.dumps(params, indent=2) + "\n")
+def write_params(params: dict, path: pathlib.Path | None = None) -> None:
+    (path or params_path()).write_text(json.dumps(params, indent=2) + "\n")

@@ -2,6 +2,7 @@
 
 import json
 import math
+import os
 import pathlib
 
 import numpy as np
@@ -10,7 +11,8 @@ REPORTS_PATH = pathlib.Path(__file__).resolve().parents[2] / "reports"
 
 
 def reports_dir() -> pathlib.Path:
-    return REPORTS_PATH
+    """MODEL_REPORTS overrides the source-tree folder, which an installed package (the image) does not have."""
+    return pathlib.Path(os.environ.get("MODEL_REPORTS", REPORTS_PATH))
 
 
 def _clean(value):

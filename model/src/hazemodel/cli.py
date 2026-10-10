@@ -1,6 +1,7 @@
 """The command line: one subcommand per job, each registered by its own module's add_<name>(subparsers)."""
 
 import argparse
+import os
 import pathlib
 
 import pandas as pd
@@ -13,6 +14,11 @@ from hazemodel.region import region_from_env
 from hazemodel.store import connect, load_source_data
 
 TARGET_LOOKAHEAD_DAYS = 3
+
+
+def _data_dir() -> str:
+    """MODEL_DATA overrides the source-tree folder, which an installed package (the image) does not have."""
+    return os.environ.get("MODEL_DATA", str(pathlib.Path(__file__).resolve().parents[2] / "data"))
 
 
 def features_command(args) -> pathlib.Path:
@@ -45,7 +51,7 @@ def add_features(subparsers) -> None:
     parser.add_argument("--from", dest="start", required=True)
     parser.add_argument("--to", dest="end", required=True)
     parser.add_argument("--hindcast-model", default="v2-analysis")
-    parser.add_argument("--out", default=str(pathlib.Path(__file__).resolve().parents[2] / "data"))
+    parser.add_argument("--out", default=_data_dir())
     parser.set_defaults(run=features_command)
 
 
@@ -82,7 +88,7 @@ def add_training(subparsers) -> None:
     retrain = subparsers.add_parser("retrain", help="features, train with backtest, promote; --loop repeats weekly")
     retrain.add_argument("--from", dest="start", default="2025-06-07")
     retrain.add_argument("--hindcast-model", default="v2-analysis")
-    retrain.add_argument("--out", default=str(pathlib.Path(__file__).resolve().parents[2] / "data"))
+    retrain.add_argument("--out", default=_data_dir())
     retrain.add_argument("--loop", action="store_true")
     retrain.set_defaults(run=retrain_command)
 
