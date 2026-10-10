@@ -138,5 +138,27 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Weekly retraining: features, train with backtest, promote by rule. Shares
+  # the artifacts volume with the model service, which re-reads `live` on
+  # every /predict, so a promotion needs no restart.
+  model-train:
+    build: ./model
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: postgres
+      PG_USER: postgres
+      PG_PASSWORD: localdev
+      MODEL_ARTIFACTS: /app/artifacts
+    volumes:
+      - model-artifacts:/app/artifacts
+      - ./model/reports:/app/reports
+    command: ["hazemodel", "retrain", "--from", "2025-06-07", "--loop"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   pgdata:
+  model-artifacts:
