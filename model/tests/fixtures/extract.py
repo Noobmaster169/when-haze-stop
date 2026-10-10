@@ -7,9 +7,7 @@ lat10 and lon10 are tenths of a degree. Every row written is a real stored value
 """
 import pathlib
 
-import pandas as pd
-
-from hazemodel.store import connect
+from hazemodel.store import connect, read_frame
 
 HERE = pathlib.Path(__file__).parent
 START, END = "2026-10-02T00:00:00Z", "2026-10-11T00:00:00Z"
@@ -35,7 +33,7 @@ QUERIES = {
 def main() -> None:
     with connect() as conn:
         for name, sql in QUERIES.items():
-            frame = pd.read_sql(sql, conn)
+            frame = read_frame(conn, sql)
             for column in ("u_ms", "v_ms", "rain_mm"):
                 if column in frame:
                     frame[column] = frame[column].map(lambda values: " ".join(f"{v:.3f}" for v in values))

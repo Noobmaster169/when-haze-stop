@@ -8,6 +8,8 @@ import pandas as pd
 import psycopg
 
 TIME_COLUMNS = {"observed_at", "valid_at", "as_of"}
+# The air features need lags to 72 h plus a 24 h mean, and the fires need 7 days, so 8 days cover both.
+LOOKBACK_DAYS = 8
 
 
 @dataclass
@@ -44,7 +46,7 @@ def _utc(frame: pd.DataFrame) -> pd.DataFrame:
     return frame
 
 
-def _read(conn, sql: str, params: tuple) -> pd.DataFrame:
+def read_frame(conn, sql: str, params: tuple = ()) -> pd.DataFrame:
     with conn.cursor() as cursor:
         cursor.execute(sql, params)
         columns = [desc.name for desc in cursor.description]
@@ -57,18 +59,18 @@ def _read(conn, sql: str, params: tuple) -> pd.DataFrame:
 
 def load_source_data(conn, start: pd.Timestamp, end: pd.Timestamp, hindcast_model: str | None = None) -> SourceData:
     span = (start.to_pydatetime(), end.to_pydatetime())
-    first_day = (start - pd.Timedelta(days=8)).date()
+    first_day = (start - pd.Timedelta(days=LOOKBACK_DAYS)).date()
     return SourceData(
-        stations=_read(conn, "select id, name, lat, lon, network from stations order by id", ()),
-        sensors=_read(conn, "select sensor_id, name, provider, reference, lat, lon from openaq_sensors order by sensor_id", ()),
-        airports=_read(conn, "select icao, name, lat, lon from airports order by icao", ()),
-        readings=_read(conn, "select station_id, observed_at, api from readings where observed_at >= %s and observed_at < %s", span),
-        nea_hours=_read(conn, "select region, observed_at, pm25_hourly, pm25_24h, psi_24h from nea_hours where observed_at >= %s and observed_at < %s", span),
-        openaq_hours=_read(conn, "select sensor_id, observed_at, pm25 from openaq_hours where observed_at >= %s and observed_at < %s", span),
-        metar_obs=_read(conn, "select icao, observed_at, visibility_m, weather from metar_obs where observed_at >= %s and observed_at < %s", span),
-        fire_cells=_read(conn, "select day, lat10, lon10, frp_mw, burning_mw from fire_cells where day >= %s and day < %s", (first_day, end.date())),
-        weather_hours=_read(conn, "select valid_at, u_ms, v_ms, rain_mm from weather_hours where valid_at >= %s and valid_at < %s", span),
-        smoke_hindcasts=_read(
+        stations=read_frame(conn, "select id, name, lat, lon, network from stations order by id", ()),
+        sensors=read_frame(conn, "select sensor_id, name, provider, reference, lat, lon from openaq_sensors order by sensor_id", ()),
+        airports=read_frame(conn, "select icao, name, lat, lon from airports order by icao", ()),
+        readings=read_frame(conn, "select station_id, observed_at, api from readings where observed_at >= %s and observed_at < %s", span),
+        nea_hours=read_frame(conn, "select region, observed_at, pm25_hourly, pm25_24h, psi_24h from nea_hours where observed_at >= %s and observed_at < %s", span),
+        openaq_hours=read_frame(conn, "select sensor_id, observed_at, pm25 from openaq_hours where observed_at >= %s and observed_at < %s", span),
+        metar_obs=read_frame(conn, "select icao, observed_at, visibility_m, weather from metar_obs where observed_at >= %s and observed_at < %s", span),
+        fire_cells=read_frame(conn, "select day, lat10, lon10, frp_mw, burning_mw from fire_cells where day >= %s and day < %s", (first_day, end.date())),
+        weather_hours=read_frame(conn, "select valid_at, u_ms, v_ms, rain_mm from weather_hours where valid_at >= %s and valid_at < %s", span),
+        smoke_hindcasts=read_frame(
             conn,
             "select as_of, instrument_id, smoke_now, smoke_24h, smoke_48h, model from smoke_hindcasts where model = %s and as_of >= %s and as_of < %s",
             (hindcast_model or "", *span),
