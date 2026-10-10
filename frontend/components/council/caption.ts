@@ -1,7 +1,7 @@
 import type { CouncilEvent } from "@/lib/api/council-schemas";
 
 import type { Agent } from "./timeline";
-import { listNames, percent, toolWords } from "./words";
+import { listNames, scoreWords, toolWords } from "./words";
 
 /** The one plain line under the objective that says what is happening now. Pure. */
 
@@ -59,7 +59,7 @@ export function captionFor(event: CouncilEvent | null, agents: Agent[]): string 
     case "candidate":
       return event.payload.baseline ? `The computer puts forward a simple plan to beat: ${event.payload.title}.` : `${name(event.payload.by)} puts a plan on the table.`;
     case "simulation":
-      return `The smoke model tests a plan: it would clear about ${percent(event.payload.score.expected)} of the smoke that could be cleared.`;
+      return `The smoke model tests a plan: ${scoreWords(event.payload.score).cleaner}.`;
     case "vote":
       return `${name(event.payload.agent)} rates the plans.`;
     case "verdict":

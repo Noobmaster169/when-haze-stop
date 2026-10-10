@@ -14,12 +14,12 @@ export interface PackageLine {
 }
 
 export const PACKAGE_LINES: PackageLine[] = [
-  { label: "1 CL-415MP scooper", basis: "accepted", note: "Offered 17 Sep and accepted 18 Sep 2026, for Kalimantan" },
+  { label: "1 water bomber", basis: "accepted", note: "One CL-415MP scooper, offered 17 Sep and accepted 18 Sep 2026" },
   { label: "3 helicopters", basis: "accepted", note: "In the accepted package; type not disclosed" },
-  { label: "52 personnel", basis: "accepted", note: "Mostly air crew and support; two lance teams of six is assumed" },
-  { label: "Up to 100 Bomba at home", basis: "assumption", note: "How many of about 15,000 Bomba staff can be moved is assumed" },
+  { label: "52 crew", basis: "accepted", note: "Mostly air crew and support; two lance teams of six is assumed" },
+  { label: "100 Bomba", basis: "assumption", note: "How many of about 15,000 Bomba staff can be moved to the fires is assumed" },
   { label: "14 days", basis: "assumption", note: "Days in theatre, on the 2015 Palembang cycle" },
-  { label: "Indonesia lets every aircraft and crew work where needed", basis: "assumption", note: "The council assumes Indonesia allows all air activity and every support asked, in Kalimantan and Sumatra alike" },
+  { label: "Free access in Indonesia", basis: "assumption", note: "The council assumes Indonesia lets every aircraft and crew work where needed, in Kalimantan and Sumatra alike" },
 ];
 
 /** Where the council's reasoning is written down, for the links that say what a number rests on. */

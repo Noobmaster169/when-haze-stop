@@ -1,9 +1,9 @@
 import type { ScoreSummary, Verdict } from "@/lib/api/council-schemas";
 
-import { percent } from "./words";
+import { scoreWords, share } from "./words";
 
 /**
- * The chosen plan beside the plans made by code, as a share of the ceiling:
+ * The chosen plan beside the simple plans made by computer, as a share of the clearable smoke:
  * a dot at the expected value on a line from the pessimistic case to the
  * optimistic one, with the ug/m3 and the hours over API 100 it is worth.
  */
@@ -31,11 +31,17 @@ export function VerdictCompare({ verdict }: { verdict: Verdict }) {
 
   return (
     <figure>
-      <figcaption className="text-small font-medium text-ink">Against simple rules worked out by computer</figcaption>
-      <p className="mt-0.5 text-caption text-ink-tertiary">
-        How much of the smoke that could be cleared from KL each plan clears (if every fire went out, KL&apos;s air would be {verdict.ceiling.toFixed(1)} ug/m3 cleaner on average). The dot is the likeliest result; the line runs from a bad case to a good one.
-      </p>
-      <ul className="mt-4 space-y-4">
+      <figcaption className="flex flex-wrap gap-x-4 gap-y-1 text-caption text-ink-tertiary">
+        <span className="flex items-center gap-1.5">
+          <span className="size-2 rounded-full bg-ink-tertiary" />
+          likeliest
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-0.5 w-4 rounded-full bg-hairline-strong" />
+          bad wind to good wind
+        </span>
+      </figcaption>
+      <ul className="mt-3 space-y-4">
         {rows.map((row) => {
           const low = Math.min(row.score.pessimistic, row.score.optimistic);
           const high = Math.max(row.score.pessimistic, row.score.optimistic);
@@ -45,15 +51,15 @@ export function VerdictCompare({ verdict }: { verdict: Verdict }) {
                 {row.title}
                 {row.chosen ? <span className="ml-1.5 text-caption text-accent">chosen</span> : null}
               </div>
-              <div className="relative h-4" role="img" aria-label={`${row.title}: expected ${percent(row.score.expected)}, from ${percent(low)} to ${percent(high)}`}>
+              <div className="relative h-4" role="img" aria-label={`${row.title}: clears ${share(row.score.expected)}, from ${share(low)} to ${share(high)}`}>
                 <div className="absolute inset-x-0 top-1/2 h-px bg-hairline" />
                 <div className={`absolute top-1/2 h-0.5 -translate-y-1/2 rounded-full ${row.chosen ? "bg-accent-line" : "bg-hairline-strong"}`} style={{ left: at(low), width: `calc(${at(high)} - ${at(low)})` }} />
                 <div className={`absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-surface ${row.chosen ? "bg-accent" : "bg-ink-tertiary"}`} style={{ left: at(row.score.expected) }} />
               </div>
-              <div className="text-caption text-ink-secondary tabular-nums sm:text-right">
-                <span className="font-medium text-ink">{percent(row.score.expected)}</span> ({percent(low)} to {percent(high)})
+              <div className="text-caption text-ink-secondary tabular-nums sm:text-right" title={`${scoreWords(row.score).clears}; ${scoreWords(row.score).ifWindTurns}.`}>
+                <span className="font-medium text-ink">{row.score.meanRemoved.toFixed(1)} ug/m3 cleaner</span>
                 <span className="block text-ink-tertiary">
-                  {row.score.meanRemoved.toFixed(1)} ug/m3 cleaner, {hoursText(row.score.hoursOver100Avoided)} fewer above API 100
+                  clears {share(row.score.expected)}, {hoursText(row.score.hoursOver100Avoided)} fewer above API 100
                 </span>
               </div>
             </li>

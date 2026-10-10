@@ -6,7 +6,7 @@ import { nameOf } from "./caption";
 import { PlanTray } from "./plan-tray";
 import type { Timeline } from "./timeline";
 import { type Said, saidUpTo, trayAt } from "./tray";
-import { ACT_COLOUR, ACT_WORD, ARGUMENT_ACTS, listNames } from "./words";
+import { ACT_COLOUR, ACT_WORD, ARGUMENT_ACTS } from "./words";
 
 /**
  * Beside the table: who is speaking now and what they said, then the plans on
@@ -14,15 +14,6 @@ import { ACT_COLOUR, ACT_WORD, ARGUMENT_ACTS, listNames } from "./words";
  */
 
 type Tab = "plans" | "transcript";
-
-function lastThought(timeline: Timeline, index: number): { agent: string; gist: string } | null {
-  for (let position = Math.min(index, timeline.beats.length - 1); position >= 0; position--) {
-    const event = timeline.beats[position].event;
-    if (event.kind === "thinking") return event.payload;
-    if (event.kind === "stage") return null;
-  }
-  return null;
-}
 
 function ActChip({ said }: { said: Said }) {
   return (
@@ -34,31 +25,17 @@ function ActChip({ said }: { said: Said }) {
 }
 
 function Now({ said, timeline }: { said: Said | null; timeline: Timeline }) {
-  const [open, setOpen] = useState<string | null>(null);
   if (!said) return <p className="text-small text-ink-tertiary">Nobody has spoken yet.</p>;
-  const expanded = open === said.id;
   return (
-    <div key={said.id} className="motion-safe:animate-[island-drop_320ms_var(--ease-island)_both]">
-      <div className="flex flex-wrap items-baseline gap-x-2 text-small">
+    <div key={said.id} className="motion-safe:animate-[island-drop_320ms_var(--ease-island)_both]" title={said.detail || undefined}>
+      <div className="flex flex-wrap items-center gap-x-2.5 text-small">
         <span className="font-medium text-ink">{nameOf(timeline.agents, said.from)}</span>
-        <span className="text-ink-tertiary" title={said.to.map((id) => nameOf(timeline.agents, id)).join(", ")}>
-          to {listNames(said.to.map((id) => nameOf(timeline.agents, id)), timeline.agents.length)}
-        </span>
-      </div>
-      <div className="mt-1.5">
         <ActChip said={said} />
-        {said.planId ? <span className="ml-2 text-caption text-ink-tertiary">on plan {said.planId}</span> : null}
       </div>
-      <p className="mt-2 font-display text-[17px] leading-[24px] text-ink">{said.headline}</p>
-      {said.detail ? (
-        <button type="button" onClick={() => setOpen(expanded ? null : said.id)} className="mt-2 text-caption font-medium text-ink-secondary underline-offset-2 hover:text-accent hover:underline">
-          {expanded ? "Hide the full text" : "Read the full text"}
-        </button>
-      ) : null}
-      {expanded ? <p className="mt-2 max-h-56 overflow-y-auto text-small whitespace-pre-line text-ink-secondary">{said.detail}</p> : null}
+      <p className="mt-1.5 font-display text-[17px] leading-[24px] text-ink">{said.headline}</p>
       {said.unverified.length > 0 ? (
-        <p className="mt-2 rounded-sm bg-differ-tint px-2 py-1 text-caption text-differ-ink">
-          Not found in what it was shown: {said.unverified.join(", ")}
+        <p className="mt-1.5 text-caption text-differ" title={`Not found in what it was shown: ${said.unverified.join(", ")}`}>
+          Some figures could not be checked
         </p>
       ) : null}
     </div>
@@ -98,7 +75,6 @@ export function Rail({ timeline, index, onSeek }: { timeline: Timeline; index: n
   const [tab, setTab] = useState<Tab>("plans");
   const said = useMemo(() => saidUpTo(timeline, index), [timeline, index]);
   const tray = useMemo(() => trayAt(timeline, index), [timeline, index]);
-  const thought = useMemo(() => lastThought(timeline, index), [timeline, index]);
 
   return (
     <div className="flex min-h-0 flex-col">
@@ -107,11 +83,6 @@ export function Rail({ timeline, index, onSeek }: { timeline: Timeline; index: n
         <div className="mt-2">
           <Now said={said.at(-1) ?? null} timeline={timeline} />
         </div>
-        {thought ? (
-          <p className="mt-4 border-l-2 border-hairline-strong pl-2.5 text-caption text-ink-tertiary">
-            <span className="text-ink-secondary">{nameOf(timeline.agents, thought.agent)} is weighing:</span> {thought.gist}
-          </p>
-        ) : null}
       </section>
       <div className="flex gap-4 border-b border-hairline px-5" role="tablist">
         {(["plans", "transcript"] as const).map((key) => (
@@ -128,7 +99,7 @@ export function Rail({ timeline, index, onSeek }: { timeline: Timeline; index: n
         ))}
       </div>
       <div className="min-h-0 grow overflow-y-auto px-5 pt-4 pb-6">
-        {tab === "plans" ? <PlanTray tray={tray} timeline={timeline} /> : <Transcript said={said} timeline={timeline} onSeek={onSeek} />}
+        {tab === "plans" ? <PlanTray tray={tray} /> : <Transcript said={said} timeline={timeline} onSeek={onSeek} />}
       </div>
     </div>
   );

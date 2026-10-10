@@ -27,7 +27,6 @@ const TAB = "rounded-md px-2.5 py-1 transition-colors";
 
 function Switcher({ runId, view, verdictReady }: { runId: number; view: View; verdictReady: boolean }) {
   const tabs: { key: View; label: string; ready: boolean }[] = [
-    { key: "start", label: "Council", ready: true },
     { key: "replay", label: "Replay", ready: true },
     { key: "verdict", label: "Verdict", ready: verdictReady },
   ];
@@ -83,6 +82,22 @@ export function CouncilExperience({ runs, run, events, view, named, missingRun }
     }
   };
 
+  /** Deletes a finished run, then reloads the list; a run the address names is gone, so the address goes too. Answers the refusal to show, or null. */
+  const remove = async (runId: number): Promise<string | null> => {
+    try {
+      const response = await fetch(`/api/council/runs/${runId}`, { method: "DELETE" });
+      if (response.status !== 204) {
+        const body: unknown = await response.json().catch(() => null);
+        return typeof body === "object" && body !== null && "error" in body ? String(body.error) : `Not deleted (${response.status}).`;
+      }
+    } catch (caught) {
+      return caught instanceof Error ? caught.message : String(caught);
+    }
+    if (named && runId === run?.id) router.push(hrefFor({ runId: null, view: "start" }));
+    else router.refresh();
+    return null;
+  };
+
   // The server reads the run on every navigation and the browser polls it while live: show whichever is further along.
   const current = fresherRun(run, followed.run);
   const log = longerLog(events, followed.events);
@@ -124,11 +139,11 @@ export function CouncilExperience({ runs, run, events, view, named, missingRun }
       <StartPanel
         runs={runs.map((item) => (item.id === current?.id && status ? { ...item, status } : item))}
         selected={current?.id ?? null}
-        named={named}
         missingRun={missingRun}
         busy={busy}
         error={error}
         onConvene={convene}
+        onDelete={remove}
       />
     </main>
   );

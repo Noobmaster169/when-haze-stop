@@ -47,6 +47,8 @@ export function VerdictChart({ verdict, asOf }: { verdict: Verdict; asOf: string
     .map(([hour, value]) => `L${x(hour).toFixed(1)},${y(value).toFixed(1)}`)
     .join("")}Z`;
   const ticks = Array.from({ length: Math.floor(top / step) + 1 }, (_, index) => index * step);
+  // A day name needs about 46 px; on a narrow chart every second or third day is named.
+  const labelEvery = Math.max(1, Math.ceil(46 / ((24 * (width - PAD.left - PAD.right)) / Math.max(1, hours - 1))));
   const days = start ? malaysiaMidnights(start, start + (hours - 1) * HOUR).map((at) => ({ at, hour: (at - start) / HOUR })) : [];
   const last = hours - 1;
   // The two end labels sit on their lines, pushed apart when the lines end close together.
@@ -86,12 +88,14 @@ export function VerdictChart({ verdict, asOf }: { verdict: Verdict; asOf: string
               </text>
             </g>
           ))}
-          {days.map((day) => (
+          {days.map((day, index) => (
             <g key={day.at}>
               <line x1={x(day.hour)} x2={x(day.hour)} y1={HEIGHT - PAD.bottom} y2={HEIGHT - PAD.bottom + 4} stroke="var(--hairline-strong)" />
-              <text x={x(day.hour) + 3} y={HEIGHT - 8} fontSize="10.5" fill="var(--ink-tertiary)">
-                {malaysiaDay(day.at)}
-              </text>
+              {index % labelEvery === 0 ? (
+                <text x={x(day.hour) + 3} y={HEIGHT - 8} fontSize="10.5" fill="var(--ink-tertiary)">
+                  {malaysiaDay(day.at)}
+                </text>
+              ) : null}
             </g>
           ))}
           <line x1={PAD.left} x2={width - PAD.right} y1={y(API_100_PM25)} y2={y(API_100_PM25)} stroke="var(--api-150)" strokeDasharray="4 4" strokeWidth={1.25} />
@@ -127,7 +131,6 @@ export function VerdictChart({ verdict, asOf }: { verdict: Verdict; asOf: string
           </div>
         ) : null}
       </div>
-      <p className="mt-1 text-caption text-ink-tertiary">The engine&apos;s central case, averaged over the wind members, hourly from the data&apos;s hour. The dashed line is where the index reaches 100 (50.4 ug/m3).</p>
     </figure>
   );
 }

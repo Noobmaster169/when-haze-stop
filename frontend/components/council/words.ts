@@ -79,13 +79,6 @@ export function initials(title: string): string {
   return title.slice(0, 2).toUpperCase();
 }
 
-/** "41.3%" for a share of the ceiling; finer below one percent, where the accepted package often lands. */
-export function percent(share: number): string {
-  const value = 100 * share;
-  if (value !== 0 && Math.abs(value) < 1) return `${value.toFixed(2)}%`;
-  return `${value.toFixed(1)}%`;
-}
-
 /** "A, B and C" for up to three; past that "the council" for most of the table, or a count. */
 export function listNames(names: string[], tableSize: number): string {
   if (names.length === 0) return "the table";
@@ -113,4 +106,23 @@ export const STAGE_ORDER = Object.keys(STAGE_LABEL) as StageId[];
 export function clockText(seconds: number): string {
   const whole = Math.max(0, Math.floor(seconds));
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+}
+
+/** "14%" for a share, rounded to whole percent except below one, where the tenth matters. */
+export function share(fraction: number): string {
+  const value = 100 * fraction;
+  return value > 0 && value < 1 ? `${value.toFixed(1)}%` : `${Math.round(value)}%`;
+}
+
+/**
+ * A plan's score in the words used everywhere it is shown: how much cleaner
+ * KL's air gets, what share of the clearable smoke that is, and the share if
+ * the wind turns against it (the worst wind member).
+ */
+export function scoreWords(score: { meanRemoved: number; expected: number; worstWind: number }): { cleaner: string; clears: string; ifWindTurns: string } {
+  return {
+    cleaner: `KL's air about ${score.meanRemoved.toFixed(1)} ug/m3 cleaner on average`,
+    clears: `Clears ${share(score.expected)} of the smoke any plan could clear`,
+    ifWindTurns: `${share(score.worstWind)} if the wind turns against it`,
+  };
 }

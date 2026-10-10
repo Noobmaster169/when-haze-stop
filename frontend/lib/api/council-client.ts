@@ -50,3 +50,10 @@ export async function startCouncilRun(budgetRm: number): Promise<CouncilOutcome<
   const run = await parseAs(CouncilRunSummary, response, "POST /council/runs");
   return { ok: true, value: { run, attached: false } };
 }
+
+/** Deletes a finished or failed run and its events. A run in session is refused with 409. */
+export async function deleteCouncilRun(id: number): Promise<CouncilOutcome<null>> {
+  const response = await request(`/council/runs/${id}`, { method: "DELETE" });
+  if (response.status === 204) return { ok: true, value: null };
+  return { ok: false, status: response.status, message: await refusalMessage(response) };
+}

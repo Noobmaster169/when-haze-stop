@@ -103,18 +103,23 @@ export function VerdictMap({ verdict }: { verdict: Verdict }) {
           <MapPanel bounds={bounds} basemap={basemap} strikes={strikes} image={images?.before ?? null} ground="field" label="Without the plan" />
           <MapPanel bounds={bounds} basemap={basemap} strikes={strikes} image={images?.after ?? null} ground="field" label="With the plan" />
         </div>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <ApiLegend />
-          <span className="text-caption text-ink-tertiary">24-hour PM2.5 as the index, {malaysiaWhen(maps.at)} MYT, the hour the plan helps most.</span>
-        </div>
-        <div className="mt-6 grid gap-4 md:grid-cols-2 md:items-center">
-          <MapPanel bounds={bounds} basemap={basemap} strikes={strikes} image={images?.removed || null} ground="overlay" label="Smoke removed" />
-          <div>
-            <p className="max-w-[44ch] text-small text-ink-secondary">The two maps above differ by a few ug/m3 in a field of hundreds, so they look alike. This one draws only the difference, without the plan minus with it, on its own scale from nothing to the most the plan removes anywhere at that hour. A difference of 1 ug/m3 is within the maps&apos; rounding and is left clear.</p>
-            {images ? <div className="mt-3">{images.max > 0 ? <RemovedLegend max={images.max} /> : <p className="text-caption text-ink-tertiary">At this hour the plan removes less than 1 ug/m3 anywhere.</p>}</div> : null}
+        <div className="mt-4 grid gap-4 md:grid-cols-2 md:items-center">
+          <MapPanel bounds={bounds} basemap={basemap} strikes={strikes} image={images?.removed || null} ground="overlay" label="Smoke the plan removes" />
+          <div className="space-y-4">
+            <div>
+              <div className="mb-1 text-caption text-ink-tertiary">Above, 24-hour PM2.5 as the air index</div>
+              <ApiLegend />
+            </div>
+            {images ? (
+              <div>
+                <div className="mb-1 text-caption text-ink-tertiary">Left, without minus with</div>
+                {images.max > 0 ? <RemovedLegend max={images.max} /> : <p className="text-caption text-ink-tertiary">Under 1 ug/m3 anywhere</p>}
+              </div>
+            ) : null}
+            <div className="text-caption text-ink-tertiary">{malaysiaWhen(maps.at)}, when the plan helps most</div>
           </div>
         </div>
-        <p className="mt-3 text-caption text-ink-tertiary">{maps.note}</p>
+        <p className="mt-2 text-caption text-ink-tertiary">{maps.note}</p>
       </div>
     );
   }
@@ -127,7 +132,7 @@ export function VerdictMap({ verdict }: { verdict: Verdict }) {
       <div className="max-w-[640px]">
         <MapPanel bounds={fitBounds(points, 1.6)} basemap={basemap} strikes={strikes} image={null} ground="plain" label="KL and the complexes the plan strikes" />
       </div>
-      <p className="mt-1.5 text-caption text-ink-tertiary">Numbered in the order the plan attacks them. The engine&apos;s before and after field is not in this run&apos;s verdict.</p>
+      <p className="mt-1.5 text-caption text-ink-tertiary">Numbered in the order the plan attacks them.</p>
     </div>
   );
 }

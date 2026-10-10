@@ -1,6 +1,6 @@
 import type { StrikeLine } from "@/lib/api/council-schemas";
 
-import { percent } from "./words";
+import { share } from "./words";
 
 /** One row per complex the plan attacks, in the order it attacks them. */
 
@@ -16,7 +16,7 @@ export function VerdictStrikes({ lines }: { lines: StrikeLine[] }) {
             <div className="min-w-0 grow">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="font-medium text-ink">{line.place}</span>
-                <span className="font-medium text-ink tabular-nums">{percent(line.share)}</span>
+                <span className="font-medium text-ink tabular-nums">{share(line.share)}</span>
               </div>
               <div className="text-caption text-ink-tertiary">
                 {line.province}, {line.country}, {Math.round(100 * line.peatShare)}% peat land
@@ -35,7 +35,7 @@ export function VerdictStrikes({ lines }: { lines: StrikeLine[] }) {
             <th className="py-2 pr-3 text-right font-normal">Peat land</th>
             <th className="py-2 pr-3 font-normal">Sent</th>
             <th className="py-2 pr-3 font-normal">Days</th>
-            <th className="py-2 text-right font-normal">Smoke removed</th>
+            <th className="py-2 text-right font-normal" title="Share of the smoke any plan could clear from KL's air that the work here clears">Clears</th>
           </tr>
         </thead>
         <tbody>
@@ -55,12 +55,11 @@ export function VerdictStrikes({ lines }: { lines: StrikeLine[] }) {
               <td className="py-2.5 pr-3 whitespace-nowrap text-ink-secondary tabular-nums">
                 {line.fromDay === line.toDay ? `Day ${line.fromDay}` : `Day ${line.fromDay} to ${line.toDay}`}
               </td>
-              <td className="py-2.5 text-right font-medium text-ink tabular-nums">{percent(line.share)}</td>
+              <td className="py-2.5 text-right font-medium text-ink tabular-nums">{share(line.share)}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      <p className="mt-2 text-caption text-ink-tertiary">Smoke removed: how much of the smoke any plan could clear from KL&apos;s air comes from the work at this place. Peat land burns underground and is the hardest to put out. Day 1 is the first day the team can work.</p>
     </div>
   );
 }
