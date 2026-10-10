@@ -1,7 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { closePool, getPool } from "../../src/db";
-import { AHEAD_HOURS, HINDCAST_MODEL, hindcastDay } from "../../src/jobs/hindcast";
+import { AHEAD_HOURS, formatHindcast, HINDCAST_MODEL, hindcastDay, runHindcast } from "../../src/jobs/hindcast";
+import { smokeHindcasts } from "../../src/repositories";
+import { TerminalError } from "../../src/lib/errors";
 import type { Instrument } from "../../src/services/instruments";
 import { recordedCycle } from "../fixtures/cycle";
 
@@ -54,5 +56,55 @@ describe("the smoke hindcast of one day", () => {
 
   it("names the horizon it stores", () => {
     expect(AHEAD_HOURS).toBe(48);
+  });
+});
+
+describe("the hindcast over a span of days", () => {
+  beforeAll(async () => {
+    await recordedCycle();
+  }, 120_000);
+
+  it("labels a day before the stored wind begins as no-wind", async () => {
+    expect(await hindcastDay(getPool(), new Date("2025-01-15T00:00:00Z"), [DOWNWIND])).toBe("no-wind");
+  });
+
+  it("stores one day, then skips it on a rerun without a second row", async () => {
+    const pool = getPool();
+    const options = { from: "2026-10-10", to: "2026-10-10", instruments: [DOWNWIND, UPWIND] };
+    const first = await runHindcast(pool, options);
+    const before = (await smokeHindcasts.storedDays(pool, HINDCAST_MODEL)).has(AS_OF.toISOString());
+    const again = await runHindcast(pool, options);
+    expect(before).toBe(true);
+    // The first run may itself find the day stored by an earlier run of this file; either way the rerun stores nothing.
+    expect(first.stored + first.skipped).toBe(1);
+    expect(again).toMatchObject({ days: 1, stored: 0, rows: 0, skipped: 1, short: 0 });
+  });
+
+  it("does not skip a day stored under another model", async () => {
+    const pool = getPool();
+    await smokeHindcasts.insertMany(pool, [{ asOf: new Date("2026-10-09T00:00:00Z"), instrumentId: DOWNWIND.id, smokeNow: 0, smoke24h: 0, smoke48h: 0, model: "other-model" }]);
+    const summary = await runHindcast(pool, { from: "2026-10-09", to: "2026-10-09", instruments: [DOWNWIND] });
+    expect(summary.stored + summary.skipped).toBe(1);
+    expect((await smokeHindcasts.storedDays(pool, HINDCAST_MODEL)).has("2026-10-09T00:00:00.000Z")).toBe(true);
+  });
+
+  it("skips a day the stored wind does not reach", async () => {
+    const summary = await runHindcast(getPool(), { from: "2025-01-15", to: "2025-01-15", instruments: [DOWNWIND] });
+    expect(summary).toMatchObject({ days: 1, stored: 0, skipped: 0, short: 1 });
+  });
+
+  it("skips a day whose wind stops before two days on", async () => {
+    // The recorded cycle's wind runs 200 hours from 6 October, to the 14th at 07:00: the 13th has it, but not 48 hours past it.
+    const summary = await runHindcast(getPool(), { from: "2026-10-13", to: "2026-10-13", instruments: [DOWNWIND] });
+    expect(summary).toMatchObject({ days: 1, stored: 0, short: 1 });
+  });
+
+  it("refuses a span that runs backwards or a day that is not a date", async () => {
+    await expect(runHindcast(getPool(), { from: "2026-10-11", to: "2026-10-10" })).rejects.toBeInstanceOf(TerminalError);
+    await expect(runHindcast(getPool(), { from: "11/10/2026", to: "2026-10-12" })).rejects.toBeInstanceOf(TerminalError);
+  });
+
+  it("prints the summary on one line", () => {
+    expect(formatHindcast({ days: 3, stored: 1, rows: 180, skipped: 1, short: 1, ms: 12_345 })).toBe("hindcast: 3 days, 1 stored (180 rows), 1 already stored, 1 without enough wind, 12 s");
   });
 });

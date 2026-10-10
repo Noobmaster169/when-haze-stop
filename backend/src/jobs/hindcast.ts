@@ -2,13 +2,15 @@ import type { Pool } from "pg";
 
 import { ensembleMean } from "../haze/ensemble";
 import { emissionsFor } from "../haze/fires";
-import { cellsWithin, hoursBetween, WEATHER_POINTS } from "../haze/grid";
+import { addHours, cellsWithin, hoursBetween, WEATHER_POINTS } from "../haze/grid";
 import { MODEL_VERSION } from "../haze/run";
 import { REACH_KM, smokeFrom } from "../haze/smoke";
 import type { Weather } from "../haze/transport";
+import { TerminalError } from "../lib/errors";
 import { childLogger } from "../lib/logger";
+import { smokeHindcasts } from "../repositories";
 import type { SmokeHindcast } from "../repositories/smoke-hindcasts.repo";
-import type { Instrument } from "../services/instruments";
+import { type Instrument, listInstruments } from "../services/instruments";
 import { loadRunInput } from "./forecast";
 
 /**
@@ -41,7 +43,8 @@ function clipped(weather: Weather, hours: number): Weather {
 
 export async function hindcastDay(pool: Pool, asOf: Date, instruments: Instrument[]): Promise<{ rows: SmokeHindcast[]; outside: number } | DaySkip> {
   const input = await loadRunInput(pool, asOf);
-  if (!input) return "no-wind";
+  // A run that starts after the issue time has no wind behind the day at all, not a short one.
+  if (!input || input.start > asOf) return "no-wind";
   const now = hoursBetween(input.start, asOf);
   if (now < SPIN_UP_HOURS) return "short-spin-up";
   const hours = now + AHEAD_HOURS + 1;
@@ -68,4 +71,63 @@ export async function hindcastDay(pool: Pool, asOf: Date, instruments: Instrumen
   }
   if (outside > 0) log.debug({ asOf: asOf.toISOString(), outside }, "instruments outside the region got no smoke");
   return { rows, outside };
+}
+
+export interface HindcastOptions {
+  /** First and last UTC day, inclusive, as YYYY-MM-DD. */
+  from: string;
+  to: string;
+  /** For tests. A run without it lists the instruments from the database. */
+  instruments?: Instrument[];
+}
+
+export interface HindcastSummary {
+  days: number;
+  stored: number;
+  rows: number;
+  skipped: number;
+  short: number;
+  ms: number;
+}
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+function issueTime(day: string, name: string): Date {
+  if (!DAY.test(day) || Number.isNaN(Date.parse(`${day}T00:00:00Z`))) throw new TerminalError(`${name} must be a UTC day as YYYY-MM-DD, not "${day}"`);
+  return new Date(`${day}T00:00:00Z`);
+}
+
+export async function runHindcast(pool: Pool, options: HindcastOptions): Promise<HindcastSummary> {
+  const from = issueTime(options.from, "from");
+  const to = issueTime(options.to, "to");
+  if (from > to) throw new TerminalError(`from (${options.from}) is after to (${options.to})`);
+
+  const started = Date.now();
+  const instruments = options.instruments ?? (await listInstruments(pool));
+  const done = await smokeHindcasts.storedDays(pool, HINDCAST_MODEL);
+  const summary: HindcastSummary = { days: 0, stored: 0, rows: 0, skipped: 0, short: 0, ms: 0 };
+  for (let asOf = from; asOf <= to; asOf = addHours(asOf, 24)) {
+    summary.days += 1;
+    if (done.has(asOf.toISOString())) {
+      summary.skipped += 1;
+      continue;
+    }
+    const dayStarted = Date.now();
+    const result = await hindcastDay(pool, asOf, instruments);
+    if (typeof result === "string") {
+      summary.short += 1;
+      log.info({ asOf: asOf.toISOString(), why: result }, "day skipped");
+      continue;
+    }
+    await smokeHindcasts.insertMany(pool, result.rows);
+    summary.stored += 1;
+    summary.rows += result.rows.length;
+    log.info({ asOf: asOf.toISOString(), rows: result.rows.length, outside: result.outside, ms: Date.now() - dayStarted }, "day stored");
+  }
+  summary.ms = Date.now() - started;
+  return summary;
+}
+
+export function formatHindcast(summary: HindcastSummary): string {
+  return `hindcast: ${summary.days} days, ${summary.stored} stored (${summary.rows} rows), ${summary.skipped} already stored, ${summary.short} without enough wind, ${Math.round(summary.ms / 1000)} s`;
 }
