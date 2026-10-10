@@ -38,7 +38,6 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
   // Until the timeline is touched it sits on the newest readings, and moves with them when a new run lands.
   const at = chosenAt ?? data?.asOf ?? 0;
   const station = data?.stations.find((item) => item.id === selected?.id) ?? null;
-  const panelOpen = station !== null || (probe !== null && data !== null);
 
   const asOf = data?.asOf;
   const seek = useCallback((moment: number) => setChosenAt(moment === asOf ? null : moment), [asOf]);
@@ -66,6 +65,7 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
 
   const pick = useCallback(
     (picked: Pick) => {
+      handle.current?.reveal(picked.lon, picked.lat);
       if (picked.station) {
         setSelected({ id: picked.station.id, via: null });
         setProbe(null);
@@ -117,7 +117,7 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
       <div className="flex min-w-0 shrink-0 grow flex-col lg:min-h-0 lg:shrink">
         <div className="@container relative h-[54dvh] min-h-[300px] shrink-0 lg:h-auto lg:shrink lg:grow">
           <MapCanvas handle={handle} data={data} basemap={basemap} at={at} layers={layers} selectedId={station?.id ?? null} pin={probe} preview={preview && (preview.lon !== probe?.lon || preview.lat !== probe?.lat) ? preview : null} onPick={pick} onPaint={followTip} />
-          <div className="absolute left-3 top-3 z-20">
+          <div className="absolute left-3 top-3 z-30">
             <PlaceSearch onChoose={choosePlace} onPreview={setPreview} />
           </div>
           <div className="absolute right-3 top-3">
@@ -126,11 +126,9 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
           <div className="absolute bottom-3 left-3">
             <LayerToggles layers={layers} onChange={setLayers} />
           </div>
-          {!panelOpen ? (
-            <div className="absolute bottom-3 right-3 hidden @[640px]:block">
-              <Legend />
-            </div>
-          ) : null}
+          <div className="absolute bottom-3 right-3 hidden @[640px]:block">
+            <Legend />
+          </div>
           {probe && data ? <ProbeTip anchor={tip} api={apiAt(data, at, probe.lon, probe.lat)} at={at} /> : null}
           {!data ? <p className="absolute inset-x-0 top-1/2 text-center text-small text-ink-tertiary">Loading the map</p> : null}
           {station ? <StationPanel key={station.id} station={station} at={at} via={selected?.via ?? null} onClose={() => setSelected(null)} /> : null}

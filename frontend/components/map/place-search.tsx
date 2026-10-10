@@ -38,7 +38,8 @@ export function PlaceSearch({ onChoose, onPreview }: { onChoose(place: Place): v
 
   return (
     <div className="relative w-[min(340px,calc(100vw-5.5rem))]">
-      <label className="flex h-10 items-center gap-2 rounded-lg border border-hairline bg-canvas px-3 shadow-overlay focus-within:border-accent-line">
+      {/* The box shows focus as a whole; the input's own ring would draw a second box inside it. */}
+      <label className="flex h-10 items-center gap-2 rounded-lg border border-hairline bg-canvas px-3 shadow-overlay focus-within:border-accent focus-within:ring-2 focus-within:ring-accent-tint">
         <Icon name="search" size={15} className="shrink-0 text-ink-tertiary" />
         <input
           role="combobox"
@@ -64,7 +65,7 @@ export function PlaceSearch({ onChoose, onPreview }: { onChoose(place: Place): v
           }}
           placeholder="Search a town or district"
           aria-label="Search a place"
-          className="min-w-0 grow bg-transparent text-strong text-ink outline-none placeholder:text-ink-faint focus-visible:shadow-none"
+          className="min-w-0 grow bg-transparent text-strong text-ink outline-none placeholder:text-ink-faint focus-visible:shadow-none!"
         />
         {state === "searching" && showing ? (
           <span className="text-ink-tertiary">

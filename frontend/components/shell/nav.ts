@@ -10,6 +10,7 @@ export interface Destination {
 
 export const DESTINATIONS: Destination[] = [
   { key: "map", label: "Map", href: "/map", icon: "map" },
+  { key: "city", label: "KL in 3D", href: "/city", icon: "city" },
   { key: "alerts", label: "Alerts", href: "/alerts", icon: "bell" },
   { key: "accuracy", label: "Track record", href: "/accuracy", icon: "chart" },
   { key: "sources", label: "Sources", href: "/sources", icon: "database" },

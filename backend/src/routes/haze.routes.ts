@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { Accuracy, GuidelineList, PlaceList } from "../contracts";
 import { GUIDELINES } from "../haze/guidelines";
 import { scores } from "../repositories";
+import { cityAir } from "../services/city";
 import { hazeMap } from "../services/map";
 import { stationOutlook } from "../services/outlook";
 import { findPlaces } from "../services/places";
@@ -19,6 +20,7 @@ export interface HazeRouteDeps {
 
 const StationId = z.string().regex(/^[A-Za-z0-9]{2,40}$/);
 const PlaceQuery = z.string().trim().min(2).max(80);
+const CityKey = z.string().regex(/^[a-z]{2,20}$/);
 
 export function hazeRouter(deps: HazeRouteDeps): Router {
   const router = Router();
@@ -39,6 +41,16 @@ export function hazeRouter(deps: HazeRouteDeps): Router {
       return;
     }
     res.json(outlook);
+  });
+
+  router.get("/cities/:key", async (req, res) => {
+    const key = CityKey.safeParse(req.params.key);
+    const air = key.success ? await cityAir(deps.pool, key.data) : null;
+    if (!air) {
+      res.status(404).json({ error: "no such city" });
+      return;
+    }
+    res.json(air);
   });
 
   router.get("/accuracy", async (_req, res) => {

@@ -62,6 +62,20 @@
   --map-fire: #d92d20;
   --map-fire-core: #fff1d6;
 
+  /* the 3D city: a clear sky and the haze it greys toward, and the materials of the streets under it */
+  --city-zenith: #4f86c6;
+  --city-horizon: #cfe0f1;
+  --city-haze: #cfc6ad;
+  --city-night: #0e1522;
+  --city-glow: #e2a564;
+  --city-ground: #d6d3cb;
+  --city-building: #e9e6df;
+  --city-glass: #c9d3dc;
+  --city-park: #a7bf8c;
+  --city-water: #86a9c6;
+  --city-road: #bdb9b0;
+  --city-tower: #eeece6;
+
   /* the index ramp, at API 0, 50, 100, 150, 200, 300 and 400. The legend, the field and the stations all read these. */
   --api-0: #2f9e54;
   --api-50: #d6cf3a;

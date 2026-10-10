@@ -6,11 +6,12 @@ import type { Station } from "@/lib/api/haze-schemas";
 
 import type { Basemap } from "./basemap";
 import { drawChart, drawMarks, type Scene } from "./draw";
-import { fly } from "./flight";
-import { homeView, type Size, toLat, toLon, toX, toY, viewOn, zoomAt } from "./geo";
+import { flyTo, reveal } from "./flight";
+import { homeView, type Size, toLat, toLon, toX, toY, zoomAt } from "./geo";
 import { createHeat, type Heat } from "./heat";
 import { drawLabels } from "./labels";
 import type { MapData } from "./map-data";
+import type { Layers, MapHandle, Pick } from "./map-handle";
 import { readTheme, type MapTheme } from "./theme";
 import { type GestureTarget, useGestures } from "./use-gestures";
 import { createWind, type WindLayer } from "./wind-particles";
@@ -24,25 +25,7 @@ import { createWind, type WindLayer } from "./wind-particles";
  * directly; React is told nothing about a drag.
  */
 
-export interface Layers {
-  haze: boolean;
-  stations: boolean;
-  fires: boolean;
-  wind: boolean;
-}
-
-export interface MapHandle {
-  zoom(factor: number): void;
-  flyTo(lon: number, lat: number): void;
-  /** Where a point is on the canvas now, for anything laid over the map. */
-  locate(lon: number, lat: number): { x: number; y: number } | null;
-}
-
-export interface Pick {
-  lon: number;
-  lat: number;
-  station: Station | null;
-}
+export type { Layers, MapHandle, Pick } from "./map-handle";
 
 interface Props {
   handle: RefObject<MapHandle | null>;
@@ -119,12 +102,13 @@ export function MapCanvas({ handle, data, basemap, at, layers, selectedId, pin, 
     },
     flyTo(lon, lat) {
       cancelFlight.current();
-      const { size, view } = target.current;
-      const get = () => target.current.view;
-      const set = (next: typeof view) => {
-        target.current.view = next;
-      };
-      cancelFlight.current = fly(get, set, size, viewOn(size, lon, lat, view), moved);
+      cancelFlight.current = flyTo(target.current, lon, lat, moved);
+    },
+    reveal(lon, lat) {
+      const cancel = reveal(target.current, lon, lat, moved);
+      if (!cancel) return;
+      cancelFlight.current();
+      cancelFlight.current = cancel;
     },
     locate(lon, lat) {
       const { view, size } = target.current;

@@ -140,3 +140,27 @@ export type Guideline = z.infer<typeof Guideline>;
 
 export const GuidelineList = z.object({ guidelines: z.array(Guideline) });
 export type GuidelineList = z.infer<typeof GuidelineList>;
+
+/** One city's air hour by hour, blended from the stations around it, with how far one could see. */
+export const CityHour = z.object({
+  at: z.string(),
+  observed: z.boolean(),
+  api: z.number().int(),
+  pm25: z.number(),
+  /** An estimate from optics, the most one could see: observed haze visibility has run shorter. */
+  visibilityKm: z.number(),
+  aerosolDepth: z.number(),
+});
+export type CityHour = z.infer<typeof CityHour>;
+
+export const CityAir = z.object({
+  city: z.object({ key: z.string(), name: z.string(), lat: z.number(), lon: z.number() }),
+  stations: z.array(z.object({ id: z.string(), name: z.string(), km: z.number(), share: z.number() })),
+  /** The newest reading's hour; null before any. */
+  asOf: z.string().nullable(),
+  /** The assumptions behind visibilityKm, for the page to state. */
+  humidity: z.number(),
+  massExtinction: z.number(),
+  hours: z.array(CityHour),
+});
+export type CityAir = z.infer<typeof CityAir>;

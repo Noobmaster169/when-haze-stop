@@ -82,6 +82,7 @@ Backend folders added for this product (all under `backend/src/`):
 | Wind at 925 and 850 hPa, rain | Open-Meteo forecast API | `https://api.open-meteo.com/v1/forecast` | Every hour | `sources/weather.ts` |
 | Place names | Open-Meteo geocoder | `https://geocoding-api.open-meteo.com/v1/search` | On search | `sources/geocoder.ts` |
 | Coastlines, borders, towns | Natural Earth (public domain) | Packed once into `frontend/public/basemap.json` | Static | `frontend/components/map/basemap.ts` |
+| Buildings, parks, water, roads of central KL | OpenStreetMap (ODbL), via the Overpass API | Packed once by `frontend/scripts/bake-city.mjs` into `frontend/public/city/kl.json` | Static, re-bake by hand | `frontend/components/city/city-data.ts` |
 
 None of these needs a key.
 
@@ -294,6 +295,59 @@ Between two frames the map blends linearly, so the timeline moves smoothly altho
 hours apart. Every colour is a token in `frontend/app/globals.css` (`--map-*`, `--api-*`); the
 canvas reads them through `theme.ts`.
 
+### 4.7 Kuala Lumpur in 3D
+
+`/city`, "KL in 3D" in the island. A three.js model of central Kuala Lumpur, about 4.9 by 3.9 km
+around the Petronas Twin Towers, seen through the haze of any hour in the stored week or the
+forecast. The timeline is the map's. Three places to stand: the skyline, which circles the towers
+slowly until touched; street level in Bukit Bintang; and Menara KL's deck at 300 m. "Light it at
+midday" keeps the sun at 13:00 local so a night hour's haze can still be seen.
+
+The city. `bake-city.mjs` fetches OSM once and packs footprints as decimetres on a flat plane
+around the towers. Where OSM models a building as `building:part`s (the towers, Merdeka 118) the
+parts are drawn instead of the outline. About 79% of buildings have no height in OSM and get a
+guess by kind (houses 7 m, sheds 4 m, others 10 m); the page says so. Menara KL is only a point
+in OSM, so its shape is drawn by hand from its published height. Tunnels are left out. Merdeka 118
+tops out at 635 m, not 679 m, because OSM tags its spire that way. Run
+`node frontend/scripts/bake-city.mjs` to re-bake; it makes one Overpass request.
+
+The air. `GET /haze/cities/kl` (`services/city.ts`) takes the stations within 10 km (Cheras and
+Batu Muda), blends them by inverse squared distance in PM2.5, not in index points, and for each
+hour gives the API, the PM2.5, an estimated visibility and the smoke's optical depth. The pure
+rules are in `haze/city-air.ts` and `haze/visibility.ts`:
+
+1. API to PM2.5 with DOE's breakpoints (`haze/api-index.ts`).
+2. Extinction = PM2.5 x 6.4 m2/g + 0.0132 per km. The 6.4 is aged smoke's dry scattering of
+   4.2 m2/g (Reid et al. 2005) grown by humidity, f = (1 - RH)^-0.31 fitted to Indonesian smoke's
+   f(80%) = 1.65 (Gras et al. 1999), at an assumed 70% RH, plus 0.3 m2/g absorption. The 0.0132 is
+   clean air.
+3. Visibility = 3.912 / extinction (Koschmieder, 2% contrast).
+4. Optical depth = smoke extinction x 1.25 km of mixed layer (Chew et al. 2013).
+
+This is an upper bound. In 2019, reported visibilities were two to five times shorter than it gives
+at the same API, probably because the API is a 24 hour mean and humidity adds mist. The page says
+so beside the number.
+
+The scene (`frontend/components/city/`). The fog is exp(-extinction x distance), so a building at
+the visibility distance keeps 2% of its contrast; three's own exponential fog squares the
+distance, so `haze-fog.ts` swaps the formula. The sun's position is computed for the hour
+(`sun.ts`). Its beam is dimmed per colour by Rayleigh and the smoke along its slant path, which
+turns it orange (`haze-look.ts`; the smoke's wavelength exponent of 1 is assumed). What the beam
+loses comes back as diffuse sky light, since peat smoke scatters 97% of what it stops. At night
+the smoke glows with the city's light, more the thicker it is. Drifting sheets of smoke
+(`haze-motes.ts`) follow the hour's optical depth; their motion is for the eye and is not the wind.
+
+| File | Does |
+| --- | --- |
+| `city-view.tsx` | The page: the timeline moment, the view, the card. |
+| `city-scene.ts` | Renderer, lights, sky, fog and the frame loop. The page calls `setLook` and `setView`. |
+| `city-geometry.ts`, `mesh-builder.ts` | The baked city as two merged geometries: solids and surfaces. |
+| `camera-rig.ts`, `city-views.ts` | Orbit and look-around, and the three places to stand. |
+| `haze-look.ts`, `sun.ts`, `air-at.ts` | Pure: what an hour looks like, where the sun is, the air between hours. Tested in `city.test.ts`. |
+| `haze-fog.ts`, `haze-motes.ts` | The fog formula, the sky dome, the drifting smoke. |
+
+Colours are `--city-*` tokens in `globals.css`, read by `city-theme.ts`.
+
 ## 5. Feature 2: alerts
 
 ### 5.1 What the person sees
@@ -424,7 +478,8 @@ not meant to serve other users.
 Backend, on `127.0.0.1:8091`. The browser never calls it; it calls the Next routes under
 `/api/...`, which forward; the Track record and Sources pages read it from the Next server. Contracts
 are zod schemas in `backend/src/contracts.haze.ts`, `contracts.alerts.ts` and `contracts.sources.ts`,
-mirrored by hand in `frontend/lib/api/haze-schemas.ts`, `alert-schemas.ts` and `source-schemas.ts`.
+mirrored by hand in `frontend/lib/api/haze-schemas.ts`, `alert-schemas.ts` and `source-schemas.ts`
+(the `CityAir` part of `contracts.haze.ts` in `city-schemas.ts`).
 Change both together.
 
 | Method | Path | Returns |
@@ -434,6 +489,7 @@ Change both together.
 | GET | `/haze/accuracy` | `Accuracy`: error by lead for model and persistence |
 | GET | `/haze/guidelines` | `GuidelineList` |
 | GET | `/haze/places?q=` | `PlaceList`: stations by name first, then geocoded places, each with its nearest station |
+| GET | `/haze/cities/:key` | `CityAir`: a city (only `kl`) blended from its stations, hour by hour with API, PM2.5, estimated visibility and optical depth; 404 for an unknown city |
 | GET | `/sources` | `SourceReport`: each source from `sources/catalog.ts` with its newest good and failed fetch and the last 24 hours' tally, and the 60 newest fetches |
 | GET | `/alerts?session=&after=` | `AlertFeed`: newest first; with a session only followed stations |
 | GET | `/alerts/subscriptions?session=` | `SubscriptionList` |
@@ -530,6 +586,8 @@ Limits, in the order they matter:
 7. The "150 for three days" rule is shown as the chance of passing 150 on each day; the app does
    not yet count consecutive days.
 8. No auth, no rate limiting. Loopback only.
+9. The 3D visibility is an optics estimate at a fixed 70% humidity, and has run long against
+   reported haze visibility. Humidity from Open-Meteo and a METAR visibility source would fix both.
 
 Next, roughly in value order:
 
