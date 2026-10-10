@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Statement } from "@/lib/api/statement-schemas";
 
 import { dayPeak } from "./day-strip";
-import { areas, reports } from "./statement-row";
+import { areas, badge, reports } from "./statement-row";
 
 /** The closure of 9 October 2026 as the alerts page lists it, from five headlines that day. */
 const CLOSURE: Statement = {
@@ -38,6 +38,15 @@ describe("a statement row", () => {
   it("says who reported it and how many more did", () => {
     expect(reports(CLOSURE)).toBe("Harian Metro and 4 more");
     expect(reports({ ...CLOSURE, reports: 1 })).toBe("Harian Metro");
+  });
+});
+
+describe("an issuer's badge", () => {
+  it("uses a national body's initials, and a state body's own short name", () => {
+    expect(badge(CLOSURE)).toBe("KPM");
+    expect(badge({ ...CLOSURE, issuer: "state", issuerName: "Jabatan Agama Islam Selangor (JAIS)" })).toBe("JAIS");
+    expect(badge({ ...CLOSURE, issuer: "other", issuerName: "JAKIM" })).toBe("JAKIM");
+    expect(badge({ ...CLOSURE, issuer: "ruler", issuerName: "Johor Regent" })).toBe("Ruler");
   });
 });
 
