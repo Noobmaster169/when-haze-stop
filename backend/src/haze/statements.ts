@@ -93,11 +93,16 @@ function overlaps(a: StoredStatement, b: StoredStatement): boolean {
   return a.states.some((state) => b.states.includes(state)) || a.districts.some((district) => b.districts.map(flatten).includes(flatten(district)));
 }
 
-function statusOf(statement: StoredStatement, later: StoredStatement[], today: string): StatementStatus {
+function statusOf(statement: StoredStatement, later: StoredStatement[], all: StoredStatement[], today: string): StatementStatus {
   const { kind, action, issuer } = statement;
   if (kind === "rule") {
     const replaced = later.some((other) => other.kind === "rule" && other.issuer === issuer && other.action === action && (other.sustainedDays ?? 1) === (statement.sustainedDays ?? 1));
     if (replaced) return "replaced";
+  }
+  if (kind === "order" && !statement.effectiveFrom) {
+    // A report with no start date is the dated decision of that day, told less fully.
+    const dated = all.some((other) => other !== statement && other.kind === "order" && other.issuer === issuer && other.action === action && other.effectiveFrom !== null && covering(other, statement) && Math.abs(other.publishedAt.getTime() - statement.publishedAt.getTime()) <= 86_400_000);
+    if (dated) return "replaced";
   }
   if (kind === "order") {
     // "Schools reopen on Monday" ends the closure on Monday, not on the day it was said.
@@ -159,7 +164,7 @@ export function resolveStatements(stored: StoredStatement[], today: string): Sta
       url: link.url,
       outlet: link.outlet,
       reports: group.length,
-      status: statusOf(first, later, today),
+      status: statusOf(first, later, firsts, today),
     };
   });
   return resolved.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt) || b.id - a.id);

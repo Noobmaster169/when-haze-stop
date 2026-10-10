@@ -394,7 +394,7 @@ Fetched by the jobs process every cycle (`jobs/statements.ts`), from three chann
 | `news-statements` | Google News RSS, "jerebu" (ms) and "haze Malaysia" (en), 7 days | The headline only, and only one that announces something (`haze/statement-text.ts`) |
 
 - An item is read once, by URL, newest first, at most 20 per channel per cycle. Prompt
-  `agents/prompts/statement/v4.md` turns it into one flat object: issuer, kind (`rule`, `order`,
+  `agents/prompts/statement/v5.md` turns it into one flat object: issuer, kind (`rule`, `order`,
   `lift`, `advice`), action, states (the 16 station state names), districts, the line and days
   for a rule, start and end dates, an English summary and a verbatim quote. Every call is a row in
   `llm_calls`.
@@ -411,8 +411,11 @@ Fetched by the jobs process every cycle (`jobs/statements.ts`), from three chann
   - A later rule of the same issuer, action and length replaces an earlier one (180 replaced 200).
   - An order ends on its stated last day, on a later lift or reopening for its areas, or a week
     after it began when nothing more is said (closures run "until further notice").
-- An order covers a station (`haze/statement-areas.ts`) by its state, by a district of the station's name, or by a gazetteer
-  district within 40 km.
+- An order covers a station (`haze/statement-areas.ts`) by its state, by a district of the
+  station's name, or by a gazetteer district within 20 km. Of several orders covering a station,
+  an emergency comes first, then a national body's, then the most reported.
+- An order with no start date that a dated order of the same body and day covers is that
+  decision told less fully, and is marked replaced.
 - The thresholds alerts use stay hand-checked in `haze/guidelines.ts`. A fetched rule never
   changes who is alerted; when one differs, update the file by hand.
 

@@ -48,7 +48,8 @@ export function StatementRow({ statement }: { statement: Statement }) {
           <p className="mt-0.5 flex flex-wrap gap-x-3 text-caption text-ink-tertiary">
             <span>
               {areas(statement)}
-              {statement.effectiveUntil ? `, until ${dayName(statement.effectiveUntil)}` : ""}
+              {statement.effectiveFrom ? `, from ${dayName(statement.effectiveFrom)}` : ""}
+              {statement.effectiveUntil ? ` until ${dayName(statement.effectiveUntil)}` : ""}
             </span>
             <a href={statement.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-accent">
               {reports(statement)}

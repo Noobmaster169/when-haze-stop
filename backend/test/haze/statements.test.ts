@@ -158,3 +158,30 @@ describe("two state bodies on one day", () => {
     expect(resolveStatements([jais, jheains], "2026-10-10").map((item) => item.states)).toEqual([["Negeri Sembilan"], ["Selangor"]]);
   });
 });
+
+describe("the second live run", () => {
+  // From the news search of 10 October 2026, as the reader recorded them.
+  const dated = statement(40, { states: ["Negeri Sembilan", "Melaka", "Selangor", "WP Kuala Lumpur", "WP Putrajaya"], districts: ["Rompin"], effectiveFrom: "2026-10-09", publishedAt: new Date("2026-10-08T14:49:00Z") });
+  // Published at 22:32 on the 8th, so it is not the same day as the closure it reports.
+  const undated = statement(41, { states: ["Selangor", "Melaka", "WP Kuala Lumpur", "WP Putrajaya"], publishedAt: new Date("2026-10-08T14:32:00Z") });
+  const jais = statement(42, { issuer: "state", issuerName: "JAIS", states: ["Selangor"], effectiveFrom: "2026-10-09", publishedAt: new Date("2026-10-08T16:37:00Z") });
+  const batuPahat = statement(43, { issuerName: "JPN Johor", districts: ["Batu Pahat"], effectiveFrom: "2026-10-07", publishedAt: new Date("2026-10-06T08:00:00Z") });
+
+  it("folds an undated report into the dated decision of that day", () => {
+    const resolved = resolveStatements([dated, undated], "2026-10-10");
+    expect(resolved.find((item) => item.id === 41)?.status).toBe("replaced");
+    expect(resolved.find((item) => item.id === 40)?.status).toBe("in-force");
+  });
+
+  it("puts the ministry's closure of every school before a state's closure of its religious schools", () => {
+    const klang = { name: "Klang", state: "Selangor", lat: 3.0, lon: 101.4 };
+    expect(ordersFor(resolveStatements([dated, jais], "2026-10-10"), klang, () => null).map((item) => item.id)).toEqual([40, 42]);
+  });
+
+  it("keeps a neighbouring district with its own station out of a district's closure", () => {
+    // Batu Pahat's gazetteer point and the Kluang station, about 36 km apart.
+    const centre = () => ({ lat: 1.85, lon: 102.93 });
+    expect(covers(batuPahat, { name: "Kluang", state: "Johor", lat: 2.03, lon: 103.32 }, centre)).toBe(false);
+    expect(covers(batuPahat, { name: "Batu Pahat", state: "Johor", lat: 1.86, lon: 102.94 }, centre)).toBe(true);
+  });
+});
