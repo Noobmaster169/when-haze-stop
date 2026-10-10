@@ -49,3 +49,16 @@ def test_help_lists_every_subcommand(monkeypatch, capsys):
     text = capsys.readouterr().out
     for name in ("features", "serve", "backtest", "train", "promote", "search", "retrain"):
         assert name in text
+
+
+def test_train_command_keeps_an_existing_scored_report(tmp_path, monkeypatch, parquet, capsys):
+    path, _ = parquet
+    monkeypatch.setenv("MODEL_ARTIFACTS", str(tmp_path / "artifacts"))
+    monkeypatch.setattr(commands, "reports_dir", lambda: tmp_path / "reports")
+    commands.train_command(_args(path))
+    (folder,) = (tmp_path / "artifacts").iterdir()
+    scores = tmp_path / "reports" / folder.name / "scores.json"
+    scores.write_text('{"backtest": {"promotion_score": 1.0}}')
+    commands.train_command(_args(path))
+    assert scores.read_text() == '{"backtest": {"promotion_score": 1.0}}'
+    assert "kept the existing scored report" in capsys.readouterr().out

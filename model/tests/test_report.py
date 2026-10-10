@@ -65,3 +65,10 @@ def test_write_report_renders_json_and_markdown(tmp_path):
     for needle in ("2026-10-10-abcd1234", "analysis", "persistence", "too few rows", "fires", "level", "doe"):
         assert needle in text
     assert "—" not in text
+
+
+def test_write_report_accepts_numpy_scalars(tmp_path):
+    payload = {"version": "v", "backtest": {"promotion_score": np.float64(np.nan), "rows": np.int64(3)}}
+    path = write_report(tmp_path, "v", payload)
+    saved = json.loads((path.parent / "scores.json").read_text())
+    assert saved["backtest"] == {"promotion_score": None, "rows": 3}

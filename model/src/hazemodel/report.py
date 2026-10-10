@@ -4,6 +4,8 @@ import json
 import math
 import pathlib
 
+import numpy as np
+
 REPORTS_PATH = pathlib.Path(__file__).resolve().parents[2] / "reports"
 
 
@@ -12,6 +14,8 @@ def reports_dir() -> pathlib.Path:
 
 
 def _clean(value):
+    if isinstance(value, np.generic):
+        value = value.item()
     if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
         return None
     if isinstance(value, dict):

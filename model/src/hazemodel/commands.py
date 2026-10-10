@@ -107,8 +107,12 @@ def train_command(args) -> None:
         payload = {**_header(artifact, info, frame, params, args.parquet), "backtest": {}}
     _attach_decisions(artifact, args.parquet)
     save_artifact(artifacts_dir(), artifact)
-    write_report(reports_dir(), artifact.version, payload)
-    print(artifact.version)
+    scored = reports_dir() / artifact.version / "scores.json"
+    if args.with_backtest or not scored.exists():
+        write_report(reports_dir(), artifact.version, payload)
+        print(f"{artifact.version}: report written")
+    else:
+        print(f"{artifact.version}: kept the existing scored report")
 
 
 def promote_command(args) -> None:

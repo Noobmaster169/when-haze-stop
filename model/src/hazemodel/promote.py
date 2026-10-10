@@ -19,8 +19,12 @@ def promote(artifacts: pathlib.Path, reports: pathlib.Path, version: str) -> dic
     candidate = _score(reports, version)
     if candidate is None:
         return {"promoted": False, "reason": "no promotion score", "version": version}
+    if not (artifacts / version / "meta.json").exists():
+        return {"promoted": False, "reason": "no artifact", "version": version}
     current = live_version(artifacts)
     live = _score(reports, current) if current else None
+    if current and live is None:
+        return {"promoted": False, "reason": "live version unscored", "version": version, "live_version": current}
     if live is not None and candidate > live:
         return {
             "promoted": False,
