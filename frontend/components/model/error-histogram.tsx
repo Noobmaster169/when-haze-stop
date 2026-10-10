@@ -35,7 +35,7 @@ export function ErrorHistogram({ bins, label }: { bins: readonly HistogramBin[];
       <KeyLegend
         items={[
           { label: "Model", colour: "var(--series-model)" },
-          { label: "No change", colour: "var(--series-same)" },
+          { label: "No change (tomorrow = today)", colour: "var(--series-same)" },
         ]}
       />
       <div className="mt-2 overflow-x-auto">

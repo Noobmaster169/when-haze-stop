@@ -1,6 +1,7 @@
 import { ChangeChapter } from "@/components/model/change-chapter";
 import { MODEL_CHAPTERS, MODEL_SCROLL_ID } from "@/components/model/chapters";
 import { CrossingBars } from "@/components/model/crossing-bars";
+import { DataChapter } from "@/components/model/data-chapter";
 import { ErrorChapter } from "@/components/model/error-chapter";
 import { FunctionChapter } from "@/components/model/function-chapter";
 import { LimitsChapter } from "@/components/model/limits-chapter";
@@ -11,7 +12,7 @@ import { Contents } from "@/components/simulation/contents";
 import { MODEL_PERFORMANCE } from "@/lib/model-performance";
 
 /**
- * The learned forecast, scored, as seven figures beside the Simulation page.
+ * The learned forecast, scored, as eight figures beside the Simulation page.
  * Every figure comes from the model's published report, bundled at build
  * time, so the page needs no backend and changes only when a new report is
  * committed.
@@ -34,6 +35,7 @@ export default function ModelPage() {
           </aside>
 
           <div className="min-w-0 max-w-[900px]">
+            <DataChapter data={data} />
             <VerdictChapter data={data} />
             <FunctionChapter />
             <ErrorChapter data={data} />

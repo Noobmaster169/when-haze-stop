@@ -15,7 +15,7 @@ export function SeriesLegend() {
       </span>
       <span className="flex items-center gap-1.5">
         <span className="inline-block w-5 border-t-2 border-dashed border-series-same" />
-        No change
+        No change (tomorrow = today)
       </span>
       <span className="flex items-center gap-1.5">
         <span className="inline-block w-5 border-t-2 border-dotted border-ink-tertiary" />

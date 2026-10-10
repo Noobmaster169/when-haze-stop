@@ -3,7 +3,7 @@ import { ModelChapter } from "./model-chapter";
 import { Formula, H3 } from "./prose";
 import { WorkedExample } from "./worked-example";
 
-/** Chapter 2: the function as a formula, its inputs by group, and one real row run through it. */
+/** What goes in: the function as a formula, its inputs by group, and one real row run through it. */
 
 const FUNCTION = `ŷq(i, t) = Fq(x) = Σ k=1..600 Tk(x)      q in {0.10, 0.50, 0.90}, one Fq per target day
 

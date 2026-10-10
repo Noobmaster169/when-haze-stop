@@ -26,7 +26,7 @@ const COLUMNS: { key: SortKey; label: string; title: string }[] = [
   {
     key: "hit150",
     label: "Caught 150",
-    title: "Share of real crossings of API 150 the model called, against no change",
+    title: "Share of real crossings of API 150 the model called, against no change (tomorrow = today)",
   },
   {
     key: "falseAlarm150",
@@ -41,7 +41,7 @@ const COLUMNS: { key: SortKey; label: string; title: string }[] = [
   {
     key: "mae",
     label: "Error",
-    title: "Mean absolute error in µg/m³, against no change",
+    title: "Mean absolute error in µg/m³, against no change (tomorrow = today)",
   },
 ];
 

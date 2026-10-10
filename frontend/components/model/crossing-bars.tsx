@@ -15,7 +15,7 @@ import { linear, niceAxis } from "./scale";
  */
 
 const WIDTH = 640;
-const LEFT = 132;
+const LEFT = 150;
 const RIGHT = 16;
 const TOP = 22;
 const ROW = 28;
@@ -30,10 +30,10 @@ const PARTS: { key: Part; label: string; colour: string }[] = [
   { key: "falseAlarm", label: "False alarm", colour: "var(--verdict-differ)" },
 ];
 
-const FORECASTS: { key: keyof ModelPerformance["cross150"]; label: string }[] = [
-  { key: "model", label: "Model" },
-  { key: "noChange", label: "No change" },
-  { key: "v2", label: "Hourly forecast" },
+const FORECASTS: { key: keyof ModelPerformance["cross150"]; label: string; note: string }[] = [
+  { key: "model", label: "Model", note: "learned, 600 trees" },
+  { key: "noChange", label: "No change", note: "tomorrow = today" },
+  { key: "v2", label: "Hourly forecast", note: "the app's old one" },
 ];
 
 function describe(tally: CrossTally, part: Part): string {
@@ -84,8 +84,11 @@ export function CrossingBars({ tallies }: { tallies: ModelPerformance["cross150"
             let start = 0;
             return (
               <g key={forecast.key}>
-                <text x={LEFT - 10} y={top + ROW / 2 + 4} textAnchor="end" fontSize="11.5" fill="var(--ink)">
+                <text x={LEFT - 10} y={top + ROW / 2 - 2} textAnchor="end" fontSize="11.5" fill="var(--ink)">
                   {forecast.label}
+                </text>
+                <text x={LEFT - 10} y={top + ROW / 2 + 11} textAnchor="end" fontSize="10" fill="var(--ink-tertiary)">
+                  {forecast.note}
                 </text>
                 {PARTS.map((part) => {
                   const from = start;
