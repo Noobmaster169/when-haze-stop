@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { FIRST_FIT } from "../../src/haze/calibrate";
 import { chanceAbove, firstHindcast } from "../../src/haze/chance";
-import { emissionsFor } from "../../src/haze/fires";
+import { emissionsFor, type FireCellDay } from "../../src/haze/fires";
 import { addHours, FIELD, FIELD_CELLS, hoursBetween } from "../../src/haze/grid";
 import { runModel, type RunStation } from "../../src/haze/run";
 import { spearman } from "../../src/haze/stats";
@@ -50,6 +50,18 @@ describe("the transport model", () => {
     // The cell at 3.6S 105.7E burned 2083.5, 3132.2 and 2694.3 MW on the three days.
     const cell = carried.find((fire) => fire.lat === -3.6 && fire.lon === 105.7);
     expect(cell?.frpMw).toBeCloseTo((2083.5 + 3132.2 + 2694.3) / 3, 1);
+  });
+
+  it("burns no fire from the day of the issue time or after, neither as seen nor carried forward", () => {
+    // Test vectors, not recorded fires: a cell at 5.0N 100.0E, far from every recorded one, on the
+    // UTC day of the issue time (not complete yet) and on the day after.
+    const leaks: FireCellDay[] = [
+      { day: "2026-10-10", lat10: 50, lon10: 1000, frpMw: 5000 },
+      { day: "2026-10-11", lat10: 50, lon10: 1000, frpMw: 5000 },
+    ];
+    const withLeaks = emissionsFor([...FIRE_CELLS, ...leaks], START, LAST_HOUR, 120);
+    expect(withLeaks.filter((fire) => fire.lat === 5 && fire.lon === 100)).toEqual([]);
+    expect(withLeaks).toEqual(emissions);
   });
 });
 

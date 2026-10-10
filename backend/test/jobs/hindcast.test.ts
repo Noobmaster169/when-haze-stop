@@ -19,12 +19,14 @@ const UPWIND: Instrument = { id: "test-upwind", kind: "airport", lat: -5, lon: 1
 const OUTSIDE: Instrument = { id: "test-outside", kind: "airport", lat: 20, lon: 130 };
 /** The day after the recorded fires of 7 to 9 October are all complete. */
 const AS_OF = new Date("2026-10-10T00:00:00Z");
+/** Past the end of the recorded wind, so no recorded day waits for its analysis unless a test says so. */
+const LATER = new Date("2026-10-20T00:00:00Z");
 
 describe("the smoke hindcast of one day", () => {
   beforeAll(async () => {
-    // The run starts at the earliest stored wind, the cycle's 6 October: four days
-    // behind the issue time, past the spin-up. No earlier wind is laid down,
-    // because other files read where the stored wind begins.
+    // The run starts at most 8 days back and no earlier than the stored wind, the
+    // cycle's 6 October: four days behind the issue time, past the spin-up. No
+    // earlier wind is laid down, because other files read where the stored wind begins.
     await recordedCycle();
   }, 120_000);
 
@@ -70,7 +72,7 @@ describe("the hindcast over a span of days", () => {
 
   it("stores one day, then skips it on a rerun without a second row", async () => {
     const pool = getPool();
-    const options = { from: "2026-10-10", to: "2026-10-10", instruments: [DOWNWIND, UPWIND] };
+    const options = { from: "2026-10-10", to: "2026-10-10", instruments: [DOWNWIND, UPWIND], now: LATER };
     const first = await runHindcast(pool, options);
     const before = (await smokeHindcasts.storedDays(pool, HINDCAST_MODEL)).has(AS_OF.toISOString());
     const again = await runHindcast(pool, options);
@@ -83,28 +85,57 @@ describe("the hindcast over a span of days", () => {
   it("does not skip a day stored under another model", async () => {
     const pool = getPool();
     await smokeHindcasts.insertMany(pool, [{ asOf: new Date("2026-10-09T00:00:00Z"), instrumentId: DOWNWIND.id, smokeNow: 0, smoke24h: 0, smoke48h: 0, model: "other-model" }]);
-    const summary = await runHindcast(pool, { from: "2026-10-09", to: "2026-10-09", instruments: [DOWNWIND] });
+    const summary = await runHindcast(pool, { from: "2026-10-09", to: "2026-10-09", instruments: [DOWNWIND], now: LATER });
     expect(summary.stored + summary.skipped).toBe(1);
     expect((await smokeHindcasts.storedDays(pool, HINDCAST_MODEL)).has("2026-10-09T00:00:00.000Z")).toBe(true);
   });
 
   it("skips a day the stored wind does not reach", async () => {
-    const summary = await runHindcast(getPool(), { from: "2025-01-15", to: "2025-01-15", instruments: [DOWNWIND] });
+    const summary = await runHindcast(getPool(), { from: "2025-01-15", to: "2025-01-15", instruments: [DOWNWIND], now: LATER });
     expect(summary).toMatchObject({ days: 1, stored: 0, skipped: 0, short: 1 });
   });
 
   it("skips a day whose wind stops before two days on", async () => {
     // The recorded cycle's wind runs 200 hours from 6 October, to the 14th at 07:00: the 13th has it, but not 48 hours past it.
-    const summary = await runHindcast(getPool(), { from: "2026-10-13", to: "2026-10-13", instruments: [DOWNWIND] });
+    const summary = await runHindcast(getPool(), { from: "2026-10-13", to: "2026-10-13", instruments: [DOWNWIND], now: LATER });
     expect(summary).toMatchObject({ days: 1, stored: 0, short: 1 });
   });
 
+  it("leaves a day whose two days on are not yet past to a later run, and stores the day before it", async () => {
+    const pool = getPool();
+    // 11 October plus 49 hours is 13 October at 01:00, before this clock; 12 October plus 49 hours is after it.
+    const summary = await runHindcast(pool, { from: "2026-10-11", to: "2026-10-12", instruments: [DOWNWIND], now: new Date("2026-10-13T12:00:00Z") });
+    expect(summary).toMatchObject({ days: 2, short: 1 });
+    expect(summary.stored + summary.skipped).toBe(1);
+    const stored = await smokeHindcasts.storedDays(pool, HINDCAST_MODEL);
+    expect(stored.has("2026-10-11T00:00:00.000Z")).toBe(true);
+    expect(stored.has("2026-10-12T00:00:00.000Z")).toBe(false);
+  });
+
+  it("runs a stored day again for an instrument added since, without a second row for the others", async () => {
+    const pool = getPool();
+    const day = new Date("2026-10-11T00:00:00Z");
+    // A new id on every run of this file, so the day is always missing it; it stands where UPWIND does.
+    const added: Instrument = { ...UPWIND, id: `test-added-${Date.now()}` };
+    await smokeHindcasts.insertMany(pool, [{ asOf: day, instrumentId: DOWNWIND.id, smokeNow: 0, smoke24h: 0, smoke48h: 0, model: HINDCAST_MODEL }]);
+    const summary = await runHindcast(pool, { from: "2026-10-11", to: "2026-10-11", instruments: [DOWNWIND, added], now: LATER });
+    expect(summary).toMatchObject({ days: 1, stored: 1, rows: 1, skipped: 0, short: 0 });
+    const have = (await smokeHindcasts.storedInstruments(pool, HINDCAST_MODEL)).get(day.toISOString());
+    expect(have?.has(DOWNWIND.id)).toBe(true);
+    expect(have?.has(added.id)).toBe(true);
+  });
+
+  it("does not run a stored day again for an instrument outside the region", async () => {
+    const summary = await runHindcast(getPool(), { from: "2026-10-10", to: "2026-10-10", instruments: [DOWNWIND, UPWIND, OUTSIDE], now: LATER });
+    expect(summary).toMatchObject({ days: 1, stored: 0, skipped: 1 });
+  });
+
   it("refuses a span that runs backwards or a day that is not a date", async () => {
-    await expect(runHindcast(getPool(), { from: "2026-10-11", to: "2026-10-10" })).rejects.toBeInstanceOf(TerminalError);
-    await expect(runHindcast(getPool(), { from: "11/10/2026", to: "2026-10-12" })).rejects.toBeInstanceOf(TerminalError);
+    await expect(runHindcast(getPool(), { from: "2026-10-11", to: "2026-10-10", now: LATER })).rejects.toBeInstanceOf(TerminalError);
+    await expect(runHindcast(getPool(), { from: "11/10/2026", to: "2026-10-12", now: LATER })).rejects.toBeInstanceOf(TerminalError);
   });
 
   it("prints the summary on one line", () => {
-    expect(formatHindcast({ days: 3, stored: 1, rows: 180, skipped: 1, short: 1, ms: 12_345 })).toBe("hindcast: 3 days, 1 stored (180 rows), 1 already stored, 1 without enough wind, 12 s");
+    expect(formatHindcast({ days: 3, stored: 1, rows: 180, skipped: 1, short: 1, ms: 12_345 })).toBe("hindcast: 3 days, 1 stored (180 rows), 1 already stored, 1 without enough analysed wind, 12 s");
   });
 });

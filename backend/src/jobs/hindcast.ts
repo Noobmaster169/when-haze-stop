@@ -33,7 +33,7 @@ export const AHEAD_HOURS = 48;
 /** Smoke released before the run started is missing, so a run with less wind behind it than this says little. */
 export const SPIN_UP_HOURS = 72;
 
-export type DaySkip = "no-wind" | "short-spin-up" | "short-ahead";
+export type DaySkip = "no-wind" | "short-spin-up" | "short-ahead" | "not-yet-analysed";
 
 /** The first `hours` of a weather grid, so the ensemble is not run past what is read. */
 function clipped(weather: Weather, hours: number): Weather {
@@ -77,6 +77,12 @@ export interface HindcastOptions {
   /** First and last UTC day, inclusive, as YYYY-MM-DD. */
   from: string;
   to: string;
+  /**
+   * The wall clock. The stored wind runs days past it as forecast, and a day whose
+   * look-ahead reaches past it would be stored under the analysis name on forecast
+   * wind and never recomputed, so such a day waits for a later run.
+   */
+  now: Date;
   /** For tests. A run without it lists the instruments from the database. */
   instruments?: Instrument[];
 }
@@ -104,12 +110,21 @@ export async function runHindcast(pool: Pool, options: HindcastOptions): Promise
 
   const started = Date.now();
   const instruments = options.instruments ?? (await listInstruments(pool));
-  const done = await smokeHindcasts.storedDays(pool, HINDCAST_MODEL);
+  // An instrument outside the region never gets a row, so it must not keep a stored day from counting as complete.
+  const expected = instruments.filter((instrument) => cellsWithin(instrument.lat, instrument.lon, REACH_KM).length > 0).map((instrument) => instrument.id);
+  const done = await smokeHindcasts.storedInstruments(pool, HINDCAST_MODEL);
   const summary: HindcastSummary = { days: 0, stored: 0, rows: 0, skipped: 0, short: 0, ms: 0 };
   for (let asOf = from; asOf <= to; asOf = addHours(asOf, 24)) {
     summary.days += 1;
-    if (done.has(asOf.toISOString())) {
+    // Instruments are added every hour by the cycle, so a stored day is complete only when it has all of today's.
+    const have = done.get(asOf.toISOString());
+    if (have && expected.every((id) => have.has(id))) {
       summary.skipped += 1;
+      continue;
+    }
+    if (addHours(asOf, AHEAD_HOURS + 1) > options.now) {
+      summary.short += 1;
+      log.info({ asOf: asOf.toISOString(), why: "not-yet-analysed" satisfies DaySkip }, "day skipped");
       continue;
     }
     const dayStarted = Date.now();
@@ -119,15 +134,16 @@ export async function runHindcast(pool: Pool, options: HindcastOptions): Promise
       log.info({ asOf: asOf.toISOString(), why: result }, "day skipped");
       continue;
     }
-    await smokeHindcasts.insertMany(pool, result.rows);
+    // A day stored before an instrument appeared is run again; the rows it already has stay as they were.
+    const added = await smokeHindcasts.insertMany(pool, result.rows);
     summary.stored += 1;
-    summary.rows += result.rows.length;
-    log.info({ asOf: asOf.toISOString(), rows: result.rows.length, outside: result.outside, ms: Date.now() - dayStarted }, "day stored");
+    summary.rows += added;
+    log.info({ asOf: asOf.toISOString(), rows: added, outside: result.outside, ms: Date.now() - dayStarted }, "day stored");
   }
   summary.ms = Date.now() - started;
   return summary;
 }
 
 export function formatHindcast(summary: HindcastSummary): string {
-  return `hindcast: ${summary.days} days, ${summary.stored} stored (${summary.rows} rows), ${summary.skipped} already stored, ${summary.short} without enough wind, ${Math.round(summary.ms / 1000)} s`;
+  return `hindcast: ${summary.days} days, ${summary.stored} stored (${summary.rows} rows), ${summary.skipped} already stored, ${summary.short} without enough analysed wind, ${Math.round(summary.ms / 1000)} s`;
 }

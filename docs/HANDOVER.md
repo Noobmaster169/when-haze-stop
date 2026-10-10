@@ -111,7 +111,7 @@ training on it. What that leaves to do:
    `backfill` starts at the oldest reading and would otherwise replay 650 days on five stations.
 4. Export the seed again (`pnpm db:export-seed`) once the stations file carries `network`: today a
    Singapore region loaded from the seed would arrive as a DOE station until the first cycle.
-5. Run `pnpm haze:hindcast` once over the stored history (about an hour or two: one ensemble run per day since June 2025). It resumes where it stopped. The learned model's phase 2 training reads the result.
+5. Run `pnpm haze:hindcast` once over the stored history (about an hour or two: one ensemble run per day from `HISTORY_FROM`, 2025-01-01, where the days before the stored wind count as without enough wind). It resumes where it stopped. The learned model's phase 2 training reads the result.
 
 ## Things that will surprise you
 
