@@ -161,6 +161,25 @@ computer's plan, critics answering in one step, the Red Cell on the faster model
 flight. Runs now execute only in the user's compose stack (`council` service), never in processes
 started by hand.
 
-## Run 7
+## Run 7, 10 October 2026, 23:11 to 23:55 MYT (run id 25)
 
-The first run of the seven-agent council. Recorded here when read.
+The first run of the seven-agent council, executed in the user's compose stack. 66 model calls, 44
+minutes, of which 12 were one stalled draft call (every council call now has a five-minute limit
+and one retry, commit 8f22227), so about half an hour of real work.
+
+> **Malaysia will send firefighters, not aircraft: 150 pump crew to Jambi and Bangka peat fires,
+> 100 Bomba to Johor.**
+>
+> **The plan:** From 12 October, 100 Bomba firefighters put out the two Johor fires, near
+> Senggarang and Pekan Serkat. From 13 October, two small lance teams join the peat fires near
+> Muaro Jambi. From 14 October, 150 pump crew work the peat fires near Simpang, Jambi, and on
+> Bangka island.
+
+It clears 22% of the smoke any plan could clear (run 4: 12.5%), for RM 4.6 million of the RM 8
+million set aside: with Indonesia allowing everything, the council chose people over aircraft,
+because aircraft cost the most and barely touch peat. The closing round showed the agreement:
+Treasury, Fire Operations, Peat Science, Air Operations and Air and Weather stood behind it, each
+for its own reason ("water dropped from the air barely touches deep peat fires"); the Red Cell
+dissented ("every firefighter goes out at once to four fires with none held back, so if a cleared
+fire relights, no one is left to answer it"). The verdict carries the source breakdown by area and
+the before, after and smoke-removed maps.
