@@ -66,10 +66,12 @@ def onset(test: pd.DataFrame, forecasts: dict[str, pd.DataFrame], days) -> dict:
     for kind, mask in _groups(test).items():
         part = test[mask]
         entry: dict = {}
+        counts: list[int] = []
         for name in ("model", "persistence", "v2"):
             usable = {d: forecasts[name] for d in days if f"p50_d{d}" in forecasts[name]}
             leads = lead_to_onset(part, usable) if len(part) else pd.DataFrame({"lead_days": []})
             entry[name] = float(leads["lead_days"].mean()) if len(leads) else float("nan")
-            entry["cases"] = int(len(leads))
+            counts.append(int(len(leads)))
+        entry["cases"] = counts[0] if counts else 0
         out[kind] = entry
     return out
