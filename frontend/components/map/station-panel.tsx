@@ -88,8 +88,8 @@ export function StationPanel({ station, at, via, onClose }: { station: Station; 
               </div>
               <p className="mt-2 text-caption leading-[17px] text-ink-tertiary">
                 Ranges cover 8 in 10 past errors.{" "}
-                <Link href="/accuracy" className="text-accent underline-offset-2 hover:underline">
-                  Track record
+                <Link href="/simulation" className="text-accent underline-offset-2 hover:underline">
+                  Simulation
                 </Link>
               </p>
             </div>
