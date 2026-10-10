@@ -5,12 +5,13 @@ import useSWR from "swr";
 
 import { FollowButton } from "@/components/alerts/follow-button";
 import { Icon } from "@/components/ui/icons";
-import { type Station, StationOutlook } from "@/lib/api/haze-schemas";
+import { type ForecastSource, type Station, StationOutlook } from "@/lib/api/haze-schemas";
 import { malaysiaWhen } from "@/lib/malaysia-time";
 import { parsedFetcher } from "@/lib/poll";
 
 import { DayRows } from "./day-rows";
 import { FLOATING_PANEL } from "./floating-panel";
+import { checkedLine, issuedWhen } from "./forecast-words";
 import { OutlookChart } from "./outlook-chart";
 import { headline, trend } from "./outlook-words";
 import { BAND_SWATCH, band, bandKey } from "./scale";
@@ -75,18 +76,39 @@ export function StationPanel({ station, at, via, onClose }: { station: Station; 
           {outlook.days.length > 0 ? (
             <div>
               <h3 className="text-strong font-medium text-ink">Next days</h3>
-              <DayRows days={outlook.days} />
-              <p className="mt-1 text-caption text-ink-tertiary">
-                Ranges cover 8 in 10 past forecasts.{" "}
-                <Link href="/accuracy" className="text-accent underline-offset-2 hover:underline">
-                  Simulation
-                </Link>
-              </p>
+              <DayRows days={outlook.days} source={outlook.source.kind} />
+              <SourceLine source={outlook.source} />
             </div>
           ) : null}
         </div>
       ) : null}
     </aside>
+  );
+}
+
+const LINK = "text-accent underline-offset-2 hover:underline";
+
+/** Whose forecast the days are, and where its record is. The hourly wording is the one the panel always had, so a shadow run reads as before. */
+function SourceLine({ source }: { source: ForecastSource }) {
+  if (source.kind !== "learned") {
+    return (
+      <p className="mt-1 text-caption text-ink-tertiary">
+        Ranges cover 8 in 10 past forecasts. Hourly forecast.{" "}
+        <Link href="/accuracy" className={LINK}>
+          Simulation
+        </Link>
+      </p>
+    );
+  }
+  const version = source.modelVersion ? ` ${source.modelVersion}` : "";
+  const issued = source.issuedAt ? `, issued ${issuedWhen(source.issuedAt)}` : "";
+  return (
+    <p className="mt-1 text-caption text-ink-tertiary">
+      Forecast by the learned model{version}{issued}. Hourly shape from the smoke simulation. {checkedLine(source.record.checkedDays)}{" "}
+      <Link href="/model" className={LINK}>
+        How good is this?
+      </Link>
+    </p>
   );
 }
 

@@ -1,4 +1,4 @@
-import type { DayOutlook } from "@/lib/api/haze-schemas";
+import type { DayOutlook, ForecastSourceKind } from "@/lib/api/haze-schemas";
 import { dayName } from "@/lib/malaysia-time";
 
 import { dayLine } from "./outlook-words";
@@ -6,7 +6,9 @@ import { BAND_SWATCH, bandKey } from "./scale";
 
 /**
  * The days ahead, one row each: the day's peak in its band's colour, the
- * likely range, and in words the line that matters that day.
+ * likely range, in words the line that matters that day, and the reason the
+ * simulation gives for it. A day the learned model has no row for, while the
+ * station's forecast is otherwise learned, is tagged as the hourly forecast's.
  */
 
 function Peak({ day }: { day: DayOutlook }) {
@@ -21,15 +23,23 @@ function Peak({ day }: { day: DayOutlook }) {
   );
 }
 
-export function DayRows({ days }: { days: DayOutlook[] }) {
+export function DayRows({ days, source }: { days: DayOutlook[]; source: ForecastSourceKind }) {
   return (
     <ul className="divide-y divide-hairline-faint">
       {days.map((day) => (
         <li key={day.day} className="grid grid-cols-[52px_1fr] gap-x-3 py-2">
           <span className="text-small text-ink-secondary">{dayName(day.day).slice(0, -4)}</span>
           <div className="min-w-0">
-            <Peak day={day} />
+            <div className="flex items-baseline gap-2">
+              <Peak day={day} />
+              {source === "learned" && day.source === "hourly" ? (
+                <span title="The learned model has no row for this day, so it is the hourly forecast's" className="rounded-sm border border-hairline-strong px-1 text-micro leading-4 text-ink-tertiary">
+                  hourly
+                </span>
+              ) : null}
+            </div>
             <p className="text-caption text-ink-tertiary">{dayLine(day)}</p>
+            {day.why ? <p className="text-caption text-ink-tertiary">{day.why}</p> : null}
           </div>
         </li>
       ))}
