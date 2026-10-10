@@ -5,6 +5,7 @@ import json
 import os
 import pathlib
 from dataclasses import dataclass
+from typing import Literal
 
 import lightgbm as lgb
 import pandas as pd
@@ -12,6 +13,7 @@ import pandas as pd
 KEYS = ["d1_q10", "d1_q50", "d1_q90", "d2_q10", "d2_q50", "d2_q90"]
 # The sensor and airport corrections the artifact was trained on, frozen so serving never refits them.
 DECISIONS = ("sensors", "airports")
+Day2 = Literal["direct", "recursive"]
 
 
 @dataclass
@@ -21,6 +23,8 @@ class Artifact:
     features: list[str]
     boosters: dict[str, lgb.Booster]
     decisions: dict[str, pd.DataFrame] | None = None
+    # How day +2 is served, chosen by the backtest. Direct is what a version saved before the choice was carried does.
+    serves_d2: Day2 = "direct"
 
 
 def artifacts_dir() -> pathlib.Path:
@@ -33,7 +37,12 @@ def save_artifact(directory: pathlib.Path, artifact: Artifact) -> pathlib.Path:
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "meta.json").write_text(
         json.dumps(
-            {"version": artifact.version, "trained_at": artifact.trained_at.isoformat(), "features": artifact.features},
+            {
+                "version": artifact.version,
+                "trained_at": artifact.trained_at.isoformat(),
+                "features": artifact.features,
+                "serves_d2": artifact.serves_d2,
+            },
             indent=2,
         )
     )
@@ -68,6 +77,7 @@ def load_artifact(directory: pathlib.Path, version: str) -> Artifact:
         features=meta["features"],
         boosters=boosters,
         decisions=_read_decisions(folder),
+        serves_d2="recursive" if meta.get("serves_d2") == "recursive" else "direct",
     )
 
 

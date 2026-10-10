@@ -90,6 +90,7 @@ def add_training(subparsers) -> None:
     retrain.add_argument("--hindcast-model", default="v2-analysis")
     retrain.add_argument("--out", default=_data_dir())
     retrain.add_argument("--loop", action="store_true")
+    retrain.add_argument("--force", action="store_true", help="retrain even when a report is under a week old")
     retrain.set_defaults(run=retrain_command)
 
 

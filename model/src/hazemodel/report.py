@@ -1,5 +1,6 @@
 """What a training run found, as scores.json and a report.md a person can read. Reports are committed."""
 
+import datetime as dt
 import json
 import math
 import os
@@ -140,3 +141,25 @@ def write_report(directory: pathlib.Path, version: str, payload: dict) -> pathli
     path = folder / "report.md"
     path.write_text(_render(payload))
     return path
+
+
+def write_search(directory: pathlib.Path, out: dict, day: dt.date) -> pathlib.Path:
+    """The search's draws table and criterion, kept so a later reader can see what the winner beat."""
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"search-{day.isoformat()}.json"
+    kept = {"criterion": out["criterion"], "params": out["params"], "draws": out["draws"]}
+    path.write_text(json.dumps(_clean(kept), indent=2) + "\n")
+    return path
+
+
+def _written_at(path: pathlib.Path) -> dt.datetime:
+    """When the run trained, from the report itself; a git checkout resets the file's mtime, so that is the fallback."""
+    trained = json.loads(path.read_text()).get("trained_at")
+    if trained:
+        return dt.datetime.fromisoformat(trained)
+    return dt.datetime.fromtimestamp(path.stat().st_mtime, dt.timezone.utc)
+
+
+def newest_report_age(directory: pathlib.Path, now: dt.datetime) -> dt.timedelta | None:
+    times = [_written_at(path) for path in directory.glob("*/scores.json")]
+    return now - max(times) if times else None

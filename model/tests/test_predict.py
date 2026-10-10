@@ -87,3 +87,15 @@ def test_quantiles_are_floored_at_zero_and_sorted():
     out = predict_rows(art, frame())
     assert (out[["p10", "p50", "p90"]] >= 0).all().all()
     assert list(out["p10"]) == [0.0, 0.0, 0.0] and list(out["p90"])[0] == 2.0
+
+
+def test_recursive_choice_routes_day_two_through_the_roll_even_with_direct_boosters():
+    values = {f"d{d}_q{q}": 100.0 * d + q for d in (1, 2) for q in (10, 50, 90)}
+    art = artifact(values)
+    art.serves_d2 = "recursive"
+    out = predict_rows(art, frame())
+    d1, d2 = art.boosters["d1_q50"], art.boosters["d2_q50"]
+    assert len(d2.calls) == 0 and len(d1.calls) == 3
+    # day +2 is d1 on the frame rolled once with the day +1 median
+    assert (col(d1, 1, "level"), col(d1, 1, "lag24")) == (150.0, 10.0)
+    assert list(out["p50"]) == [150.0, 150.0, 150.0]

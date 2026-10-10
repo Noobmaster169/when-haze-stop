@@ -10,7 +10,10 @@ RUN pip install --no-cache-dir .
 # The installed package cannot see the source tree, so the committed parameters travel as a file.
 COPY params.json ./params.json
 
-RUN useradd --create-home --uid 10002 hazemodel && mkdir -p /app/artifacts /app/reports /app/data && chown hazemodel /app/artifacts /app/reports /app/data
+# Writable by any uid, because the retrain job runs as the host user (`--user`) so its reports land in a bind
+# mount that user owns, and it still writes the parquet to /app/data and the artifact to the shared volume.
+RUN useradd --create-home --uid 10002 hazemodel && mkdir -p /app/artifacts /app/reports /app/data \
+    && chown hazemodel /app/artifacts /app/reports /app/data && chmod 0777 /app/artifacts /app/reports /app/data
 USER hazemodel
 
 ENV MODEL_ARTIFACTS=/app/artifacts \

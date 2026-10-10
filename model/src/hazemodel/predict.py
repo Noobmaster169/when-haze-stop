@@ -1,9 +1,9 @@
 """Run an artifact over feature rows.
 
-Day +1 and day +2 are scored on the original frame whenever their direct boosters exist, since those are the
-features they were trained on. Recursion is used only where no direct model exists: day +2 without `d2_*` is the
-`d1` boosters on the frame rolled once with the day +1 median; day +3 is always the `d1` boosters on the frame
-rolled twice, first with the day +1 median, then with the day +2 median (direct if present, else the recursive one).
+Day +1 is scored on the original frame. Day +2 is the direct `d2_*` boosters on the original frame when they exist
+and the artifact serves day +2 direct; otherwise it is the `d1` boosters on the frame rolled once with the day +1
+median. Day +3 is always the `d1` boosters on the frame rolled twice, first with the day +1 median, then with the
+day +2 median (whichever path served day +2).
 """
 
 import numpy as np
@@ -44,7 +44,8 @@ def predict_rows(artifact: Artifact, frame: pd.DataFrame) -> pd.DataFrame:
     issue_days = (frame.index.get_level_values("issue_at") + MALAYSIA_OFFSET).date
     q1 = _score(artifact, "d1", frame)
     rolled_once = rolled(frame, q1[:, 1])
-    q2 = _score(artifact, "d2", frame) if "d2_q50" in artifact.boosters else _score(artifact, "d1", rolled_once)
+    direct = artifact.serves_d2 == "direct" and "d2_q50" in artifact.boosters
+    q2 = _score(artifact, "d2", frame) if direct else _score(artifact, "d1", rolled_once)
     q3 = _score(artifact, "d1", rolled(rolled_once, q2[:, 1]))
     rows = []
     for d, q in ((1, q1), (2, q2), (3, q3)):

@@ -1,4 +1,5 @@
 import datetime as dt
+import json
 
 import lightgbm as lgb
 import numpy as np
@@ -53,3 +54,14 @@ def test_frozen_decisions_round_trip(tmp_path, data):
     assert set(back.decisions) == {"sensors", "airports"}
     for name in ("sensors", "airports"):
         pd.testing.assert_frame_equal(back.decisions[name], decisions[name])
+
+
+def test_day_two_choice_round_trips_and_absent_means_direct(tmp_path):
+    artifact = tiny_artifact()
+    artifact.serves_d2 = "recursive"
+    folder = save_artifact(tmp_path, artifact)
+    assert load_artifact(tmp_path, artifact.version).serves_d2 == "recursive"
+    meta = json.loads((folder / "meta.json").read_text())
+    del meta["serves_d2"]
+    (folder / "meta.json").write_text(json.dumps(meta))
+    assert load_artifact(tmp_path, artifact.version).serves_d2 == "direct"
