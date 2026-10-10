@@ -10,15 +10,26 @@ import pandas as pd
 from hazemodel.instruments import distance_km
 
 ACCEPT_CORRELATION = 0.8
-ACCEPT_HOURS = 200
+# Five full days of shared hours: DOE stations hold one week, so 200 is out of reach.
+ACCEPT_HOURS = 120
 
 
-def nearest_reference(table: pd.DataFrame, instrument_id: str) -> tuple[str, float]:
+def nearest_reference(
+    table: pd.DataFrame, instrument_id: str, series_by_id: dict[str, pd.Series] | None = None
+) -> tuple[str, float]:
+    """Nearest reference sharing ACCEPT_HOURS hours with the instrument; nearest overall when none does."""
     me = table.set_index("instrument_id").loc[instrument_id]
     candidates = table[table["reference"] & (table["instrument_id"] != instrument_id)]
     distances = distance_km(me["lat"], me["lon"], candidates["lat"].to_numpy(), candidates["lon"].to_numpy())
-    best = int(np.argmin(distances))
-    return str(candidates["instrument_id"].iloc[best]), float(distances[best])
+    ids = candidates["instrument_id"].to_numpy()
+    order = np.argsort(distances)
+    if series_by_id is not None and instrument_id in series_by_id:
+        mine = series_by_id[instrument_id].index
+        for i in order:
+            theirs = series_by_id.get(str(ids[i]))
+            if theirs is not None and len(mine.intersection(theirs.index)) >= ACCEPT_HOURS:
+                return str(ids[i]), float(distances[i])
+    return str(ids[order[0]]), float(distances[order[0]])
 
 
 def fit_line(x: pd.Series, y: pd.Series) -> tuple[float, float, float, int]:
@@ -27,7 +38,7 @@ def fit_line(x: pd.Series, y: pd.Series) -> tuple[float, float, float, int]:
     if len(shared) < 2:
         return 0.0, 1.0, 0.0, len(shared)
     xs, ys = x[shared].to_numpy(dtype=float), y[shared].to_numpy(dtype=float)
-    if xs.std() == 0 or ys.std() == 0:
+    if np.ptp(xs) == 0 or np.ptp(ys) == 0:
         return 0.0, 1.0, 0.0, len(shared)
     slope, intercept = np.polyfit(xs, ys, 1)
     return float(intercept), float(slope), float(np.corrcoef(xs, ys)[0, 1]), len(shared)
@@ -38,7 +49,7 @@ def correct_sensors(series: pd.DataFrame, table: pd.DataFrame) -> tuple[pd.DataF
     corrected = series.copy()
     decisions = []
     for instrument_id in table[table["kind"] == "openaq"]["instrument_id"]:
-        reference_id, distance = nearest_reference(table, instrument_id)
+        reference_id, distance = nearest_reference(table, instrument_id, by_id)
         raw = by_id.get(instrument_id, pd.Series(dtype=float))
         ref = by_id.get(reference_id, pd.Series(dtype=float))
         intercept, slope, correlation, hours = fit_line(raw, ref)

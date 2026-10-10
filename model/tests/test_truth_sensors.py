@@ -38,3 +38,18 @@ def test_a_short_overlap_is_not_accepted(data):
     cut = series[(series["instrument_id"] != sensor) | (series.groupby("instrument_id").cumcount() < ACCEPT_HOURS - 1)]
     _, decisions = correct_sensors(cut, table)
     assert not decisions.set_index("instrument_id").loc[sensor, "accepted"]
+
+
+def test_reference_is_chosen_among_those_sharing_hours(data):
+    series = reference_series(data)
+    table = instruments(data)
+    _, decisions = correct_sensors(series, table)
+    by_id = {key: group.set_index("observed_at")["pm25_24h"] for key, group in series.groupby("instrument_id")}
+    refs = table[table["reference"]]["instrument_id"]
+    for _, row in decisions.iterrows():
+        if row["instrument_id"] not in by_id:
+            continue  # no readings at all in the series: the nearest reference is the fallback
+        mine = by_id[row["instrument_id"]].index
+        overlaps = {r: len(mine.intersection(by_id[r].index)) for r in refs if r in by_id and r != row["instrument_id"]}
+        if any(n >= ACCEPT_HOURS for n in overlaps.values()):
+            assert overlaps[row["reference_id"]] >= ACCEPT_HOURS

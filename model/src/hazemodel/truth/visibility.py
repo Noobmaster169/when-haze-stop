@@ -46,7 +46,7 @@ def airport_series(data: SourceData, series: pd.DataFrame, table: pd.DataFrame) 
     pooled_x, pooled_y = [], []
     for icao in table[table["kind"] == "airport"]["instrument_id"]:
         hourly = _hourly_extinction(data.metar_obs[data.metar_obs["icao"] == icao])
-        reference_id, _ = nearest_reference(table, icao)
+        reference_id, _ = nearest_reference(table, icao, {**by_id, icao: hourly["extinction_24h"]})
         ref = by_id.get(reference_id, pd.Series(dtype=float))
         per_airport[icao] = (hourly, reference_id, ref)
         shared = hourly.index.intersection(ref.index)
