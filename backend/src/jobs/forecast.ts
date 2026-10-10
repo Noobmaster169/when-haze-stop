@@ -2,7 +2,7 @@ import type { Pool } from "pg";
 
 import { withTx } from "../db";
 import { addHours, hoursBetween } from "../haze/grid";
-import { HORIZON_HOURS, runModel, type RunStation } from "../haze/run";
+import { HORIZON_HOURS, runModel, type RunInput, type RunStation } from "../haze/run";
 import { childLogger } from "../lib/logger";
 import { fires, forecasts, readings, stations, weather } from "../repositories";
 import type { RunKind } from "../repositories/forecasts.repo";
@@ -14,10 +14,13 @@ const log = childLogger({ module: "jobs.forecast" });
 /** Smoke lives up to six days, so the run starts far enough back to hold everything still in the air. */
 const LOOKBACK_DAYS = 8;
 
-/** Returns the new run's id, or null where the run already exists or cannot be made yet. */
-export async function runForecast(pool: Pool, asOf: Date, kind: RunKind): Promise<number | null> {
-  if (await forecasts.exists(pool, asOf, kind)) return null;
-
+/**
+ * What a run as of `asOf` is allowed to know: weather from the lookback on,
+ * fires and readings up to `asOf`. The live run and the backtest both load
+ * through here, so a backtest cannot see what a live run would not have.
+ * Null where the stored weather does not reach `asOf`.
+ */
+export async function loadRunInput(pool: Pool, asOf: Date): Promise<RunInput | null> {
   const earliest = await weather.earliestAt(pool);
   if (!earliest) {
     log.warn("no weather stored yet, so there is nothing to carry the smoke");
@@ -31,6 +34,7 @@ export async function runForecast(pool: Pool, asOf: Date, kind: RunKind): Promis
     return null;
   }
 
+  // emissionsFor drops the days not yet complete at asOf, so loading later days here leaks nothing.
   const cells = await fires.since(pool, addHours(start, -24).toISOString().slice(0, 10));
   const known = await readings.between(pool, start, asOf);
   const series = new Map<string, Float32Array>();
@@ -48,9 +52,17 @@ export async function runForecast(pool: Pool, asOf: Date, kind: RunKind): Promis
     lon: station.lon,
     readings: series.get(station.id) ?? new Float32Array(grid.hours).fill(NaN),
   }));
+  return { asOf, start, weather: grid, fires: cells, stations: placed };
+}
+
+/** Returns the new run's id, or null where the run already exists or cannot be made yet. */
+export async function runForecast(pool: Pool, asOf: Date, kind: RunKind): Promise<number | null> {
+  if (await forecasts.exists(pool, asOf, kind)) return null;
+  const input = await loadRunInput(pool, asOf);
+  if (!input) return null;
 
   const started = Date.now();
-  const output = runModel({ asOf, start, weather: grid, fires: cells, stations: placed });
+  const output = runModel(input);
   const runId = await withTx(pool, async (tx) => {
     const id = await forecasts.insertRun(tx, asOf, kind, output.calibration);
     await forecasts.insertFrames(tx, id, output.frames);

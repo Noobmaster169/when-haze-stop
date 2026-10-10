@@ -61,3 +61,12 @@ export function colourAt(stops: Stop[], api: number): Rgb {
 export function css(rgb: Rgb, alpha = 1): string {
   return alpha >= 1 ? `rgb(${rgb[0]} ${rgb[1]} ${rgb[2]})` : `rgb(${rgb[0]} ${rgb[1]} ${rgb[2]} / ${alpha})`;
 }
+
+/** The swatch beside a value, in the band's colour token. */
+export const BAND_SWATCH: Record<BandKey, string> = {
+  good: "bg-api-0",
+  moderate: "bg-api-50",
+  unhealthy: "bg-api-150",
+  "very-unhealthy": "bg-api-200",
+  hazardous: "bg-api-300",
+};

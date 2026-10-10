@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import type { SourceFetch, SourceStatus } from "@/lib/api/source-schemas";
 
-import { ago, describeDetail, duration, sourceState } from "./source-state";
+import { DATASETS } from "./datasets";
+import { ago, duration, nextFetch, sourceState, worstState } from "./source-state";
 
 const NOW = new Date("2026-10-10T06:30:00Z");
 
@@ -32,6 +33,7 @@ const SOURCE: SourceStatus = {
   lastSuccess: FETCHED,
   lastFailure: null,
   day: { ok: 1, failed: 0 },
+  marks: [{ at: "2026-10-10T06:20:00.000Z", ok: true }],
 };
 
 describe("the state of a source", () => {
@@ -57,16 +59,46 @@ describe("the state of a source", () => {
   });
 });
 
-describe("how a fetch reads", () => {
-  it("names the counts in reading order and shows times in UTC", () => {
-    expect(describeDetail({ lastDay: "2026-10-10", added: 1234, stations: 68, newestReading: "2026-10-10T06:00:00.000Z" })).toEqual([
-      { label: "stations", value: "68" },
-      { label: "new readings", value: "1,234" },
-      { label: "newest reading", value: "10 Oct 06:00" },
-      { label: "last day", value: "2026-10-10" },
+describe("a dataset as a whole", () => {
+  it("is as healthy as its least healthy fetch", () => {
+    expect(worstState([SOURCE, { ...SOURCE, id: "doe-readings", lastFailure: FAILED }], NOW)).toBe("failing");
+    expect(worstState([SOURCE, SOURCE], NOW)).toBe("fresh");
+  });
+
+  it("expects the next fetch at the first cycle a full interval after the last attempt", () => {
+    expect(nextFetch(SOURCE)).toBe(Date.parse("2026-10-10T07:20:00Z"));
+    // A fetch after a restart at 06:25 is still followed by the 07:20 cycle.
+    expect(nextFetch({ ...SOURCE, lastFailure: FAILED })).toBe(Date.parse("2026-10-10T07:20:00Z"));
+    // Fires go every third cycle: a fetch at 06:20 is next asked at 09:20.
+    expect(nextFetch({ ...SOURCE, everyHours: 3 })).toBe(Date.parse("2026-10-10T09:20:00Z"));
+    expect(nextFetch({ ...SOURCE, everyHours: null })).toBeNull();
+  });
+
+  it("shows the station counts from the station list fetch and the newest hour in Malaysian time", () => {
+    const air = DATASETS[0];
+    const details: Record<string, SourceFetch["detail"]> = { "doe-stations": FETCHED.detail, "doe-readings": { received: 1234, newestReading: "2026-10-10T07:00:00.000Z" } };
+    expect(air.stats((id) => details[id] ?? null)).toEqual([
+      { icon: "pin", value: "68", label: "stations" },
+      { icon: "map", value: "16", label: "states" },
+      { icon: "chart", value: "1,234", label: "readings received" },
+      { icon: "clock", value: "15:00", label: "newest hour, 10 Oct" },
     ]);
   });
 
+  it("writes the weather span short, naming the month once when it does not change", () => {
+    const weather = DATASETS[2];
+    const span = (from: string, to: string) => weather.stats(() => ({ points: 345, hours: 312, from, to }))[2].value;
+    expect(span("2026-10-02T00:00:00.000Z", "2026-10-14T23:00:00.000Z")).toBe("2 to 15 Oct");
+    expect(span("2026-09-28T00:00:00.000Z", "2026-10-03T00:00:00.000Z")).toBe("28 Sep to 3 Oct");
+  });
+
+  it("says n/a for a number an older fetch did not record", () => {
+    const fires = DATASETS[1];
+    expect(fires.stats(() => ({ detections: 267264, cellDays: 8544 })).map((stat) => stat.value)).toEqual(["267,264", "n/a", "n/a", "8,544"]);
+  });
+});
+
+describe("how a fetch reads", () => {
   it("gives how long it took and how long ago", () => {
     expect(duration(FETCHED)).toBe("5.6 s");
     expect(duration({ ...FETCHED, finishedAt: "2026-10-10T06:23:10.000Z" })).toBe("3 min 10 s");

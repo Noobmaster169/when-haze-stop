@@ -3,13 +3,16 @@
 import { type RefObject, useCallback, useEffect, useImperativeHandle, useRef } from "react";
 
 import type { Station } from "@/lib/api/haze-schemas";
+import { useScheme } from "@/lib/colour-scheme";
 
 import type { Basemap } from "./basemap";
 import { drawChart, drawMarks, type Scene } from "./draw";
-import { homeView, type Size, toLat, toLon, toX, toY, viewOn, zoomAt } from "./geo";
+import { flyTo, reveal } from "./flight";
+import { homeView, type Size, toLat, toLon, toX, toY, zoomAt } from "./geo";
 import { createHeat, type Heat } from "./heat";
 import { drawLabels } from "./labels";
 import type { MapData } from "./map-data";
+import type { Layers, MapHandle, Pick } from "./map-handle";
 import { readTheme, type MapTheme } from "./theme";
 import { type GestureTarget, useGestures } from "./use-gestures";
 import { createWind, type WindLayer } from "./wind-particles";
@@ -23,26 +26,7 @@ import { createWind, type WindLayer } from "./wind-particles";
  * directly; React is told nothing about a drag.
  */
 
-export interface Layers {
-  haze: boolean;
-  stations: boolean;
-  fires: boolean;
-  wind: boolean;
-  visibility: boolean;
-}
-
-export interface MapHandle {
-  zoom(factor: number): void;
-  flyTo(lon: number, lat: number): void;
-  /** Where a point is on the canvas now, for anything laid over the map. */
-  locate(lon: number, lat: number): { x: number; y: number } | null;
-}
-
-export interface Pick {
-  lon: number;
-  lat: number;
-  station: Station | null;
-}
+export type { Layers, MapHandle, Pick } from "./map-handle";
 
 interface Props {
   handle: RefObject<MapHandle | null>;
@@ -52,6 +36,7 @@ interface Props {
   layers: Layers;
   selectedId: string | null;
   pin: { lon: number; lat: number } | null;
+  preview: { lon: number; lat: number } | null;
   onPick(pick: Pick): void;
   /** Called after every repaint, so an overlay can follow the map. */
   onPaint?(): void;
@@ -60,14 +45,15 @@ interface Props {
 const PICK_RADIUS_PX = 14;
 const MAX_PIXEL_RATIO = 2;
 
-export function MapCanvas({ handle, data, basemap, at, layers, selectedId, pin, onPick, onPaint }: Props) {
+export function MapCanvas({ handle, data, basemap, at, layers, selectedId, pin, preview, onPick, onPaint }: Props) {
   const frame = useRef<HTMLDivElement>(null);
   const chart = useRef<HTMLCanvasElement>(null);
   const wind = useRef<HTMLCanvasElement>(null);
   const marks = useRef<HTMLCanvasElement>(null);
   const target = useRef<GestureTarget>({ view: { cx: 103, cy: 2.6, scale: 40 }, size: { width: 0, height: 0 } });
   const tools = useRef<{ theme: MapTheme; heat: Heat; wind: WindLayer; font: string } | null>(null);
-  const live = useRef({ data, basemap, at, layers, selectedId, pin, onPaint });
+  const live = useRef({ data, basemap, at, layers, selectedId, pin, preview, onPaint });
+  const cancelFlight = useRef<() => void>(() => undefined);
 
   const paint = useCallback(() => {
     const kit = tools.current;
@@ -81,10 +67,8 @@ export function MapCanvas({ handle, data, basemap, at, layers, selectedId, pin, 
     const haze = now.data !== null && now.layers.haze && now.data.fields.length > 0;
     if (now.data && haze) kit.heat.paint(now.data, now.at);
     drawChart(base, scene, haze ? kit.heat.canvas : null);
-    if (now.data) {
-      const { fires, stations, visibility } = now.layers;
-      drawMarks(top, scene, { data: now.data, at: now.at, fires, stations, visibility, fontFamily: kit.font, selectedId: now.selectedId, pin: now.pin });
-    }
+    const { fires, stations, visibility } = now.layers;
+    if (now.data) drawMarks(top, scene, { data: now.data, at: now.at, fires, stations, visibility, fontFamily: kit.font, selectedId: now.selectedId, pin: now.pin, preview: now.preview });
     else top.clearRect(0, 0, size.width, size.height);
     drawLabels(top, scene, kit.font);
     now.onPaint?.();
@@ -121,8 +105,14 @@ export function MapCanvas({ handle, data, basemap, at, layers, selectedId, pin, 
       moved();
     },
     flyTo(lon, lat) {
-      target.current.view = viewOn(target.current.size, lon, lat, target.current.view);
-      moved();
+      cancelFlight.current();
+      cancelFlight.current = flyTo(target.current, lon, lat, moved);
+    },
+    reveal(lon, lat) {
+      const cancel = reveal(target.current, lon, lat, moved);
+      if (!cancel) return;
+      cancelFlight.current();
+      cancelFlight.current = cancel;
     },
     locate(lon, lat) {
       const { view, size } = target.current;
@@ -172,10 +162,22 @@ export function MapCanvas({ handle, data, basemap, at, layers, selectedId, pin, 
     };
   }, [moved]);
 
+  // A canvas holds colours, not class names: when light and dark swap, read the tokens again and repaint.
+  const scheme = useScheme();
   useEffect(() => {
-    live.current = { data, basemap, at, layers, selectedId, pin, onPaint };
+    const element = frame.current;
+    if (!element || !scheme || !tools.current) return;
+    const theme = readTheme(element);
+    tools.current = { ...tools.current, theme, heat: createHeat(theme.stops), wind: createWind(theme.wind) };
+    const { size } = target.current;
+    wind.current?.getContext("2d")?.clearRect(0, 0, size.width, size.height);
     paint();
-  }, [paint, data, basemap, at, layers, selectedId, pin, onPaint]);
+  }, [scheme, paint]);
+
+  useEffect(() => {
+    live.current = { data, basemap, at, layers, selectedId, pin, preview, onPaint };
+    paint();
+  }, [paint, data, basemap, at, layers, selectedId, pin, preview, onPaint]);
 
   useEffect(() => {
     if (layers.wind) return;

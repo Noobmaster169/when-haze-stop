@@ -42,12 +42,19 @@ export const SourceStatus = z.object({
   lastFailure: SourceFetch.nullable(),
   /** Fetches in the last 24 hours. */
   day: z.object({ ok: z.number().int(), failed: z.number().int() }),
+  /** Each fetch started in the last 24 hours, oldest first: when, and whether it worked. */
+  marks: z.array(z.object({ at: z.string(), ok: z.boolean() })),
 });
 export type SourceStatus = z.infer<typeof SourceStatus>;
 
-export const SourceReport = z.object({
-  sources: z.array(SourceStatus),
-  /** The newest fetches of every source, newest first. */
-  recent: z.array(SourceFetch),
-});
+export const SourceReport = z.object({ sources: z.array(SourceStatus) });
 export type SourceReport = z.infer<typeof SourceReport>;
+
+/** One page of a source's fetches, newest first. */
+export const SourceFetchPage = z.object({
+  fetches: z.array(SourceFetch),
+  page: z.number().int(),
+  pageSize: z.number().int(),
+  total: z.number().int(),
+});
+export type SourceFetchPage = z.infer<typeof SourceFetchPage>;

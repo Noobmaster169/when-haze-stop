@@ -1,7 +1,7 @@
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { SourceReport } from "../../src/contracts";
+import { SourceFetchPage, SourceReport } from "../../src/contracts";
 import { closePool, getPool } from "../../src/db";
 import { WEATHER_POINTS } from "../../src/haze/grid";
 import { ingestWeather } from "../../src/jobs/ingest";
@@ -54,7 +54,17 @@ describe("every fetch of a source is kept and served", () => {
     const weather = source("open-meteo");
     expect(weather.lastFailure).toMatchObject({ ok: false, error: "Open-Meteo forecast did not answer", detail: {} });
     expect(weather.day.failed).toBeGreaterThan(0);
-    expect(report.recent[0]).toMatchObject({ source: "open-meteo", ok: false });
+    expect(weather.marks.at(-1)).toMatchObject({ ok: false });
+  });
+
+  it("pages a source's fetches five at a time, newest first", async () => {
+    const first = SourceFetchPage.parse((await request(app).get("/sources/fetches?source=open-meteo").expect(200)).body);
+    expect(first).toMatchObject({ page: 1, pageSize: 5 });
+    expect(first.fetches.length).toBeLessThanOrEqual(5);
+    expect(first.fetches[0]).toMatchObject({ source: "open-meteo", ok: false });
+    const second = SourceFetchPage.parse((await request(app).get("/sources/fetches?source=open-meteo&page=2").expect(200)).body);
+    expect(second.total).toBe(first.total);
+    await request(app).get("/sources/fetches?source=nope").expect(400);
   });
 
   it("records the airports' reports and Singapore's hours", () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { FIRST_FIT } from "../../src/haze/calibrate";
 import { chanceAbove, firstHindcast } from "../../src/haze/chance";
 import { emissionsFor } from "../../src/haze/fires";
 import { addHours, FIELD, FIELD_CELLS, hoursBetween } from "../../src/haze/grid";
@@ -79,7 +80,16 @@ describe("a model run", () => {
   });
 
   it("falls back to the first fit when it has too few readings to make its own", () => {
-    expect(output.calibration).toMatchObject({ fallback: true, intercept: 64, slope: 6.79 });
+    expect(output.calibration).toMatchObject({ fallback: true, ...FIRST_FIT });
+  });
+
+  it("follows on from the observed map into the forecast without a jump", () => {
+    const at = output.frames.findIndex((frame) => frame.validAt.getTime() === LAST_HOUR.getTime());
+    const [now, next] = [output.frames[at].field, output.frames[at + 1].field];
+    let moved = 0;
+    for (let cell = 0; cell < now.length; cell++) moved += Math.abs(now[cell] - next[cell]) * 2;
+    // One byte is two API points; the first forecast frame is at most three hours on.
+    expect(moved / now.length).toBeLessThan(3);
   });
 });
 
@@ -87,9 +97,9 @@ describe("chance of passing a line", () => {
   // Petaling Jaya on 10 October: a forecast peak of 153 for the next day, from a station already above 100.
   const errors = firstHindcast(24, true);
 
-  it("matches the first live run", () => {
-    expect(chanceAbove(153, 150, errors)).toBeCloseTo(0.66, 2);
-    expect(chanceAbove(153, 180, errors)).toBeCloseTo(0.06, 2);
+  it("matches the replayed week's errors", () => {
+    expect(chanceAbove(153, 150, errors)).toBeCloseTo(0.56, 2);
+    expect(chanceAbove(153, 180, errors)).toBeCloseTo(0.01, 2);
   });
 
   it("falls as the line rises and never reaches certainty", () => {

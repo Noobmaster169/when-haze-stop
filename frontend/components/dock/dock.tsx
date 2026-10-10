@@ -20,8 +20,10 @@ import { useDock } from "./dock-state";
  * a question asked on one page is still being answered on the next. It resumes
  * the conversation it was left in, and its History lists every other one.
  *
- * Below 1280px it is a sheet over the page rather than a column, which keeps
- * the page from moving when it opens.
+ * It slides in from the right. From 1280px it is a column the page makes room
+ * for, its width easing open; below that it is a sheet over the page, which
+ * keeps the page from moving. Its thread mounts on first opening and stays,
+ * so closing and reopening keeps a half-read answer where it was.
  */
 
 const Held = z.object({ thread: ChatThread.nullable() });
@@ -42,14 +44,21 @@ export function Dock() {
   // The remembered conversation is read from local storage, which the server
   // cannot see; seeding before hydration would resume nothing every time.
   const hydrated = useHydrated();
-  if (!dock.open || !hydrated) return null;
+  const [opened, setOpened] = useState(dock.open);
+  if (dock.open && !opened) setOpened(true);
+  if (!hydrated) return null;
+  const shown = dock.open ? "visible translate-x-0 xl:w-[380px]" : "invisible translate-x-full xl:w-0 xl:translate-x-0 xl:border-l-0";
   return (
     <aside
       aria-label="Ask Haze"
-      className="fixed inset-y-0 right-0 z-30 flex w-full max-w-[380px] shrink-0 flex-col border-l border-hairline bg-surface shadow-overlay xl:static xl:shadow-none"
+      inert={!dock.open}
+      className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-[380px] shrink-0 flex-col border-l border-hairline bg-surface shadow-overlay transition-[translate,width,visibility] duration-300 ease-island xl:static xl:max-w-none xl:overflow-hidden xl:shadow-none ${shown}`}
     >
-      {/* Keyed on the thread counter, so New and an opened history item start fresh while the first question's own conversation does not remount it. */}
-      <DockSeed key={dock.thread} />
+      {/* A fixed width inside, so the thread does not reflow while the column eases open. */}
+      <div className="flex h-full w-full flex-col xl:w-[380px] xl:shrink-0">
+        {/* Keyed on the thread counter, so New and an opened history item start fresh while the first question's own conversation does not remount it. */}
+        {opened ? <DockSeed key={dock.thread} /> : null}
+      </div>
     </aside>
   );
 }

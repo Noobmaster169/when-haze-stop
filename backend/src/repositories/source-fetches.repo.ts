@@ -55,9 +55,27 @@ export async function latest(db: Queryable): Promise<SourceFetch[]> {
   return rows.map(toFetch);
 }
 
-export async function recent(db: Queryable, limit: number): Promise<SourceFetch[]> {
-  const { rows } = await db.query<FetchRow>(`select ${COLUMNS} from source_fetches order by started_at desc, id desc limit $1`, [limit]);
+/** One source's fetches, newest first. */
+export async function page(db: Queryable, source: string, limit: number, offset: number): Promise<SourceFetch[]> {
+  const { rows } = await db.query<FetchRow>(
+    `select ${COLUMNS} from source_fetches where source = $1 order by started_at desc, id desc limit $2 offset $3`,
+    [source, limit, offset],
+  );
   return rows.map(toFetch);
+}
+
+export async function count(db: Queryable, source: string): Promise<number> {
+  const { rows } = await db.query<{ total: string }>("select count(*) as total from source_fetches where source = $1", [source]);
+  return Number(rows[0]?.total ?? 0);
+}
+
+/** When each fetch since an instant started and whether it worked, oldest first. */
+export async function marksSince(db: Queryable, since: Date): Promise<{ source: string; at: Date; ok: boolean }[]> {
+  const { rows } = await db.query<{ source: string; started_at: Date; ok: boolean }>(
+    "select source, started_at, ok from source_fetches where started_at >= $1 order by started_at",
+    [since],
+  );
+  return rows.map((row) => ({ source: row.source, at: row.started_at, ok: row.ok }));
 }
 
 /** How many fetches of each source worked and failed since an instant. */

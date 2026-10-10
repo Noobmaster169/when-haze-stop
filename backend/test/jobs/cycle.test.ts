@@ -1,8 +1,9 @@
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { Accuracy, AlertFeed, GuidelineList, HazeMap, PlaceList, StationOutlook, Subscription, SubscriptionList } from "../../src/contracts";
-import { closePool } from "../../src/db";
+import { Accuracy, AlertFeed, Simulation, AreaList, GuidelineList, HazeMap, PlaceList, PushKey, StatementPage, StationOutlook, Subscription, SubscriptionList } from "../../src/contracts";
+import { closePool, getPool } from "../../src/db";
+import { evaluateAlerts } from "../../src/jobs/alerts";
 import { FIELD_CELLS } from "../../src/haze/grid";
 import { type FakeDoeClient, FakeGeocoder } from "../../src/sources/__fakes__/fake.sources";
 import { testApp } from "../app";
@@ -49,6 +50,15 @@ describe("one cycle, then what the api serves", () => {
     expect(map.fires[0].frpMw).toBeGreaterThan(1000);
   });
 
+  it("explains the run and replays the stored readings against no change", async () => {
+    const simulation = Simulation.parse((await request(app).get("/haze/simulation").expect(200)).body);
+    expect(simulation.run?.members).toBe(10);
+    expect(simulation.period.stations).toBeGreaterThan(0);
+    const oneHour = simulation.skill.find((row) => row.lead === 1);
+    expect(oneHour?.cases).toBeGreaterThan(0);
+    expect(simulation.histogram.reduce((sum, bin) => sum + bin.count, 0)).toBe(simulation.period.readings);
+  });
+
   it("gives a station a forecast and a day-by-day outlook against the official lines", async () => {
     const outlook = StationOutlook.parse((await request(app).get("/haze/stations/CA24N").expect(200)).body);
     expect(outlook.forecast).toHaveLength(84);
@@ -59,11 +69,24 @@ describe("one cycle, then what the api serves", () => {
     expect(Object.keys(outlook.days[1].chance)).toEqual(["100", "150", "180", "200"]);
   });
 
-  it("raises an alert for a reading over a line, once", async () => {
+  it("reads the statements once, and shows only those whose quote is in the text", async () => {
+    const page = StatementPage.parse((await request(app).get("/statements?status=all").expect(200)).body);
+    const summaries = page.statements.map((statement) => statement.summary);
+    expect(summaries).toEqual(expect.arrayContaining(["Education institutions close where the API passes 180, from 9 October.", "All education institutions in Negeri Sembilan close from 9 October."]));
+    // The Johor reading quoted a sentence its headline does not hold.
+    expect(summaries.some((summary) => summary.includes("Johor"))).toBe(false);
+    const rule = page.statements.find((statement) => statement.threshold === 180);
+    expect(rule).toMatchObject({ status: "in-force", outlet: "Kementerian Pendidikan" });
+    expect(page.statements.find((statement) => statement.threshold === 200)?.status).toBe("replaced");
+    await request(app).get("/statements?status=some").expect(400);
+  });
+
+  it("raises one alert for Seremban, the order that covers it, and says it once", async () => {
     const feed = AlertFeed.parse((await request(app).get("/alerts").expect(200)).body);
-    const seremban = feed.events.filter((event) => event.stationId === "CA24N" && event.kind === "observed");
-    expect(seremban).toHaveLength(1);
-    expect(seremban[0].message).toBe("Seremban: API 182, above 180. Schools close under the Education Ministry rule.");
+    // Newest first. The test database is kept between runs, so older alerts may sit below it.
+    const [newest] = feed.events.filter((event) => event.stationId === "CA24N");
+    expect(newest).toMatchObject({ kind: "order", message: "Ministry of Education: All education institutions in Negeri Sembilan close from 9 October." });
+    expect(await evaluateAlerts(getPool(), null, new Date(LAST_HOUR.getTime() + 20 * 60_000))).toBe(0);
   });
 
   it("lets a browser follow a station and read only what it follows", async () => {
@@ -77,6 +100,22 @@ describe("one cycle, then what the api serves", () => {
     expect(mine.events.length).toBeGreaterThan(0);
     expect(mine.events.every((event) => event.stationId === "CA24N")).toBe(true);
     await request(app).post("/alerts/subscriptions").send({ sessionId: SESSION, stationId: "NOPE" }).expect(404);
+  });
+
+  it("gives each followed area a card that leads with the forecast and lists the order in force", async () => {
+    const { areas } = AreaList.parse((await request(app).get(`/alerts/areas?session=${SESSION}`).expect(200)).body);
+    expect(areas).toHaveLength(1);
+    expect(areas[0]).toMatchObject({ stationId: "CA24N", stationName: "Seremban", api: 182, alert: { kind: "order" } });
+    expect(areas[0].days).toHaveLength(4);
+    expect(areas[0].headline.title.length).toBeGreaterThan(0);
+    expect(areas[0].orders.map((order) => order.states)).toEqual([["Negeri Sembilan"]]);
+  });
+
+  it("keeps the device a session notifies, and says when no push key is set", async () => {
+    const push = { endpoint: "https://fcm.googleapis.com/fcm/send/test-endpoint", keys: { p256dh: "BNcR", auth: "tBHI" } };
+    await request(app).put("/alerts/push").send({ sessionId: SESSION, push }).expect(204);
+    await request(app).put("/alerts/push").send({ sessionId: SESSION, push: { endpoint: "not a url" } }).expect(400);
+    expect(PushKey.parse((await request(app).get("/alerts/push-key").expect(200)).body).publicKey).toBeNull();
   });
 
   it("finds a place by name, a station's own name first", async () => {

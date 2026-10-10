@@ -12,8 +12,8 @@ const HOME: Record<string, { href: string; title: string }> = {
   "Open-Meteo": { href: "https://open-meteo.com/", title: "Open-Meteo, wind and rain forecast" },
   METAR: { href: "https://aviationweather.gov/data/api/", title: "Airport weather reports (METARs) from NOAA's Aviation Weather Center" },
   "NEA Singapore": { href: "https://www.haze.gov.sg/", title: "National Environment Agency Singapore, hourly PM2.5 and PSI by region" },
-  "Haze model": { href: "/accuracy", title: "This app's own smoke model, and how well it has done" },
-  "Ministry guidance": { href: "/accuracy#lines", title: "Thresholds published by the Ministries of Education and Health" },
+  "Haze model": { href: "/simulation", title: "How the simulation runs, and the backtest that shows it predicts" },
+  "Ministry guidance": { href: "/simulation#lines", title: "Thresholds published by the Ministries of Education and Health" },
 };
 
 export function Sources({ calls }: { calls: ChatToolCall[] }) {

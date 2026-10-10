@@ -42,6 +42,18 @@ export async function newestAt(db: Queryable, network?: Network): Promise<Date |
   return rows[0]?.at ?? null;
 }
 
+/** How many of one network's stations reported each hour, over the `hours` before that network's newest reading. */
+export async function stationsPerHour(db: Queryable, hours: number, network: Network): Promise<{ at: Date; stations: number }[]> {
+  const { rows } = await db.query<{ at: Date; stations: string }>(
+    `with mine as (select r.observed_at from readings r join stations s on s.id = r.station_id where s.network = $2)
+     select observed_at as at, count(*) as stations from mine
+      where observed_at > (select max(observed_at) from mine) - make_interval(hours => $1)
+      group by observed_at order by observed_at`,
+    [hours, network],
+  );
+  return rows.map((row) => ({ at: row.at, stations: Number(row.stations) }));
+}
+
 export async function oldestAt(db: Queryable): Promise<Date | null> {
   const { rows } = await db.query<{ at: Date | null }>("select min(observed_at) as at from readings");
   return rows[0]?.at ?? null;

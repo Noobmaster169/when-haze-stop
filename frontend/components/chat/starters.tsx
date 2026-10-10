@@ -11,7 +11,7 @@ const STARTERS = [
 export function Starters({ onAsk }: { onAsk(question: string): void }) {
   return (
     <div>
-      <p className="text-small leading-[19px] text-ink-tertiary">Ask about haze anywhere in Malaysia. Answers come from the readings, fires, wind and forecast on the map, and name their sources.</p>
+      <p className="text-small leading-[19px] text-ink-tertiary">Ask about haze anywhere in Malaysia.</p>
       <ul className="mt-3 space-y-1.5">
         {STARTERS.map((question) => (
           <li key={question}>

@@ -35,6 +35,15 @@ const Env = z.object({
   // else runs without it.
   FIRMS_MAP_KEY: optionalString,
 
+  // Web Push, so an alert reaches a device with the tab closed. Make a pair
+  // with `npx web-push generate-vapid-keys`. Without them alerts still show in
+  // the app and no notification is sent.
+  VAPID_PUBLIC_KEY: optionalString,
+  VAPID_PRIVATE_KEY: optionalString,
+  // The contact the push services may write to. Safari refuses a localhost
+  // one, so set a real mailto: or https: address before relying on it there.
+  VAPID_SUBJECT: z.string().min(1).default("mailto:admin@localhost"),
+
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal", "silent"]).default("info"),
 
   // The commit an image was built from. "dev" outside a built image, which is

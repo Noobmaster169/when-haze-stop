@@ -4,7 +4,7 @@
  * page joins those records to this list.
  */
 
-export const TRACKED_SOURCES = ["doe-stations", "doe-readings", "firms", "open-meteo", "firms-archive", "open-meteo-history", "metar", "nea"] as const;
+export const TRACKED_SOURCES = ["doe-stations", "doe-readings", "firms", "open-meteo", "firms-archive", "open-meteo-history", "metar", "nea", "moe-statements", "doe-statements", "news-statements"] as const;
 export type SourceId = (typeof TRACKED_SOURCES)[number];
 
 export interface SourceEntry {
@@ -109,10 +109,54 @@ export const SOURCE_CATALOG: readonly SourceEntry[] = [
     tracked: true,
   },
   {
+    id: "moe-statements",
+    name: "Education Ministry statements",
+    provider: "Ministry of Education Malaysia (KPM)",
+    what: "Press statements about the haze, read from the statement PDF: school closing rules and closures.",
+    endpoint: "https://www.moe.gov.my/kenyataan-media",
+    link: "https://www.moe.gov.my/kenyataan-media",
+    cadence: "Every hour, at 20 past",
+    everyHours: 1,
+    tracked: true,
+  },
+  {
+    id: "doe-statements",
+    name: "DOE statements",
+    provider: "Department of Environment Malaysia (JAS)",
+    what: "DOE posts of the last 30 days that mention the haze.",
+    endpoint: "https://www.doe.gov.my/wp-json/wp/v2/posts?search=jerebu",
+    link: "https://www.doe.gov.my/kenyataan-media/",
+    cadence: "Every hour, at 20 past",
+    everyHours: 1,
+    tracked: true,
+  },
+  {
+    id: "news-statements",
+    name: "Orders in the news",
+    provider: "Google News search",
+    what: "Headlines of the last 7 days that announce a closure, emergency or decree, for authorities that post nowhere we can fetch.",
+    endpoint: "https://news.google.com/rss/search?q=jerebu+when:7d",
+    link: "https://news.google.com/",
+    cadence: "Every hour, at 20 past",
+    everyHours: 1,
+    tracked: true,
+  },
+  {
+    id: "gazetteer",
+    name: "Towns and districts",
+    provider: "GeoNames (CC BY 4.0)",
+    what: "1,706 towns, districts and states of Malaysia, Singapore and Brunei, bundled so a search answers at once.",
+    endpoint: "backend/src/sources/gazetteer-data.ts",
+    link: "https://www.geonames.org/",
+    cadence: "Static, bundled",
+    everyHours: null,
+    tracked: false,
+  },
+  {
     id: "geocoder",
     name: "Place search",
     provider: "Open-Meteo geocoding",
-    what: "Turns a place name into coordinates for the search box and the assistant. Asked by the api on each search, not recorded here.",
+    what: "Finds the villages the bundled list leaves out. Asked by the api only when the list has few matches, and cached for a day.",
     endpoint: "https://geocoding-api.open-meteo.com/v1/search",
     link: "https://open-meteo.com/en/docs/geocoding-api",
     cadence: "On each search",

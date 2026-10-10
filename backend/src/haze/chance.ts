@@ -12,14 +12,17 @@ export type Quantiles = [number, number, number, number, number];
 const LEVELS = [0.1, 0.25, 0.5, 0.75, 0.9];
 
 /**
- * The errors of the first hindcast, 6 to 10 October 2026, by lead and by
- * whether the station was already above 100. They stand in until the scores
- * table has enough cases of its own for a lead.
+ * The errors of the station forecast (`station-forecast.ts`) replayed on the
+ * readings of every hour from 3 to 10 October 2026, by lead and by whether the
+ * station was already above 100: 9,792, 8,160 and 6,528 cases at 24, 48 and
+ * 72 hours. `all` is the stations at or under 100; its long upper tail is the
+ * 101 to 150 band, which a reading crosses in an hour or two. They stand in
+ * until the scores table has enough cases of its own for a lead.
  */
 const FIRST_HINDCAST: Record<24 | 48 | 72, { all: Quantiles; hazy: Quantiles }> = {
-  24: { all: [-12.8, -4.6, 4.2, 15.2, 28.5], hazy: [-21.9, -6.7, 3.5, 13.8, 24.1] },
-  48: { all: [-11.8, -2.5, 6.7, 23, 48.2], hazy: [-36.7, -2.5, 7, 18.7, 29.8] },
-  72: { all: [-15.1, -0.2, 13.1, 36, 75.6], hazy: [-45.2, -1.3, 12.8, 23.7, 36.6] },
+  24: { all: [-12, -4.3, 3.2, 15, 53.2], hazy: [-31.2, -10, -0.8, 6.8, 18.2] },
+  48: { all: [-13, -4, 7, 41.9, 77], hazy: [-50.4, -9, 2, 13, 25] },
+  72: { all: [-10, -1, 21, 75, 86], hazy: [-60.9, -13, 5, 17.8, 30] },
 };
 
 export function leadBucket(leadHours: number): 24 | 48 | 72 {

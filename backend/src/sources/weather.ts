@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { DOMAIN, WEATHER, WEATHER_POINTS } from "../haze/grid";
 import type { WeatherGrid } from "../haze/transport";
-import { TerminalError } from "../lib/errors";
+import { RetryableError, TerminalError } from "../lib/errors";
 import { fetchText, pause } from "./http";
 
 /**
@@ -89,6 +89,21 @@ export function assembleGrid(rows: Location[][]): WeatherGrid {
   return grid;
 }
 
+/** Tries per row before the whole fetch is given up. A dropped connection on one of fifteen rows should not cost the hour. */
+const ATTEMPTS = 3;
+const RETRY_WAIT_MS = 5_000;
+
+async function fetchRow(url: string, what: string): Promise<string> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fetchText(url, what, TIMEOUT_MS);
+    } catch (error) {
+      if (!(error instanceof RetryableError) || attempt >= ATTEMPTS) throw error;
+      await pause(RETRY_WAIT_MS * attempt);
+    }
+  }
+}
+
 /** One request per row of the grid; `span` is the part of the query that says which hours. */
 async function fetchGrid(base: string, span: string, what: string, spacingMs: number): Promise<WeatherGrid> {
   const lons = Array.from({ length: WEATHER.nx }, (_, i) => DOMAIN.lon0 + i * WEATHER.step);
@@ -96,7 +111,7 @@ async function fetchGrid(base: string, span: string, what: string, spacingMs: nu
   for (let j = 0; j < WEATHER.ny; j++) {
     const lat = DOMAIN.lat0 + j * WEATHER.step;
     const url = `${base}?latitude=${lons.map(() => lat).join(",")}&longitude=${lons.join(",")}&hourly=${FIELDS}&${span}&wind_speed_unit=ms&timezone=GMT`;
-    const parsed = Row.safeParse(JSON.parse(await fetchText(url, what, TIMEOUT_MS)));
+    const parsed = Row.safeParse(JSON.parse(await fetchRow(url, what)));
     if (!parsed.success) throw new TerminalError("Open-Meteo answered in a shape this client does not know", { cause: parsed.error });
     rows.push(parsed.data);
     if (j < WEATHER.ny - 1) await pause(spacingMs);

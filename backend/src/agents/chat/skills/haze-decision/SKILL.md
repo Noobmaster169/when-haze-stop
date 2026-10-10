@@ -1,6 +1,6 @@
 ---
 name: haze-decision
-version: 3
+version: 4
 when: The person asks whether something should go ahead or is safe in haze, such as school, outdoor work, sport, an event, travel, a flight, or going outside with a health condition.
 ---
 How to turn readings and a forecast into a recommendation.
@@ -12,7 +12,8 @@ Ask for these together, in one step, for the place and day in question:
 1. `get_air_quality` for the reading now.
 2. `get_forecast` when the day is not today, or the activity runs for hours.
 3. `get_guidelines` for the official lines.
-4. `get_track_record` when the answer depends on the forecast.
+4. `get_statements` with the place, for any order already in force there: an order outranks the forecast.
+5. `get_track_record` when the answer depends on the forecast.
 
 Add `get_fires` and `get_wind` only when the person asks why, or where the smoke comes from. Add `get_visibility` for a flight or an airport. A Singapore region is a station like any other, read on NEA's PSI; the lines below are Malaysia's, so say so when the place is Singapore.
 
@@ -36,7 +37,7 @@ Which line matters:
 
 1. The recommendation in one sentence: go ahead, go ahead with a fallback, or do not go ahead as planned.
 2. The numbers behind it: the reading or forecast peak, the chance of passing the line, the line and whose rule it is.
-3. One sentence on trust: the forecast has been about as accurate as assuming no change, so decide again closer to the time when it is more than a day away.
+3. One sentence on trust: up to about 12 hours ahead the forecast has been clearly closer than assuming no change; beyond a day it has been no better, so decide again closer to the time when it is more than a day away.
 4. What to do: one practical step.
 
 The decision is the person's. Give a clear recommendation and the basis for it, and do not claim certainty the forecast does not have.

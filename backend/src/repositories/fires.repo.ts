@@ -80,3 +80,9 @@ export async function byDay(db: Queryable): Promise<FireDay[]> {
   );
   return rows.map((row) => ({ day: row.day, cells: Number(row.cells), frpMw: Math.round(row.frp_mw) }));
 }
+
+/** The burning cells and their total fire power on one UTC day. */
+export async function dayTotal(db: Queryable, day: string): Promise<{ cells: number; frpMw: number }> {
+  const { rows } = await db.query<{ cells: string; frp: number | null }>(`select count(*) as cells, sum(${BURNING}) as frp from fire_cells where day = $1 and ${BURNING} > 0`, [day]);
+  return { cells: Number(rows[0]?.cells ?? 0), frpMw: Math.round(Number(rows[0]?.frp ?? 0)) };
+}

@@ -6,15 +6,19 @@
  * south-west corner, so index 0 is the bottom-left cell on a map.
  */
 
-export const DOMAIN = { lon0: 96, lat0: -6, lon1: 118, lat1: 8 } as const;
+// East to 120 so all of Sabah is inside: Semporna and Tawau reach about 119.3.
+export const DOMAIN = { lon0: 96, lat0: -6, lon1: 120, lat1: 8 } as const;
 
-/** Wind and rain arrive on this one. One degree is as fine as the free forecast is worth sampling. */
-export const WEATHER = { nx: 23, ny: 15, step: 1 } as const;
+/** Wind and rain arrive on this one, a point on every whole degree. One degree is as fine as the free forecast is worth sampling. */
+export const WEATHER = { nx: DOMAIN.lon1 - DOMAIN.lon0 + 1, ny: DOMAIN.lat1 - DOMAIN.lat0 + 1, step: 1 } as const;
 export const WEATHER_POINTS = WEATHER.nx * WEATHER.ny;
 
 /** Smoke is counted on this one. A quarter degree is about 28 km. */
-export const FIELD = { nx: 88, ny: 56, step: 0.25 } as const;
+export const FIELD = { nx: (DOMAIN.lon1 - DOMAIN.lon0) * 4, ny: (DOMAIN.lat1 - DOMAIN.lat0) * 4, step: 0.25 } as const;
 export const FIELD_CELLS = FIELD.nx * FIELD.ny;
+
+/** Names the region and field step together, so a stored run says which grid its frames are on. */
+export const GRID_KEY = `${DOMAIN.lon0}:${DOMAIN.lon1}:${DOMAIN.lat0}:${DOMAIN.lat1}:${FIELD.step}`;
 
 const KM_PER_DEGREE = 111.2;
 

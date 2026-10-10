@@ -4,17 +4,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Place } from "@/lib/api/haze-schemas";
 
-import { distanceKm } from "./geo";
+import { REGION } from "./geo";
 import { HistoryStrip } from "./history-strip";
+import { LocateCard } from "./locate-card";
 import { type Layers, MapCanvas, type MapHandle, type Pick } from "./map-canvas";
 import { Legend, LayerToggles, ZoomButtons } from "./map-controls";
 import { apiAt } from "./map-data";
 import { PlaceSearch } from "./place-search";
-import { type Probe, ProbeTip } from "./probe-tip";
+import { PointPanel } from "./point-panel";
+import { nearestStation, type Probe, ProbeTip } from "./probe-tip";
 import { StationPanel } from "./station-panel";
 import { Timeline } from "./timeline";
 import { useHazeDay } from "./use-haze-day";
 import { useHazeMap } from "./use-haze-map";
+import { saveLocation, useMyLocation } from "./my-location";
 
 /**
  * The map page: the map, what is laid over it, the timeline under it and the
@@ -37,6 +40,7 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
   const [layers, setLayers] = useState(ALL_LAYERS);
   const [selected, setSelected] = useState<{ id: string; via: string | null } | null>(initialStation ? { id: initialStation, via: null } : null);
   const [probe, setProbe] = useState<Probe | null>(null);
+  const [preview, setPreview] = useState<Place | null>(null);
 
   // Until the timeline is touched it sits on the newest readings, and moves with them when a new run lands.
   const at = chosenAt ?? data?.asOf ?? 0;
@@ -54,17 +58,7 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
     handle.current?.flyTo(target.lon, target.lat);
   }, [initialStation, data]);
 
-  const nearestTo = useCallback(
-    (lon: number, lat: number): Probe["nearest"] => {
-      let best: Probe["nearest"] = null;
-      for (const item of data?.stations ?? []) {
-        const km = Math.round(distanceKm(lat, lon, item.lat, item.lon));
-        if (!best || km < best.km) best = { id: item.id, name: item.name, km };
-      }
-      return best;
-    },
-    [data],
-  );
+  const nearestTo = useCallback((lon: number, lat: number) => nearestStation(data?.stations ?? [], lon, lat), [data]);
 
   const chooseDay = useCallback(
     (day: string | null) => {
@@ -79,23 +73,61 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
   const hasField = (data?.fields.length ?? 0) > 0;
   const pick = useCallback(
     (picked: Pick) => {
+      handle.current?.reveal(picked.lon, picked.lat);
       if (picked.station) {
         setSelected({ id: picked.station.id, via: null });
         setProbe(null);
         return;
       }
-      if (hasField) setProbe({ lon: picked.lon, lat: picked.lat, nearest: nearestTo(picked.lon, picked.lat) });
+      // A day from before the first readings has no field, so a spot on it has nothing to show.
+      if (!hasField) return;
+      setSelected(null);
+      setProbe({ lon: picked.lon, lat: picked.lat, name: null, nearest: nearestTo(picked.lon, picked.lat) });
     },
     [nearestTo, hasField],
   );
 
+  const location = useMyLocation();
+  /** Your own spot opens like any other, named as yours, with its nearest station one tap away. */
+  const goHome = useCallback(
+    (lat: number, lon: number) => {
+      const inside = lon >= REGION.lon0 && lon <= REGION.lon1 && lat >= REGION.lat0 && lat <= REGION.lat1;
+      const nearest = inside ? nearestTo(lon, lat) : null;
+      saveLocation({ lat, lon, nearest });
+      if (!inside) return;
+      handle.current?.flyTo(lon, lat);
+      setSelected(null);
+      setProbe({ lon, lat, name: "Your location", nearest });
+    },
+    [nearestTo],
+  );
+  const homed = useRef(false);
+  useEffect(() => {
+    if (homed.current || initialStation || !data || !location || location === "declined") return;
+    homed.current = true;
+    goHome(location.lat, location.lon);
+  }, [data, location, initialStation, goHome]);
+
+  /** A station opens its own panel. Anywhere else opens the spot itself, named, with its nearest station one tap away. */
   const choosePlace = useCallback((place: Place) => {
     handle.current?.flyTo(place.lon, place.lat);
-    if (!place.nearest) return;
-    const away = place.nearest.km > 0;
-    setSelected({ id: place.nearest.id, via: away ? `${place.name}, ${place.nearest.km} km away` : null });
-    setProbe(away ? { lon: place.lon, lat: place.lat, nearest: null } : null);
+    if (place.nearest && place.nearest.km === 0) {
+      setSelected({ id: place.nearest.id, via: null });
+      setProbe(null);
+      return;
+    }
+    setSelected(null);
+    setProbe({ lon: place.lon, lat: place.lat, name: place.name, nearest: place.nearest });
   }, []);
+
+  const openStation = useCallback(
+    (id: string) => {
+      const from = probe?.name && probe.nearest ? `${probe.name}, ${probe.nearest.km} km away` : null;
+      setSelected({ id, via: from });
+      setProbe(null);
+    },
+    [probe],
+  );
 
   const followTip = useCallback(() => {
     const element = tip.current;
@@ -115,11 +147,13 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
     <div className="flex min-h-0 grow flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
       <div className="flex min-w-0 shrink-0 grow flex-col lg:min-h-0 lg:shrink">
         <div className="@container relative h-[54dvh] min-h-[300px] shrink-0 lg:h-auto lg:shrink lg:grow">
-          <MapCanvas handle={handle} data={data} basemap={basemap} at={at} layers={layers} selectedId={station?.id ?? null} pin={probe} onPick={pick} onPaint={followTip} />
-          <div className="absolute left-3 top-3 z-20">
-            <PlaceSearch onChoose={choosePlace} />
+          <MapCanvas handle={handle} data={data} basemap={basemap} at={at} layers={layers} selectedId={station?.id ?? null} pin={probe} preview={preview && (preview.lon !== probe?.lon || preview.lat !== probe?.lat) ? preview : null} onPick={pick} onPaint={followTip} />
+          {/* Under the island on a map too narrow to hold both side by side. */}
+          <div className="absolute left-3 top-16 z-30 @[900px]:top-3">
+            <PlaceSearch onChoose={choosePlace} onPreview={setPreview} />
           </div>
-          <div className="absolute right-3 top-3">
+          {/* Below the chat's button, which floats in the corner above. */}
+          <div className="absolute right-3 top-16">
             <ZoomButtons onZoom={(factor) => handle.current?.zoom(factor)} />
           </div>
           <div className="absolute bottom-3 left-3">
@@ -128,19 +162,15 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
           <div className="absolute bottom-3 right-3 hidden @[640px]:block">
             <Legend />
           </div>
-          {probe && data && hasField ? (
-            <ProbeTip
-              anchor={tip}
-              api={apiAt(data, at, probe.lon, probe.lat)}
-              at={at}
-              probe={probe}
-              onStation={(id) => {
-                setSelected({ id, via: null });
-                setProbe(null);
-              }}
-            />
+          {probe && data && hasField ? <ProbeTip anchor={tip} api={apiAt(data, at, probe.lon, probe.lat)} at={at} /> : null}
+          {data && location === null ? (
+            <div className="absolute left-1/2 top-1/2 z-30 -translate-x-1/2 -translate-y-1/2">
+              <LocateCard onLocated={goHome} onDecline={() => saveLocation("declined")} />
+            </div>
           ) : null}
           {!data ? <p className="absolute inset-x-0 top-1/2 text-center text-small text-ink-tertiary">Loading the map</p> : null}
+          {station ? <StationPanel key={station.id} station={station} at={at} via={selected?.via ?? null} onClose={() => setSelected(null)} /> : null}
+          {!station && probe && data && hasField ? <PointPanel data={data} basemap={basemap} probe={probe} at={at} onStation={openStation} onClose={() => setProbe(null)} /> : null}
         </div>
         <HistoryStrip days={history.days} day={history.day} onChoose={chooseDay} />
         {data && history.day ? (
@@ -149,7 +179,6 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
           <Timeline from={data.times[0]} to={data.times[data.times.length - 1]} now={data.asOf} at={at} playing={playing} onSeek={seek} onPlaying={setPlaying} />
         ) : null}
       </div>
-      {station ? <StationPanel key={station.id} station={station} at={at} via={selected?.via ?? null} onClose={() => setSelected(null)} /> : null}
     </div>
   );
 }

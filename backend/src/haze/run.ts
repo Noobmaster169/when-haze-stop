@@ -1,15 +1,17 @@
-import { type Calibration, calibrate, type Pair, toApi } from "./calibrate";
+import { apiToPm25 } from "./api-index";
+import { calibrate, type Pair, toPm25 } from "./calibrate";
 import { ensembleMean } from "./ensemble";
 import { type Anchor, forecastFrame, modelled, observedFrame, spreadErrors, stationWeight } from "./field";
 import { emissionsFor, type FireCellDay } from "./fires";
 import { addHours, cellsWithin, hoursBetween } from "./grid";
 import { REACH_KM, smokeFrom } from "./smoke";
+import { carried, forecastStation, windowSlope } from "./station-forecast";
 import type { Weather } from "./transport";
 
 /**
  * One run of the model, from what was known at `asOf` to a map and a forecast
  * for every station. Pure: everything it reads is handed in, so a backfilled
- * hour and the live one go through exactly the same code.
+ * hour, a backtest and the live one go through exactly the same code.
  */
 
 export interface RunStation {
@@ -36,14 +38,14 @@ export interface RunFrame {
 }
 
 export interface RunOutput {
-  calibration: Calibration;
+  calibration: ReturnType<typeof calibrate>;
   frames: RunFrame[];
   /** Hourly from `asOf` + 1 hour. Absent for a station outside the region or with no recent reading. */
   forecasts: { stationId: string; api: Float32Array }[];
 }
 
-/** The modelled change is scaled by this before it moves a forecast: its changes have run about this much too large. */
-export const GAIN = 0.4;
+/** Names the method, so runs made by different methods are never scored or drawn together. */
+export const MODEL_VERSION = "v2";
 export const HORIZON_HOURS = 84;
 const FRAME_EVERY = 3;
 const FRAMES_BACK_HOURS = 24;
@@ -53,10 +55,10 @@ const FIT_WINDOW_HOURS = 120;
 /** A station that has said nothing for this long has no reading to carry forward. */
 const STALE_HOURS = 6;
 
-function latestReading(readings: Float32Array, hour: number): number | null {
+/** The hour of the newest reading at or before `hour`, no older than STALE_HOURS. */
+function anchorHour(readings: Float32Array, hour: number): number | null {
   for (let back = 0; back <= STALE_HOURS && hour - back >= 0; back++) {
-    const value = readings[hour - back];
-    if (!Number.isNaN(value)) return value;
+    if (!Number.isNaN(readings[hour - back])) return hour - back;
   }
   return null;
 }
@@ -73,31 +75,32 @@ export function runModel(input: RunInput): RunOutput {
   for (const { station, cells } of placed) {
     for (let hour = Math.max(SPIN_UP_HOURS, now - FIT_WINDOW_HOURS); hour <= now; hour++) {
       const api = station.readings[hour];
-      if (!Number.isNaN(api)) pairs.push({ smoke: smoke.near(cells, hour), api });
+      if (!Number.isNaN(api)) pairs.push({ smoke: smoke.near(cells, hour), pm25: apiToPm25(api) });
     }
   }
   const calibration = calibrate(pairs);
-  const modelAt = (cells: number[], hour: number): number => toApi(calibration, smoke.near(cells, hour));
+  const modelAt = (cells: number[], hour: number): number => toPm25(calibration, smoke.near(cells, hour));
 
-  const forecasts: RunOutput["forecasts"] = [];
-  for (const { station, cells } of placed) {
-    const anchor = latestReading(station.readings, now);
-    if (anchor === null) continue;
-    const base = modelAt(cells, now);
-    const api = new Float32Array(end - now);
-    for (let hour = now + 1; hour <= end; hour++) api[hour - now - 1] = Math.max(0, anchor + GAIN * (modelAt(cells, hour) - base));
-    forecasts.push({ stationId: station.id, api });
-  }
+  // One anchor per station, used alike by its forecast and by the map, so the two cannot disagree.
+  const anchored = placed.flatMap(({ station, cells }) => {
+    const hour = anchorHour(station.readings, now);
+    return hour === null ? [] : [{ station, cells, hour }];
+  });
 
-  const anchorsAt = (hour: number): Anchor[] =>
+  const forecasts: RunOutput["forecasts"] = anchored.map(({ station, hour }) => ({
+    stationId: station.id,
+    api: forecastStation({ readings: station.readings, anchorHour: hour, now, end }),
+  }));
+
+  const errorsAt = (hour: number): Anchor[] =>
     placed.flatMap(({ station, cells }) => {
       const reading = station.readings[hour];
-      return Number.isNaN(reading) ? [] : [{ lat: station.lat, lon: station.lon, error: reading - modelAt(cells, hour) }];
+      return Number.isNaN(reading) ? [] : [{ lat: station.lat, lon: station.lon, error: apiToPm25(reading) - modelAt(cells, hour) }];
     });
-
+  const errorsNow = spreadErrors(anchored.map(({ station, cells, hour }) => ({ lat: station.lat, lon: station.lon, error: apiToPm25(station.readings[hour]) - modelAt(cells, hour) })));
+  const slopes = spreadErrors(anchored.map(({ station, hour }) => ({ lat: station.lat, lon: station.lon, error: windowSlope(station.readings, hour) })));
   const modelNow = modelled(calibration, smoke.everywhere(now));
-  const errorsNow = spreadErrors(anchorsAt(now));
-  const weight = stationWeight(placed.map(({ station }) => station));
+  const weight = stationWeight(anchored.map(({ station }) => station));
 
   const frames: RunFrame[] = [];
   // Frames sit on fixed three-hour marks so every run's frames line up into one history, plus one at `asOf` itself.
@@ -105,8 +108,14 @@ export function runModel(input: RunInput): RunOutput {
   const onMark = (hour: number): boolean => ((startMs / 3_600_000 + hour) % FRAME_EVERY + FRAME_EVERY) % FRAME_EVERY === 0;
   for (let hour = Math.max(0, now - FRAMES_BACK_HOURS); hour <= end; hour++) {
     if (hour !== now && !onMark(hour)) continue;
-    const model = hour === now ? modelNow : modelled(calibration, smoke.everywhere(hour));
-    const field = hour <= now ? observedFrame(model, hour === now ? errorsNow : spreadErrors(anchorsAt(hour))) : forecastFrame(model, modelNow, errorsNow, weight, GAIN);
+    let field: Uint8Array;
+    if (hour === now) field = observedFrame(modelNow, errorsNow);
+    else if (hour < now) field = observedFrame(modelled(calibration, smoke.everywhere(hour)), spreadErrors(errorsAt(hour)));
+    else {
+      const built = carried(hour - now);
+      const trend = slopes.map((slope) => slope * built);
+      field = forecastFrame({ model: modelled(calibration, smoke.everywhere(hour)), modelAtAsOf: modelNow, errorsAtAsOf: errorsNow, trend, weight });
+    }
     frames.push({ validAt: addHours(start, hour), observed: hour <= now, field });
   }
   return { calibration, frames, forecasts };

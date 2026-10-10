@@ -10,5 +10,6 @@ export * as nea from "./nea.repo";
 export * as readings from "./readings.repo";
 export * as scores from "./scores.repo";
 export * as sourceFetches from "./source-fetches.repo";
+export * as statements from "./statements.repo";
 export * as stations from "./stations.repo";
 export * as weather from "./weather.repo";

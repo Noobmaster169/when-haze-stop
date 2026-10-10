@@ -18,12 +18,10 @@ export interface Size {
   height: number;
 }
 
-/** What the model covers, which is also what the heat layer is drawn over. */
-export const REGION = { lon0: 96, lat0: -6, lon1: 118, lat1: 8 } as const;
+/** What the model covers, which is also what the heat layer is drawn over. backend/src/haze/grid.ts has the same box. */
+export const REGION = { lon0: 96, lat0: -6, lon1: 120, lat1: 8 } as const;
 
-const PAN_MARGIN = 3;
 const MAX_ZOOM = 9;
-const MIN_ZOOM = 0.8;
 
 export function toX(view: View, size: Size, lon: number): number {
   return size.width / 2 + (lon - view.cx) * view.scale;
@@ -52,12 +50,20 @@ export function homeView(size: Size): View {
   return clampView({ cx: 103.2, cy: 2.6, scale }, size);
 }
 
+/** Keeps a centre so the view's edge never passes the region's: there is no forecast out there to show. */
+function within(centre: number, halfSpan: number, low: number, high: number): number {
+  if (halfSpan * 2 >= high - low) return (low + high) / 2;
+  return Math.max(low + halfSpan, Math.min(high - halfSpan, centre));
+}
+
+/** The region always fills the canvas: no zooming out past it, no panning off its edge. */
 export function clampView(view: View, size: Size): View {
   const fit = fitScale(size);
+  const scale = Math.max(fit, Math.min(fit * MAX_ZOOM, view.scale));
   return {
-    scale: Math.max(fit * MIN_ZOOM, Math.min(fit * MAX_ZOOM, view.scale)),
-    cx: Math.max(REGION.lon0 - PAN_MARGIN, Math.min(REGION.lon1 + PAN_MARGIN, view.cx)),
-    cy: Math.max(REGION.lat0 - PAN_MARGIN, Math.min(REGION.lat1 + PAN_MARGIN, view.cy)),
+    scale,
+    cx: within(view.cx, size.width / 2 / scale, REGION.lon0, REGION.lon1),
+    cy: within(view.cy, size.height / 2 / scale, REGION.lat0, REGION.lat1),
   };
 }
 

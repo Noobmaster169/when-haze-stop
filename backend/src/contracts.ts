@@ -10,7 +10,9 @@ import { z } from "zod";
 export * from "./contracts.alerts";
 export * from "./contracts.chat";
 export * from "./contracts.haze";
+export * from "./contracts.simulation";
 export * from "./contracts.sources";
+export * from "./contracts.statements";
 
 export const CheckStatus = z.enum(["up", "down"]);
 export type CheckStatus = z.infer<typeof CheckStatus>;

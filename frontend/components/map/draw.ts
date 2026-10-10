@@ -70,6 +70,30 @@ export interface Marks {
   fontFamily: string;
   selectedId: string | null;
   pin: { lon: number; lat: number } | null;
+  /** A search result being looked at, drawn faint until it is chosen. */
+  preview: { lon: number; lat: number } | null;
+}
+
+/** A map pin: a round head on a point, the tip on the spot itself. */
+function drawPin(context: CanvasRenderingContext2D, x: number, y: number, fill: string, edge: string, alpha: number): void {
+  context.save();
+  context.globalAlpha = alpha;
+  context.beginPath();
+  context.moveTo(x, y);
+  context.bezierCurveTo(x - 3, y - 7, x - 9, y - 11, x - 9, y - 18);
+  context.arc(x, y - 18, 9, Math.PI, 0);
+  context.bezierCurveTo(x + 9, y - 11, x + 3, y - 7, x, y);
+  context.closePath();
+  context.fillStyle = fill;
+  context.fill();
+  context.lineWidth = 1.5;
+  context.strokeStyle = edge;
+  context.stroke();
+  context.beginPath();
+  context.arc(x, y - 18, 3.4, 0, Math.PI * 2);
+  context.fillStyle = edge;
+  context.fill();
+  context.restore();
 }
 
 function onCanvas(size: Size, x: number, y: number, margin: number): boolean {
@@ -107,21 +131,13 @@ export function drawMarks(context: CanvasRenderingContext2D, scene: Scene, marks
       context.arc(x, y, chosen ? 7 : 4.2, 0, Math.PI * 2);
       context.fillStyle = css(colourAt(theme.stops, apiAt(marks.data, marks.at, station.lon, station.lat)));
       context.fill();
-      context.strokeStyle = chosen ? theme.ink : theme.halo;
-      context.lineWidth = chosen ? 2 : 1.2;
+      // A light ring reads on every colour of the field, the darkest haze included.
+      context.strokeStyle = theme.label;
+      context.lineWidth = chosen ? 2.6 : 1.4;
       context.stroke();
     }
   }
 
-  if (marks.pin) {
-    const x = toX(view, size, marks.pin.lon);
-    const y = toY(view, size, marks.pin.lat);
-    context.beginPath();
-    context.arc(x, y, 5, 0, Math.PI * 2);
-    context.fillStyle = theme.halo;
-    context.fill();
-    context.strokeStyle = theme.ink;
-    context.lineWidth = 2;
-    context.stroke();
-  }
+  if (marks.preview) drawPin(context, toX(view, size, marks.preview.lon), toY(view, size, marks.preview.lat), theme.ink, theme.halo, 0.45);
+  if (marks.pin) drawPin(context, toX(view, size, marks.pin.lon), toY(view, size, marks.pin.lat), theme.ink, theme.halo, 1);
 }

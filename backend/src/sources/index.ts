@@ -6,3 +6,8 @@ export { AIRPORTS, FAR_M, type MetarClient, metarClient, type MetarReport } from
 export { NEA_REGIONS, NEA_STATIONS, type NeaClient, neaClient, type NeaHour, type NeaRegion, neaRegionOf } from "./nea";
 export { type FoundPlace, type Geocoder, openMeteoGeocoder } from "./geocoder";
 export { openMeteoClient, type WeatherClient } from "./weather";
+export { doeStatementsClient } from "./doe-statements";
+export { moeStatementsClient } from "./moe-statements";
+export { newsStatementsClient } from "./news-statements";
+export { type PushMessage, type PushSender, type VapidKeys, webPushSender } from "./push";
+export type { StatementChannel, StatementItem, StatementsClient } from "./statements";

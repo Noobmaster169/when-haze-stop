@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Icon } from "@/components/ui/icons";
 import { malaysiaDay, malaysiaMidnights, malaysiaWhen } from "@/lib/malaysia-time";
 
 /**
  * The strip under the map: where in the week the map is, with the readings
- * behind the Now mark and the forecast ahead of it.
+ * behind the Now mark and the forecast ahead of it. The line is drawn here and
+ * a transparent native range sits over it, so keyboard and screen readers get
+ * a real slider.
  */
 
 interface Props {
@@ -26,6 +28,10 @@ interface Props {
 const STEP_MS = 15 * 60_000;
 /** Hours of the timeline passed each second of play: the whole span in about half a minute. */
 const HOURS_A_SECOND = 9;
+/** A day label this far along has no room before the end of the strip, so it is left out. */
+const LAST_LABEL = 0.94;
+/** The forecast part of the line is dashed, as the forecast is in every chart. */
+const FORECAST_DASHES = "repeating-linear-gradient(90deg, var(--accent-line) 0 6px, transparent 6px 10px)";
 
 function describe(at: number, now: number): string {
   const hours = Math.round((at - now) / 3_600_000);
@@ -57,7 +63,11 @@ export function Timeline({ from, to, now, at, playing, caption, onSeek, onPlayin
     return () => cancelAnimationFrame(request);
   }, [playing, to, onSeek, onPlaying]);
 
-  const share = (moment: number): string => `${((moment - from) / (to - from)) * 100}%`;
+  const [focused, setFocused] = useState(false);
+  const fraction = (moment: number): number => Math.min(1, Math.max(0, (moment - from) / (to - from)));
+  const share = (moment: number): string => `${fraction(moment) * 100}%`;
+  // The Now pill is centred on its line, except near an end, where it would hang off the strip.
+  const pillShift = (moment: number): string => (fraction(moment) < 0.04 ? "0" : fraction(moment) > 0.96 ? "-100%" : "-50%");
   const toggle = (): void => {
     if (!playing && at >= to) onSeek(from);
     onPlaying(!playing);
@@ -80,8 +90,26 @@ export function Timeline({ from, to, now, at, playing, caption, onSeek, onPlayin
           <p className={`text-caption ${at > now ? "text-accent" : "text-ink-tertiary"}`}>{caption ?? describe(at, now)}</p>
         </div>
 
-        <div className="relative order-last w-full min-w-0 pb-5 @[760px]:order-none @[760px]:w-auto @[760px]:grow">
-          <div aria-hidden="true" className="absolute top-[9px] h-1 rounded-full bg-accent-tint" style={{ left: share(now), right: 0 }} />
+        <div className="relative order-last w-full min-w-0 pt-6 pb-5 @[760px]:order-none @[760px]:w-auto @[760px]:grow">
+          <div aria-hidden="true" className="relative h-5">
+            <div className="absolute inset-x-0 top-2 h-1 rounded-full bg-hairline-strong" style={{ right: `calc(100% - ${share(now)})` }} />
+            <div className="absolute top-2 h-1 rounded-r-full" style={{ left: share(now), right: 0, backgroundImage: FORECAST_DASHES }} />
+            <div className="absolute left-0 top-2 h-1 rounded-l-full bg-accent" style={{ width: share(Math.min(at, now)) }} />
+            <div className="absolute -top-6 bottom-0 flex flex-col items-center" style={{ left: share(now), transform: `translateX(${pillShift(now)})` }}>
+              <span className="flex items-center gap-1 rounded-full bg-accent px-1.5 text-micro font-semibold leading-4 text-ink-inverse shadow-overlay">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="absolute inset-0 animate-ping rounded-full bg-ink-inverse opacity-75 motion-reduce:hidden" />
+                  <span className="relative h-1.5 w-1.5 rounded-full bg-ink-inverse" />
+                </span>
+                Now
+              </span>
+            </div>
+            <div className="absolute -top-1 bottom-0 w-0.5 -translate-x-1/2 rounded-full bg-accent" style={{ left: share(now) }} />
+            <div
+              className="absolute top-0.5 h-4 w-4 -translate-x-1/2 rounded-full border-2 border-accent bg-canvas shadow-overlay"
+              style={{ left: share(at), boxShadow: focused ? "var(--focus-ring)" : undefined }}
+            />
+          </div>
           <input
             type="range"
             min={from}
@@ -92,16 +120,24 @@ export function Timeline({ from, to, now, at, playing, caption, onSeek, onPlayin
               onPlaying(false);
               onSeek(Number(event.target.value));
             }}
+            onFocus={(event) => setFocused(event.currentTarget.matches(":focus-visible"))}
+            onBlur={() => setFocused(false)}
             aria-label="Time"
-            aria-valuetext={malaysiaWhen(at)}
-            className="relative block h-[22px] w-full cursor-pointer accent-[var(--accent)]"
+            aria-valuetext={`${malaysiaWhen(at)}, ${describe(at, now).toLowerCase()}`}
+            className="absolute inset-x-0 top-5 h-7 w-full cursor-pointer opacity-0"
           />
           <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-4 text-micro text-ink-tertiary">
-            {malaysiaMidnights(from, to).map((midnight) => (
-              <span key={midnight} className="absolute border-l border-hairline-strong pl-1 leading-4" style={{ left: share(midnight) }}>
-                {malaysiaDay(midnight)}
-              </span>
-            ))}
+            {malaysiaMidnights(from, to)
+              .filter((midnight) => (midnight - from) / (to - from) < LAST_LABEL)
+              .map((midnight, index) => (
+                <span
+                  key={midnight}
+                  className={`absolute whitespace-nowrap border-l border-hairline-strong pl-1 leading-4 ${index % 2 === 1 ? "hidden @[640px]:block" : ""}`}
+                  style={{ left: share(midnight) }}
+                >
+                  {malaysiaDay(midnight)}
+                </span>
+              ))}
           </div>
         </div>
 

@@ -12,10 +12,10 @@ assistant's tools. Nothing has been pushed. `main` is untouched.
 | Check | Result |
 | --- | --- |
 | Backend `pnpm type-check` | Clean |
-| Backend `pnpm test` | 99 tests pass, 15 files |
+| Backend `pnpm test` | 158 tests pass, 21 files |
 | Frontend `pnpm lint`, `pnpm type-check` | Clean |
-| Frontend `pnpm test` | 32 tests pass |
-| Pages in a browser (dev server) | Map, station panel, search, timeline, alerts, track record and chat all render and work |
+| Frontend `pnpm test` | 59 tests pass |
+| Pages in a browser (dev server) | Map, station panel, search, timeline, alerts, simulation and chat all render and work |
 
 ## What has not been verified
 
@@ -66,7 +66,7 @@ Open http://localhost:3000 and go through this list:
 - Play the timeline. The label turns blue past Now.
 - Search "Shah Alam". The panel opens on the nearest station and says so.
 - Press "Alert me here". `/alerts` lists the station.
-- `/accuracy` shows a table under "Since this app started running" after backfill.
+- `/simulation` shows the backtest and, after backfill, the live runs' scores. `/accuracy` redirects there.
 - Ask the five starter questions in the dock. Check each answer has numbers from tools, source
   chips, and a map link. Ask something off topic and check it refuses.
 
@@ -75,8 +75,8 @@ Open http://localhost:3000 and go through this list:
 1. Fix whatever the first live run breaks.
 2. Read real assistant answers and tune. A prompt change is a new file `prompts/chat/v3.md` and a
    bump of `CHAT_PROMPT` in `agents/chat/loop.ts`. Never edit `v2.md`.
-3. Look at the heat layer with real data. Its opacity is `FAINT_ALPHA` and `FULL_ALPHA` in
-   `frontend/components/map/heat.ts`.
+3. Look at the heat layer with real data. The field is painted solid at `ALPHA` in
+   `frontend/components/map/heat.ts`; its colours are the `--api-*` tokens in `globals.css`.
 4. Run `pnpm build` in `frontend/`.
 5. Push `haze-product` and merge.
 
@@ -100,8 +100,14 @@ skill describe the two sources.
 - **Readings cannot be refetched.** DOE serves about 7 days. Do not drop or reset the dev database
   casually; the stored history is the backtest.
 - **`weather_hours` is overwritten by design.** It is the one exception to the no overwrite rule.
-- **The forecast ties with "no change".** This is measured and stated in the app on purpose. Do
-  not remove those sentences unless the Track record table shows the model winning.
+- **The forecast beats "no change" only up to about 12 hours.** Beyond a day it ties. This is
+  measured (`docs/FORECAST.md`) and stated in the app on purpose; change the wording only when
+  `pnpm haze:evaluate` and the Simulation page show otherwise.
+- **The backtest has one known leak: the wind.** `weather_hours` keeps the analysis, so a replayed
+  run knows the real future wind. The station forecast uses no weather, so its proof is clean; any
+  claim about the smoke model's own change needs weather stored by fetch time first.
+- **Runs carry `model`.** Migration 005. A method change is a new `MODEL_VERSION` in
+  `haze/run.ts`; the map, outlook and scores read only the current one, so deploy jobs with it.
 - **A hotspot is not always a fire.** Detections on NASA's labelled fixed sources (370 sites:
   flares, industry, volcanoes) are dropped, and so is any cell-day that only one satellite pass saw
   at under 10 MW. That is 35% of cell-days and 4% of the fire power. `fire_cells.frp_mw` is what
@@ -112,7 +118,7 @@ skill describe the two sources.
   has a hole in the readings that DOE cannot fill. See section 3.1.2.
 - **The months before 3 October have fires and wind but no readings.** DOE cannot serve them, so
   the model cannot be scored there. Tuning on more than one week needs a readings history first.
-- **Chances use hard-coded first test percentiles** (`haze/chance.ts`) until 300 checked forecasts
+- **Chances use hard-coded replay percentiles** (`haze/chance.ts`) until 300 checked forecasts
   exist per lead bucket, then switch to the database's own automatically.
 - **Test data is real.** `backend/test/fixtures/recorded*.ts` are values fetched on 10 October
   2026. `steady-wind.ts` is a uniform wind test vector for the transport maths and is labelled as
@@ -122,9 +128,14 @@ skill describe the two sources.
 - **Frontend is Next 16.** Read `frontend/AGENTS.md` and the docs in
   `frontend/node_modules/next/dist/docs/` before writing Next code. Files stay under 200 lines
   (lint enforces it).
-- **Contracts are mirrored by hand.** A change in `backend/src/contracts.haze.ts` or
-  `contracts.alerts.ts` or `contracts.sources.ts` needs the same change in
-  `frontend/lib/api/haze-schemas.ts`, `alert-schemas.ts` or `source-schemas.ts`.
+- **Contracts are mirrored by hand.** A change in `backend/src/contracts.haze.ts`,
+  `contracts.alerts.ts`, `contracts.sources.ts` or `contracts.statements.ts` needs the same change
+  in `frontend/lib/api/haze-schemas.ts`, `alert-schemas.ts`, `source-schemas.ts` or
+  `statement-schemas.ts`.
+- **Statements cost model calls.** The jobs process reads each new haze item once through the
+  proxy (up to 20 per channel per cycle). Without the Claude token no statement is read and
+  alerts fall back to the forecast. Push needs `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` in
+  `.env` (see `.env.example`).
 - **The commit author** on the first commit was set to `Henson Zein <hello@upshot.cards>` because
   no git identity was configured where it was made. Amend before pushing if that is wrong.
 
@@ -134,7 +145,8 @@ skill describe the two sources.
 | --- | --- |
 | The model | `backend/src/haze/run.ts`, then `transport.ts`, `ensemble.ts`, `calibrate.ts` |
 | Thresholds and their wording | `backend/src/haze/guidelines.ts` |
-| When an alert fires and what it says | `backend/src/haze/alert-rules.ts` |
+| When an alert fires and what it says | `backend/src/haze/alert-rules.ts`, `closing.ts`, `headline.ts` |
+| How statements are read and which are in force | `backend/src/agents/prompts/statement/`, `backend/src/haze/statements.ts` |
 | What the hourly job does | `backend/src/jobs/cycle.ts` |
 | A data source | `backend/src/sources/` |
 | Which hotspots count as fires | `backend/src/haze/fire-screen.ts`, `backend/src/haze/fixed-sources.ts` |

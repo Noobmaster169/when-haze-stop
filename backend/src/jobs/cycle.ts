@@ -1,3 +1,4 @@
+import { newestCompleteHour } from "../haze/complete-hour";
 import { addHours, hoursBetween } from "../haze/grid";
 import { childLogger } from "../lib/logger";
 import { forecasts, readings } from "../repositories";
@@ -5,10 +6,11 @@ import { evaluateAlerts } from "./alerts";
 import { runForecast } from "./forecast";
 import { type IngestDeps, ingestFires, ingestReadings, ingestWeather } from "./ingest";
 import { ingestMetars, ingestSingapore } from "./ingest-context";
+import { ingestStatements } from "./statements";
 
 /**
- * One turn of the crank: fetch, run the model on the newest reading, raise
- * alerts. A source that fails is logged and stepped past, because a model run
+ * One turn of the crank: fetch, read new official statements, run the model on
+ * the newest reading, raise alerts. A source that fails is logged and stepped past, because a model run
  * on an hour-old wind is worth more than no run at all.
  */
 
@@ -22,6 +24,9 @@ async function attempt(what: string, work: () => Promise<unknown>): Promise<void
   }
 }
 
+/** How far back to look for the usual number of reporting stations. */
+const COVERAGE_HOURS = 72;
+
 export interface CycleOptions {
   /** The fire files are large and change a few times a day, so the loop skips them on most hours. */
   fires: boolean;
@@ -33,15 +38,17 @@ export async function runCycle(deps: IngestDeps, now: Date, options: CycleOption
   await attempt("weather", () => ingestWeather(deps));
   await attempt("metar", () => ingestMetars(deps));
   await attempt("nea", () => ingestSingapore(deps, now));
+  const reading = deps.statements;
+  if (reading) await attempt("statements", () => ingestStatements({ pool: deps.pool, ...reading }));
 
-  // The run starts from DOE's newest hour: its 68 stations are the forecast's subject, and NEA can post a few minutes ahead.
-  const asOf = await readings.newestAt(deps.pool, "doe");
+  // The run starts from DOE's hours: its 68 stations are the forecast's subject, and NEA can post a few minutes ahead.
+  const asOf = newestCompleteHour(await readings.stationsPerHour(deps.pool, COVERAGE_HOURS, "doe"));
   if (!asOf) {
     log.warn("no readings stored, so there is no hour to forecast from");
     return;
   }
   await attempt("forecast", () => runForecast(deps.pool, asOf, "live"));
-  await attempt("alerts", () => evaluateAlerts(deps.pool));
+  await attempt("alerts", () => evaluateAlerts(deps.pool, deps.push ?? null, now));
 }
 
 const BACKFILL_EVERY_HOURS = 6;

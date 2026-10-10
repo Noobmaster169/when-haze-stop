@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { dayName, malaysiaMidnights, malaysiaWhen } from "@/lib/malaysia-time";
 
 import { bracket, decodeBytes, sampleField, sampleWind } from "./field";
-import { clampView, fitScale, toLat, toLon, toX, toY, zoomAt } from "./geo";
+import { clampView, fitScale, REGION, toLat, toLon, toX, toY, zoomAt } from "./geo";
 import { visibilityAt } from "./map-data";
 import { band, colourAt, parseHex, type Stop } from "./scale";
 
@@ -88,8 +88,23 @@ describe("the view", () => {
 
   it("does not zoom out past the region or in past nine times it", () => {
     const fit = fitScale(size);
-    expect(clampView({ cx: 103, cy: 2, scale: 1 }, size).scale).toBeCloseTo(fit * 0.8);
+    expect(clampView({ cx: 103, cy: 2, scale: 1 }, size).scale).toBeCloseTo(fit);
     expect(clampView({ cx: 103, cy: 2, scale: 1e6 }, size).scale).toBeCloseTo(fit * 9);
+  });
+
+  it("never lets the view's edge pass the region's, however far it is dragged", () => {
+    const scale = fitScale(size) * 2;
+    for (const [cx, cy] of [[60, 2], [150, 2], [108, -40], [108, 40]]) {
+      const view = clampView({ cx, cy, scale }, size);
+      expect(toLon(view, size, 0)).toBeGreaterThanOrEqual(REGION.lon0 - 1e-9);
+      expect(toLon(view, size, size.width)).toBeLessThanOrEqual(REGION.lon1 + 1e-9);
+      expect(toLat(view, size, 0)).toBeLessThanOrEqual(REGION.lat1 + 1e-9);
+      expect(toLat(view, size, size.height)).toBeGreaterThanOrEqual(REGION.lat0 - 1e-9);
+    }
+  });
+
+  it("reaches all of Malaysia, Semporna in eastern Sabah included", () => {
+    expect(REGION.lon1).toBeGreaterThan(118.62);
   });
 });
 

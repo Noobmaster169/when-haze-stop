@@ -2,10 +2,15 @@ import { getPool } from "../../src/db";
 import type { Detection } from "../../src/haze/fires";
 import { runCycle } from "../../src/jobs/cycle";
 import { FakeDoeClient, FakeFiresClient, FakeMetarClient, FakeNeaClient, FakeWeatherClient } from "../../src/sources/__fakes__/fake.sources";
+import { FakeStatementsClient } from "../../src/sources/__fakes__/fake.statements";
 import { parseMetars } from "../../src/sources/metar";
+import { parseMoeList } from "../../src/sources/moe-statements";
 import { parseNea } from "../../src/sources/nea";
+import { parseNewsRss } from "../../src/sources/news-statements";
 import { FIRE_CELLS, LAST_HOUR, READINGS, STATIONS } from "./recorded";
 import { METAR_JSON, NEA_PM25_DAY_JSON, NEA_PSI_DAY_JSON, NEA_PSI_TODAY_JSON } from "./recorded-context";
+import { MOE_LIST_HTML, MOE_PDF_TEXT, NEWS_RSS } from "./recorded-statements";
+import { statementReader } from "./statement-readings";
 import { steadyWind } from "./steady-wind";
 
 /**
@@ -35,6 +40,11 @@ const NEA_HOURS = [...parseNea(NEA_PM25_DAY_JSON, NEA_PSI_DAY_JSON), ...parseNea
  */
 export async function recordedCycle(): Promise<FakeDoeClient> {
   const doe = new FakeDoeClient(STATIONS, READINGS);
+  const moe = parseMoeList(MOE_LIST_HTML);
+  const channels = [
+    new FakeStatementsClient("moe-statements", moe, { [moe[0].url]: MOE_PDF_TEXT }),
+    new FakeStatementsClient("news-statements", parseNewsRss(NEWS_RSS)),
+  ];
   await runCycle(
     {
       pool: getPool(),
@@ -43,6 +53,7 @@ export async function recordedCycle(): Promise<FakeDoeClient> {
       weather: new FakeWeatherClient(steadyWind(WEATHER_START, 200, 3, 3)),
       metar: new FakeMetarClient(parseMetars(METAR_JSON)),
       nea: new FakeNeaClient(NEA_HOURS),
+      statements: { channels, llm: statementReader() },
     },
     new Date(LAST_HOUR.getTime() + 20 * 60_000),
     { fires: true },

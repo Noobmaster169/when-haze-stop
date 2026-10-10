@@ -60,6 +60,10 @@ services:
       LLM_PROXY_URL: http://llm-proxy:4000
       LLM_MODEL_CHAT: ${LLM_MODEL_CHAT:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Web Push, so alerts reach a device with the tab closed. Empty: in-app only.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@localhost}
     # The seed is the data every teammate starts from: readings, screened fires
     # and the fixed heat sources. It only adds, and loads a file once.
     command: ["sh", "-c", "node db/migrate.mjs && node db/seed.mjs"]
@@ -90,9 +94,11 @@ services:
       retries: 6
     restart: unless-stopped
 
-  # The hourly fetch, model run and alert pass. One cycle now so the map has
-  # data, then a backfill of the stored week (it skips hours already run, so a
-  # restart costs little), then the hourly loop.
+  # The hourly fetch, statement reading, model run and alert pass: one cycle
+  # now so the map has data, the history of the months before, then the loop,
+  # which backfills the stored week (it skips hours already run, so a restart
+  # costs little) and runs a cycle at 20 past every hour.
+  # The proxy reads the new official statements each cycle.
   jobs:
     build: ./backend
     environment:
@@ -106,11 +112,12 @@ services:
       - >-
         node --import tsx src/jobs/main.ts once;
         node --import tsx src/jobs/main.ts history;
-        node --import tsx src/jobs/main.ts backfill;
         exec node --import tsx src/jobs/main.ts loop
     depends_on:
       migrate:
         condition: service_completed_successfully
+      llm-proxy:
+        condition: service_started
     restart: unless-stopped
 
   frontend:
