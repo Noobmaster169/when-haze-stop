@@ -82,3 +82,9 @@ export async function stationForecasts(db: Queryable, runId: number): Promise<Ma
   const { rows } = await db.query<{ station_id: string; api: number[] }>("select station_id, api from station_forecasts where run_id = $1", [runId]);
   return new Map(rows.map((row) => [row.station_id, row.api]));
 }
+
+/** The first hour any run drew a field for, or null before the first run. */
+export async function earliestFrameAt(db: Queryable): Promise<Date | null> {
+  const { rows } = await db.query<{ at: Date | null }>("select min(valid_at) as at from forecast_frames");
+  return rows[0]?.at ?? null;
+}

@@ -6,10 +6,14 @@ import { z } from "zod";
  * against these, so a drift fails at the boundary naming the field.
  */
 
+export const Network = z.enum(["doe", "nea"]);
+export type Network = z.infer<typeof Network>;
+
 export const Station = z.object({
   id: z.string(),
   name: z.string(),
   state: z.string(),
+  network: Network,
   lat: z.number(),
   lon: z.number(),
   api: z.number().int().nullable(),
@@ -38,6 +42,12 @@ export const RunSummary = z.object({
 });
 export type RunSummary = z.infer<typeof RunSummary>;
 
+export const VisibilityReport = z.object({ at: z.string(), m: z.number().int().nullable(), wx: z.string().nullable() });
+export type VisibilityReport = z.infer<typeof VisibilityReport>;
+
+export const Airport = z.object({ icao: z.string(), name: z.string(), lat: z.number(), lon: z.number(), reports: z.array(VisibilityReport) });
+export type Airport = z.infer<typeof Airport>;
+
 export const HazeMap = z.object({
   run: RunSummary.nullable(),
   grid: FieldGrid,
@@ -46,8 +56,25 @@ export const HazeMap = z.object({
   frames: z.array(Frame),
   wind: z.array(WindFrame),
   fires: z.array(FireCell),
+  airports: z.array(Airport),
 });
 export type HazeMap = z.infer<typeof HazeMap>;
+
+export const FireDay = z.object({ day: z.string(), cells: z.number().int(), frpMw: z.number() });
+export type FireDay = z.infer<typeof FireDay>;
+
+export const HazeDays = z.object({ days: z.array(FireDay), hazeFrom: z.string().nullable() });
+export type HazeDays = z.infer<typeof HazeDays>;
+
+export const HazeDay = z.object({
+  day: z.string(),
+  grid: FieldGrid,
+  windGrid: FieldGrid,
+  frames: z.array(Frame),
+  wind: z.array(WindFrame),
+  fires: z.array(FireCell),
+});
+export type HazeDay = z.infer<typeof HazeDay>;
 
 export const DayOutlook = z.object({
   day: z.string(),
@@ -64,6 +91,7 @@ export const StationOutlook = z.object({
   readings: z.array(z.object({ at: z.string(), api: z.number().int() })),
   forecast: z.array(z.object({ at: z.string(), api: z.number() })),
   days: z.array(DayOutlook),
+  pm25: z.object({ at: z.string(), value: z.number() }).nullable(),
 });
 export type StationOutlook = z.infer<typeof StationOutlook>;
 
@@ -84,7 +112,7 @@ export const Place = z.object({
   country: z.string(),
   lat: z.number(),
   lon: z.number(),
-  nearest: z.object({ id: z.string(), name: z.string(), km: z.number() }).nullable(),
+  nearest: z.object({ id: z.string(), name: z.string(), network: Network, km: z.number() }).nullable(),
 });
 export type Place = z.infer<typeof Place>;
 

@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { Accuracy, GuidelineList, PlaceList } from "../contracts";
 import { GUIDELINES } from "../haze/guidelines";
 import { scores } from "../repositories";
+import { hazeDay, hazeDays } from "../services/history";
 import { hazeMap } from "../services/map";
 import { stationOutlook } from "../services/outlook";
 import { findPlaces } from "../services/places";
@@ -18,6 +19,7 @@ export interface HazeRouteDeps {
 }
 
 const StationId = z.string().regex(/^[A-Za-z0-9]{2,40}$/);
+const Day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const PlaceQuery = z.string().trim().min(2).max(80);
 
 export function hazeRouter(deps: HazeRouteDeps): Router {
@@ -25,6 +27,19 @@ export function hazeRouter(deps: HazeRouteDeps): Router {
 
   router.get("/map", async (_req, res) => {
     res.json(await hazeMap(deps.pool));
+  });
+
+  router.get("/days", async (_req, res) => {
+    res.json(await hazeDays(deps.pool));
+  });
+
+  router.get("/days/:day", async (req, res) => {
+    const day = Day.safeParse(req.params.day);
+    if (!day.success || Number.isNaN(Date.parse(`${day.data}T00:00:00Z`))) {
+      res.status(400).json({ error: "a day is YYYY-MM-DD" });
+      return;
+    }
+    res.json(await hazeDay(deps.pool, day.data));
   });
 
   router.get("/stations/:id", async (req, res) => {

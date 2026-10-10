@@ -48,7 +48,7 @@ export function StationPanel({ station, at, via, onClose }: { station: Station; 
         <div className="min-w-0 grow">
           <h2 className="truncate font-display text-[21px] leading-7 text-ink">{station.name}</h2>
           <p className="text-caption text-ink-tertiary">
-            {station.state}, DOE station <span className="font-mono text-mono-xs">{station.id}</span>
+            {station.state}, {station.network === "nea" ? "NEA region" : "DOE station"} <span className="font-mono text-mono-xs">{station.id}</span>
           </p>
           {via ? <p className="text-caption text-ink-tertiary">Nearest station to {via}</p> : null}
         </div>
@@ -71,7 +71,8 @@ export function StationPanel({ station, at, via, onClose }: { station: Station; 
                   {band(value.api)}
                 </p>
                 <p className="text-caption text-ink-tertiary">
-                  {value.forecast ? "Forecast for" : "Read at"} {malaysiaWhen(at)}
+                  {station.network === "nea" ? "PSI, " : "API, "}
+                  {value.forecast ? "forecast for" : "read at"} {malaysiaWhen(at)}
                 </p>
               </div>
             </div>
@@ -79,11 +80,17 @@ export function StationPanel({ station, at, via, onClose }: { station: Station; 
             <p className="text-small text-ink-tertiary">This station has no readings stored yet.</p>
           )}
 
-          <FollowButton stationId={station.id} stationName={station.name} />
+          {outlook.pm25 ? (
+            <p className="text-small text-ink-secondary">
+              Measured one-hour PM2.5: <span className="font-medium text-ink">{outlook.pm25.value} ug/m3</span> at {malaysiaWhen(Date.parse(outlook.pm25.at))}. NEA publishes it; DOE has no equivalent.
+            </p>
+          ) : null}
+
+          {station.network === "doe" ? <FollowButton stationId={station.id} stationName={station.name} /> : <p className="text-caption text-ink-tertiary">Alerts follow Malaysia&apos;s official lines, so none are raised for a Singapore region.</p>}
 
           <div>
             <OutlookChart outlook={outlook} at={at} />
-            <p className="text-caption text-ink-tertiary">Black is what DOE read. Blue dashes are the forecast.</p>
+            <p className="text-caption text-ink-tertiary">Black is what {station.network === "nea" ? "NEA" : "DOE"} read. Blue dashes are the forecast.</p>
           </div>
 
           {outlook.days.length > 0 ? (

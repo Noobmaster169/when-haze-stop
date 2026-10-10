@@ -4,6 +4,7 @@ import { forecasts, readings } from "../repositories";
 import { evaluateAlerts } from "./alerts";
 import { runForecast } from "./forecast";
 import { type IngestDeps, ingestFires, ingestReadings, ingestWeather } from "./ingest";
+import { ingestMetars, ingestSingapore } from "./ingest-context";
 
 /**
  * One turn of the crank: fetch, run the model on the newest reading, raise
@@ -30,8 +31,11 @@ export async function runCycle(deps: IngestDeps, now: Date, options: CycleOption
   await attempt("readings", () => ingestReadings(deps, now));
   if (options.fires) await attempt("fires", () => ingestFires(deps));
   await attempt("weather", () => ingestWeather(deps));
+  await attempt("metar", () => ingestMetars(deps));
+  await attempt("nea", () => ingestSingapore(deps, now));
 
-  const asOf = await readings.newestAt(deps.pool);
+  // The run starts from DOE's newest hour: its 68 stations are the forecast's subject, and NEA can post a few minutes ahead.
+  const asOf = await readings.newestAt(deps.pool, "doe");
   if (!asOf) {
     log.warn("no readings stored, so there is no hour to forecast from");
     return;
@@ -52,7 +56,7 @@ const BACKFILL_MARGIN_HOURS = 72;
  */
 export async function backfill(deps: IngestDeps): Promise<number> {
   const oldest = await readings.oldestAt(deps.pool);
-  const newest = await readings.newestAt(deps.pool);
+  const newest = await readings.newestAt(deps.pool, "doe");
   if (!oldest || !newest) return 0;
 
   let made = 0;

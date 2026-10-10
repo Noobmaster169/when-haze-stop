@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Place } from "@/lib/api/haze-schemas";
 
 import { distanceKm } from "./geo";
+import { HistoryStrip } from "./history-strip";
 import { type Layers, MapCanvas, type MapHandle, type Pick } from "./map-canvas";
 import { Legend, LayerToggles, ZoomButtons } from "./map-controls";
 import { apiAt } from "./map-data";
@@ -12,6 +13,7 @@ import { PlaceSearch } from "./place-search";
 import { type Probe, ProbeTip } from "./probe-tip";
 import { StationPanel } from "./station-panel";
 import { Timeline } from "./timeline";
+import { useHazeDay } from "./use-haze-day";
 import { useHazeMap } from "./use-haze-map";
 
 /**
@@ -20,11 +22,14 @@ import { useHazeMap } from "./use-haze-map";
  * the timeline is on, the station chosen, and the layers shown.
  */
 
-const ALL_LAYERS: Layers = { haze: true, stations: true, fires: true, wind: true };
+const ALL_LAYERS: Layers = { haze: true, stations: true, fires: true, wind: true, visibility: true };
 
 /** Keyed by the page on `initialStation`, so a link to another station starts it on that one. */
 export function HazeMapView({ initialStation }: { initialStation: string | null }) {
-  const { map, data, basemap, error } = useHazeMap();
+  const { map, data: liveData, basemap, error } = useHazeMap();
+  const history = useHazeDay();
+  // Looking back replaces what the map draws, and nothing else: the same canvas, layers and timeline.
+  const data = history.day ? history.data : liveData;
   const handle = useRef<MapHandle | null>(null);
   const tip = useRef<HTMLDivElement | null>(null);
   const [chosenAt, setChosenAt] = useState<number | null>(null);
@@ -61,6 +66,17 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
     [data],
   );
 
+  const chooseDay = useCallback(
+    (day: string | null) => {
+      history.choose(day);
+      setPlaying(false);
+      setProbe(null);
+      setChosenAt(day ? Date.parse(`${day}T12:00:00Z`) : null);
+    },
+    [history],
+  );
+
+  const hasField = (data?.fields.length ?? 0) > 0;
   const pick = useCallback(
     (picked: Pick) => {
       if (picked.station) {
@@ -68,9 +84,9 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
         setProbe(null);
         return;
       }
-      setProbe({ lon: picked.lon, lat: picked.lat, nearest: nearestTo(picked.lon, picked.lat) });
+      if (hasField) setProbe({ lon: picked.lon, lat: picked.lat, nearest: nearestTo(picked.lon, picked.lat) });
     },
-    [nearestTo],
+    [nearestTo, hasField],
   );
 
   const choosePlace = useCallback((place: Place) => {
@@ -91,7 +107,7 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
   useEffect(followTip, [followTip]);
 
   if (error) return <Notice title="The map could not be loaded." body={error} />;
-  if (map && !data) {
+  if (map && !liveData) {
     return <Notice title="No forecast has been made yet." body="Start the data job in backend/ with pnpm haze:once. It fetches the readings, fires and wind, then runs the model." />;
   }
 
@@ -112,7 +128,7 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
           <div className="absolute bottom-3 right-3 hidden @[640px]:block">
             <Legend />
           </div>
-          {probe && data ? (
+          {probe && data && hasField ? (
             <ProbeTip
               anchor={tip}
               api={apiAt(data, at, probe.lon, probe.lat)}
@@ -126,7 +142,12 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
           ) : null}
           {!data ? <p className="absolute inset-x-0 top-1/2 text-center text-small text-ink-tertiary">Loading the map</p> : null}
         </div>
-        {data ? <Timeline from={data.times[0]} to={data.times[data.times.length - 1]} now={data.asOf} at={at} playing={playing} onSeek={seek} onPlaying={setPlaying} /> : null}
+        <HistoryStrip days={history.days} day={history.day} onChoose={chooseDay} />
+        {data && history.day ? (
+          <Timeline from={data.asOf - 86_400_000} to={data.asOf} now={data.asOf} at={at} playing={playing} caption={hasField ? "Past day" : "Fires and wind only"} onSeek={setChosenAt} onPlaying={setPlaying} />
+        ) : data ? (
+          <Timeline from={data.times[0]} to={data.times[data.times.length - 1]} now={data.asOf} at={at} playing={playing} onSeek={seek} onPlaying={setPlaying} />
+        ) : null}
       </div>
       {station ? <StationPanel key={station.id} station={station} at={at} via={selected?.via ?? null} onClose={() => setSelected(null)} /> : null}
     </div>

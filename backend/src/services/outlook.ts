@@ -3,7 +3,8 @@ import type { Queryable } from "../db";
 import { firstHindcast, leadBucket } from "../haze/chance";
 import { addHours } from "../haze/grid";
 import { dayOutlooks, type ErrorsFor, type Hourly } from "../haze/outlook";
-import { forecasts, readings, scores, stations } from "../repositories";
+import { forecasts, nea, readings, scores, stations } from "../repositories";
+import { neaRegionOf } from "../sources/nea";
 
 /**
  * A station's readings, forecast and next few days, read from what the last
@@ -48,7 +49,16 @@ export async function outlookFor(db: Queryable, station: Station, context: Outlo
     readings: observed.map((reading) => ({ at: reading.at.toISOString(), api: reading.api })),
     forecast: ahead.map((value) => ({ at: value.at.toISOString(), api: Math.round(value.api) })),
     days: dayOutlooks(asOf, observed, ahead, errorsFor),
+    pm25: await measuredPm25(db, station),
   };
+}
+
+/** NEA measures PM2.5 hour by hour in each region; nothing of the kind exists for a DOE station. */
+async function measuredPm25(db: Queryable, station: Station): Promise<StationOutlook["pm25"]> {
+  const region = station.network === "nea" ? neaRegionOf(station.id) : null;
+  if (!region) return null;
+  const latest = await nea.latestPm25(db, region);
+  return latest ? { at: latest.at.toISOString(), value: latest.value } : null;
 }
 
 /** Null for a station that does not exist. A station with no forecast still answers, with its readings alone. */
@@ -56,6 +66,6 @@ export async function stationOutlook(db: Queryable, stationId: string): Promise<
   const station = await stations.find(db, stationId);
   if (!station) return null;
   const context = await outlookContext(db);
-  if (!context) return { station, readings: [], forecast: [], days: [] };
+  if (!context) return { station, readings: [], forecast: [], days: [], pm25: await measuredPm25(db, station) };
   return outlookFor(db, station, context);
 }

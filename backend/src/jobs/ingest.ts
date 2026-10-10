@@ -1,11 +1,11 @@
 import type { Pool } from "pg";
 
-import { screenDetections } from "../haze/fire-screen";
-import { toCellDays } from "../haze/fires";
+import { burningCells } from "../haze/burning";
+import { FIXED_MIN_DAYS, fixedMask } from "../haze/fixed-sources";
 import { addHours, WEATHER_POINTS } from "../haze/grid";
 import { childLogger } from "../lib/logger";
-import { fires, readings, stations, weather } from "../repositories";
-import type { DoeClient, FiresClient, WeatherClient } from "../sources";
+import { fires, fixedSources, readings, stations, weather } from "../repositories";
+import type { DoeClient, FiresClient, MetarClient, NeaClient, WeatherClient } from "../sources";
 import { recordFetch } from "./record-fetch";
 
 /** Fetch what the sources have and store it. Each function is one source, so one being down does not stop the others. */
@@ -17,6 +17,8 @@ export interface IngestDeps {
   doe: DoeClient;
   fires: FiresClient;
   weather: WeatherClient;
+  metar: MetarClient;
+  nea: NeaClient;
 }
 
 /** DOE serves the 24 hours before an instant, as far back as about a week. */
@@ -32,11 +34,11 @@ function topOfHour(at: Date): Date {
 export async function ingestReadings(deps: IngestDeps, now: Date): Promise<number> {
   await recordFetch(deps.pool, "doe-stations", async () => {
     const found = await deps.doe.stations();
-    await stations.upsertMany(deps.pool, found);
+    await stations.upsertMany(deps.pool, found.map((station) => ({ ...station, network: "doe" as const })));
     return { stations: found.length, states: new Set(found.map((station) => station.stateId)).size };
   });
 
-  const newest = await readings.newestAt(deps.pool);
+  const newest = await readings.newestAt(deps.pool, "doe");
   const behindDays = newest ? Math.ceil((now.getTime() - newest.getTime()) / 86_400_000) : DOE_MAX_DAYS;
   const days = Math.max(1, Math.min(DOE_MAX_DAYS, behindDays));
 
@@ -66,14 +68,15 @@ export async function ingestReadings(deps: IngestDeps, now: Date): Promise<numbe
 export async function ingestFires(deps: IngestDeps): Promise<number> {
   const detail = await recordFetch(deps.pool, "firms", async () => {
     const detections = await deps.fires.recent();
-    const screened = screenDetections(detections);
-    const cells = toCellDays(screened.kept);
+    const { cells, glint, offshore, fixed, unconfirmed } = burningCells(detections, fixedMask(await fixedSources.sites(deps.pool, FIXED_MIN_DAYS)));
     await fires.upsertMany(deps.pool, cells);
     const days = cells.map((cell) => cell.day).sort();
     return {
       detections: detections.length,
-      glintDropped: screened.glint,
-      offshoreDropped: screened.offshore,
+      glintDropped: glint,
+      offshoreDropped: offshore,
+      fixedDropped: fixed,
+      unconfirmedDropped: unconfirmed,
       cellDays: cells.length,
       ...(days.length > 0 ? { firstDay: days[0], lastDay: days[days.length - 1] } : {}),
     };

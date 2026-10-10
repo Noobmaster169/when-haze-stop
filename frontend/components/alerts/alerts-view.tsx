@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 
 import { PlaceSearch } from "@/components/map/place-search";
 import { Icon } from "@/components/ui/icons";
@@ -11,6 +12,7 @@ import { useFollows } from "./use-follows";
 /** The alerts page: the areas this browser follows, a way to add one, and what has been said. */
 export function AlertsView() {
   const follows = useFollows();
+  const [refused, setRefused] = useState<string | null>(null);
   return (
     <div className="max-w-[760px] space-y-9">
       <section>
@@ -19,10 +21,18 @@ export function AlertsView() {
         <div className="relative z-10 mt-3">
           <PlaceSearch
             onChoose={(place) => {
-              if (place.nearest) void follows.follow(place.nearest.id);
+              if (!place.nearest) return;
+              // The lines alerts are judged on are Malaysia's, so a Singapore region cannot be followed.
+              if (place.nearest.network !== "doe") {
+                setRefused(place.nearest.name);
+                return;
+              }
+              setRefused(null);
+              void follows.follow(place.nearest.id);
             }}
           />
         </div>
+        {refused ? <p className="mt-2 text-small text-ink-tertiary">{refused} is an NEA region. Alerts follow Malaysia&apos;s official lines, so none are raised there.</p> : null}
 
         {follows.ready && follows.list.length === 0 ? <p className="mt-4 text-small text-ink-tertiary">You are not following any area yet.</p> : null}
         <ul className="mt-4 divide-y divide-hairline-faint border-y border-hairline-faint empty:hidden">

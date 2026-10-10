@@ -10,8 +10,11 @@
     "test:watch": "vitest",
     "type-check": "tsc --noEmit",
     "db:migrate": "node --env-file-if-exists=.env db/migrate.mjs",
+    "db:seed": "node --env-file-if-exists=.env db/seed.mjs",
+    "db:export-seed": "node --env-file-if-exists=.env db/export-seed.mjs",
     "haze:once": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts once",
     "haze:backfill": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts backfill",
+    "haze:history": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts history",
     "haze:loop": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts loop"
   },
   "dependencies": {

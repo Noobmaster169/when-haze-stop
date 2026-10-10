@@ -69,3 +69,9 @@ export async function countsSince(db: Queryable, since: Date): Promise<Map<strin
   );
   return new Map(rows.map((row) => [row.source, { ok: Number(row.ok), failed: Number(row.failed) }]));
 }
+
+/** What every good fetch of one source brought back, so a job that was stopped half way can tell what it already has. */
+export async function succeeded(db: Queryable, source: string): Promise<FetchDetail[]> {
+  const { rows } = await db.query<{ detail: FetchDetail }>("select detail from source_fetches where source = $1 and ok", [source]);
+  return rows.map((row) => row.detail);
+}

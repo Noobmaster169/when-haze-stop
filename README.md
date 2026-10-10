@@ -50,6 +50,15 @@ takes longer. Until the cycle finishes the map says "No forecast has been made y
 `docker compose logs -f jobs`. `curl 127.0.0.1:8091/health` says whether Postgres and the proxy
 are up. Without the token the map and alerts work and the chat does not.
 
+Everyone starts from the same data. `backend/db/seed/` holds the readings since 3 October 2026,
+the fires since 1 July 2026 already screened, and the list of fixed heat sources (gas flares,
+industry, volcanoes). The `migrate` service loads it, and the `jobs` service then fetches the wind
+for those months by itself. The History strip under the map shows any of those days.
+
+To keep teammates in step, whoever has been running longest exports and commits the seed about
+once a week: `cd backend && pnpm db:export-seed`. A NASA key in `FIRMS_MAP_KEY` is optional: with
+it the jobs service also replays the fire archive itself instead of relying on the seed.
+
 ### Host development
 
 To run the api, jobs or frontend from source with reload, start only the infrastructure and stop
@@ -60,11 +69,12 @@ docker compose up -d postgres llm-proxy
 
 cd backend
 cp .env.example .env
-pnpm install && pnpm db:migrate
+pnpm install && pnpm db:migrate && pnpm db:seed
 pnpm dev                        # http://127.0.0.1:8091
 pnpm haze:once                  # in another terminal: fetch, run the model, raise alerts
 pnpm haze:backfill              # once: replay the stored week for the timeline and the track record
 pnpm haze:loop                  # keep running: refreshes every hour
+pnpm haze:history               # once: wind for the seeded months, and with FIRMS_MAP_KEY the fire archive too
 
 cd ../frontend
 cp .env.example .env.local
@@ -93,7 +103,7 @@ This needs Node 24 and pnpm 11. Without Docker, the proxy also runs on the host 
   The prompt picks it up from the registry.
 - **A skill.** Add `backend/src/agents/chat/skills/<name>/SKILL.md` with `name`, `version` and
   `when` in its frontmatter. The agent sees the card and loads the body with `load_skill`.
-- **The system prompt.** Add `backend/src/agents/prompts/chat/v2.md` and bump `CHAT_PROMPT` in
+- **The system prompt.** Add `backend/src/agents/prompts/chat/v5.md` and bump `CHAT_PROMPT` in
   `loop.ts`.
 - **The model.** Set `LLM_MODEL_CHAT` in `backend/.env` to `sonnet`, `opus` or `haiku`. The
   aliases are in `proxy/proxy.yaml`.
@@ -115,6 +125,8 @@ This needs Node 24 and pnpm 11. Without Docker, the proxy also runs on the host 
 | POST | `/chat/:id/messages` | Ask. `{ content, sessionId? }`. JSON by default, SSE with `Accept: text/event-stream`. |
 | DELETE | `/chat/:id` | Delete a conversation and its turns. |
 | GET | `/haze/map` | Everything the map draws: frames, stations, fires, wind. |
+| GET | `/haze/days` | The stored days of fires, for looking back. |
+| GET | `/haze/days/:day` | One past day for the map: fires, wind, and the haze field where readings exist. |
 | GET | `/haze/stations/:id` | One station: readings, forecast, day-by-day outlook. |
 | GET | `/haze/accuracy` | Forecast error by lead time, beside "no change". |
 | GET | `/haze/guidelines` | The official API thresholds. |

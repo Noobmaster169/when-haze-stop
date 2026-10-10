@@ -28,6 +28,7 @@ export interface Layers {
   stations: boolean;
   fires: boolean;
   wind: boolean;
+  visibility: boolean;
 }
 
 export interface MapHandle {
@@ -76,9 +77,14 @@ export function MapCanvas({ handle, data, basemap, at, layers, selectedId, pin, 
     if (!kit || !base || !top || size.width === 0) return;
     const now = live.current;
     const scene: Scene = { view, size, theme: kit.theme, basemap: now.basemap };
-    if (now.data && now.layers.haze) kit.heat.paint(now.data, now.at);
-    drawChart(base, scene, now.data && now.layers.haze ? kit.heat.canvas : null);
-    if (now.data) drawMarks(top, scene, { data: now.data, at: now.at, fires: now.layers.fires, stations: now.layers.stations, selectedId: now.selectedId, pin: now.pin });
+    // A day from before the first readings has fires and wind but no field to paint.
+    const haze = now.data !== null && now.layers.haze && now.data.fields.length > 0;
+    if (now.data && haze) kit.heat.paint(now.data, now.at);
+    drawChart(base, scene, haze ? kit.heat.canvas : null);
+    if (now.data) {
+      const { fires, stations, visibility } = now.layers;
+      drawMarks(top, scene, { data: now.data, at: now.at, fires, stations, visibility, fontFamily: kit.font, selectedId: now.selectedId, pin: now.pin });
+    }
     else top.clearRect(0, 0, size.width, size.height);
     drawLabels(top, scene, kit.font);
     now.onPaint?.();

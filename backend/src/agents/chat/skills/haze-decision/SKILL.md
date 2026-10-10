@@ -1,6 +1,6 @@
 ---
 name: haze-decision
-version: 1
+version: 3
 when: The person asks whether something should go ahead or is safe in haze, such as school, outdoor work, sport, an event, travel, a flight, or going outside with a health condition.
 ---
 How to turn readings and a forecast into a recommendation.
@@ -14,7 +14,7 @@ Ask for these together, in one step, for the place and day in question:
 3. `get_guidelines` for the official lines.
 4. `get_track_record` when the answer depends on the forecast.
 
-Add `get_fires` and `get_wind` only when the person asks why, or where the smoke comes from.
+Add `get_fires` and `get_wind` only when the person asks why, or where the smoke comes from. Add `get_visibility` for a flight or an airport. A Singapore region is a station like any other, read on NEA's PSI; the lines below are Malaysia's, so say so when the place is Singapore.
 
 ## How to decide
 
@@ -30,7 +30,7 @@ Which line matters:
 - Outdoor work and strenuous exercise for adults: limit above 100, avoid strenuous work above 200.
 - Children, older people, pregnant women, and anyone with asthma, heart or lung disease: treat 100 as the line for staying indoors, and tell them to follow their doctor.
 - A public event, concert, race or match: there is no official line. Say so. Treat 100 as the point where organisers should protect spectators and staff (masks, shade, medical cover, shorter exposure) and 200 as the point where a long outdoor event should not run. Call this your reading of the school and workplace lines, not a rule.
-- A flight or airport: airlines and airports decide on visibility, which this app does not have. Give the reading and forecast, say high API often comes with poor visibility but does not decide it, and tell the person to check with the airline.
+- A flight or airport: airlines and airports decide on visibility against their own minima, which this app does not know. Give the visibility the nearest airport reported and whether haze or smoke was in the report, with the reading and forecast, and tell the person to check with the airline. Under 1 km is where delays become common; say that as experience, not a rule.
 
 ## What to say
 

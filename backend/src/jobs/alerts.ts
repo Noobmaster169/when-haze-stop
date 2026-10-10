@@ -19,7 +19,8 @@ export async function evaluateAlerts(pool: Pool): Promise<number> {
   const holding = new Set<string>();
 
   let opened = 0;
-  for (const station of await stations.list(pool)) {
+  // The lines are Malaysia's ministry rules, so a Singapore region is never judged against them.
+  for (const station of (await stations.list(pool)).filter((item) => item.network === "doe")) {
     const outlook = await outlookFor(pool, station, context, forecastByStation.get(station.id) ?? null);
     const conditions = conditionsFor({ stationId: station.id, name: station.name, api: station.api, days: outlook.days }, (kind, threshold) =>
       openKeys.has(key(station.id, kind, threshold)),

@@ -6,6 +6,10 @@
 # Then open http://localhost:3000. The first data cycle fetches a week of DOE
 # readings and takes a few minutes; `docker compose logs -f jobs` shows it.
 #
+# The readings, the screened fires and the fixed heat sources of the months
+# before your first run come from backend/db/seed/, loaded by the migrate
+# service. The jobs service then fetches the wind for those months by itself.
+#
 # For host development (`pnpm dev`, `pnpm test`) start only the infrastructure:
 #
 #   docker compose up -d postgres llm-proxy
@@ -56,7 +60,9 @@ services:
       LLM_PROXY_URL: http://llm-proxy:4000
       LLM_MODEL_CHAT: ${LLM_MODEL_CHAT:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-    command: ["node", "db/migrate.mjs"]
+    # The seed is the data every teammate starts from: readings, screened fires
+    # and the fixed heat sources. It only adds, and loads a file once.
+    command: ["sh", "-c", "node db/migrate.mjs && node db/seed.mjs"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -89,12 +95,17 @@ services:
   # restart costs little), then the hourly loop.
   jobs:
     build: ./backend
-    environment: *backend-env
+    environment:
+      <<: *backend-env
+      # Optional. With it `history` replays the fire archive; without it the
+      # fires before the first run come from the seed and only the wind is fetched.
+      FIRMS_MAP_KEY: ${FIRMS_MAP_KEY:-}
     command:
       - sh
       - -c
       - >-
         node --import tsx src/jobs/main.ts once;
+        node --import tsx src/jobs/main.ts history;
         node --import tsx src/jobs/main.ts backfill;
         exec node --import tsx src/jobs/main.ts loop
     depends_on:

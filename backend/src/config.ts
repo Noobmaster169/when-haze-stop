@@ -31,6 +31,10 @@ const Env = z.object({
   // more only wait inside the proxy with their request timeout already running.
   LLM_MAX_CONCURRENCY: z.coerce.number().int().positive().default(4),
 
+  // The NASA FIRMS archive key, read only by `pnpm haze:history`. Everything
+  // else runs without it.
+  FIRMS_MAP_KEY: optionalString,
+
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal", "silent"]).default("info"),
 
   // The commit an image was built from. "dev" outside a built image, which is

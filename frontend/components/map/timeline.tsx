@@ -17,6 +17,8 @@ interface Props {
   now: number;
   at: number;
   playing: boolean;
+  /** Says what the map is showing, in place of the live wording, when looking back at a past day. */
+  caption?: string;
   onSeek(at: number): void;
   onPlaying(playing: boolean): void;
 }
@@ -31,7 +33,7 @@ function describe(at: number, now: number): string {
   return hours < 0 ? "Past readings" : `Forecast, ${hours} h ahead`;
 }
 
-export function Timeline({ from, to, now, at, playing, onSeek, onPlaying }: Props) {
+export function Timeline({ from, to, now, at, playing, caption, onSeek, onPlaying }: Props) {
   const position = useRef(at);
   useEffect(() => {
     position.current = at;
@@ -75,7 +77,7 @@ export function Timeline({ from, to, now, at, playing, onSeek, onPlaying }: Prop
 
         <div className="w-[164px] shrink-0 grow @[760px]:grow-0">
           <p className="text-strong font-medium text-ink">{malaysiaWhen(at)}</p>
-          <p className={`text-caption ${at > now ? "text-accent" : "text-ink-tertiary"}`}>{describe(at, now)}</p>
+          <p className={`text-caption ${at > now ? "text-accent" : "text-ink-tertiary"}`}>{caption ?? describe(at, now)}</p>
         </div>
 
         <div className="relative order-last w-full min-w-0 pb-5 @[760px]:order-none @[760px]:w-auto @[760px]:grow">
@@ -109,7 +111,7 @@ export function Timeline({ from, to, now, at, playing, onSeek, onPlaying }: Prop
             onPlaying(false);
             onSeek(now);
           }}
-          disabled={at === now}
+          disabled={at === now || caption !== undefined}
           className="h-8 shrink-0 rounded-md border border-hairline-strong px-3 text-small font-medium text-ink-secondary hover:bg-active hover:text-ink disabled:cursor-default disabled:text-ink-faint disabled:hover:bg-transparent"
         >
           Now

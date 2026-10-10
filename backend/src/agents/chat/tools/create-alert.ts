@@ -20,6 +20,7 @@ export const createAlert: ChatTool<Input> = {
     if (!ctx.sessionId) return refused("this browser sent no session id, so there is nobody to follow the station for. Ask the person to use the Alert me button on the map");
     const found = await resolveStation(ctx.pool, ctx.geocoder, input.place);
     if (!found) return refused(`no place named "${input.place}" was found inside the map's region`);
+    if (found.station.network !== "doe") return refused(`${found.station.name} is an NEA region; alerts follow Malaysia's official lines and are not raised for Singapore`);
     await alerts.subscribe(ctx.pool, ctx.sessionId, found.station.id);
     const where = `${found.station.name}, ${found.station.state}${found.via ? ` (the nearest DOE station to ${found.via})` : ""}`;
     return {

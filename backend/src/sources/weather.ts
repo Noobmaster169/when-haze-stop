@@ -17,13 +17,19 @@ import { fetchText, pause } from "./http";
 export interface WeatherClient {
   /** Hourly over the whole grid, from `pastDays` ago to `forecastDays` ahead. */
   grid(pastDays: number, forecastDays: number): Promise<WeatherGrid>;
+  /** Hourly over the whole grid for whole UTC days in the past, both days included. */
+  history(firstDay: string, lastDay: string): Promise<WeatherGrid>;
 }
 
 const BASE = "https://api.open-meteo.com/v1/forecast";
+/** The same model's past runs, kept from 2022 on. The reanalysis archive has no wind at these levels. */
+const HISTORY_BASE = "https://historical-forecast-api.open-meteo.com/v1/forecast";
 const FIELDS = "wind_speed_925hPa,wind_direction_925hPa,wind_speed_850hPa,wind_direction_850hPa,precipitation";
 const TIMEOUT_MS = 60_000;
 /** One request per row of the grid, spaced out to stay well inside the free tier. */
 const SPACING_MS = 1500;
+/** Open-Meteo counts a request by its locations and days, so two weeks of a 23 point row is some 25 calls against 600 a minute. */
+const HISTORY_SPACING_MS = 3000;
 
 const series = z.array(z.number().nullable());
 const Location = z.object({
@@ -83,22 +89,31 @@ export function assembleGrid(rows: Location[][]): WeatherGrid {
   return grid;
 }
 
+/** One request per row of the grid; `span` is the part of the query that says which hours. */
+async function fetchGrid(base: string, span: string, what: string, spacingMs: number): Promise<WeatherGrid> {
+  const lons = Array.from({ length: WEATHER.nx }, (_, i) => DOMAIN.lon0 + i * WEATHER.step);
+  const rows: Location[][] = [];
+  for (let j = 0; j < WEATHER.ny; j++) {
+    const lat = DOMAIN.lat0 + j * WEATHER.step;
+    const url = `${base}?latitude=${lons.map(() => lat).join(",")}&longitude=${lons.join(",")}&hourly=${FIELDS}&${span}&wind_speed_unit=ms&timezone=GMT`;
+    const parsed = Row.safeParse(JSON.parse(await fetchText(url, what, TIMEOUT_MS)));
+    if (!parsed.success) throw new TerminalError("Open-Meteo answered in a shape this client does not know", { cause: parsed.error });
+    rows.push(parsed.data);
+    if (j < WEATHER.ny - 1) await pause(spacingMs);
+  }
+  return assembleGrid(rows);
+}
+
 export function openMeteoClient(): WeatherClient {
   return {
     async grid(pastDays, forecastDays) {
-      const lons = Array.from({ length: WEATHER.nx }, (_, i) => DOMAIN.lon0 + i * WEATHER.step);
-      const rows: Location[][] = [];
-      for (let j = 0; j < WEATHER.ny; j++) {
-        const lat = DOMAIN.lat0 + j * WEATHER.step;
-        const url =
-          `${BASE}?latitude=${lons.map(() => lat).join(",")}&longitude=${lons.join(",")}` +
-          `&hourly=${FIELDS}&past_days=${pastDays}&forecast_days=${forecastDays}&wind_speed_unit=ms&timezone=GMT`;
-        const parsed = Row.safeParse(JSON.parse(await fetchText(url, "Open-Meteo forecast", TIMEOUT_MS)));
-        if (!parsed.success) throw new TerminalError("Open-Meteo answered in a shape this client does not know", { cause: parsed.error });
-        rows.push(parsed.data);
-        if (j < WEATHER.ny - 1) await pause(SPACING_MS);
-      }
-      return assembleGrid(rows);
+      return fetchGrid(BASE, `past_days=${pastDays}&forecast_days=${forecastDays}`, "Open-Meteo forecast", SPACING_MS);
+    },
+    async history(firstDay, lastDay) {
+      const grid = await fetchGrid(HISTORY_BASE, `start_date=${firstDay}&end_date=${lastDay}`, "Open-Meteo history", HISTORY_SPACING_MS);
+      // The caller asks span after span, and the last row of one must not run into the first of the next.
+      await pause(HISTORY_SPACING_MS);
+      return grid;
     },
   };
 }

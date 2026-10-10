@@ -24,7 +24,7 @@ A web app about haze in Malaysia with three features that share one set of data.
 
 | Feature | What a person gets |
 | --- | --- |
-| Haze map | The official readings now, the past week, and a forecast 3.5 days ahead, on a map of Sumatra, the peninsula and Borneo, with the fires and the wind that explain it. |
+| Haze map | The official readings now, the past week, and a forecast 3.5 days ahead, on a map of Sumatra, the peninsula and Borneo, with the fires, the wind and the airport visibility that explain it. |
 | Alerts | A banner in the app when a followed area crosses an official line, when the forecast says haze is arriving, and when it says haze is clearing. |
 | Assistant | A chat panel that answers haze questions and gives recommendations (school, outdoor work, events, travel) from the same data, and names its sources. |
 
@@ -80,10 +80,14 @@ Backend folders added for this product (all under `backend/src/`):
 | Station list with coordinates | DOE Malaysia APIMS | `.../publicportalapims/mapcaqm` | Every hour | `sources/doe.ts` |
 | Fire detections | NASA FIRMS, VIIRS on S-NPP, NOAA-20, NOAA-21 | Three 7-day CSV files under `https://firms.modaps.eosdis.nasa.gov/data/active_fire/` | Every 3 hours | `sources/firms.ts` |
 | Wind at 925 and 850 hPa, rain | Open-Meteo forecast API | `https://api.open-meteo.com/v1/forecast` | Every hour | `sources/weather.ts` |
+| Older fires, and NASA's label for hotspots that are not fires | NASA FIRMS area API (needs `FIRMS_MAP_KEY`) | `https://firms.modaps.eosdis.nasa.gov/api/area/csv/<key>/<product>/<area>/<days>/<date>` | By hand, `pnpm haze:history` | `sources/firms-archive.ts` |
+| Wind and rain before the first run | Open-Meteo historical forecast API | `https://historical-forecast-api.open-meteo.com/v1/forecast` | By hand, `pnpm haze:history` | `sources/weather.ts` |
+| Singapore's 24-hour PSI and one-hour PM2.5 for five regions, stored as five more stations | NEA Singapore, via data.gov.sg | `https://api.data.gov.sg/v1/environment/pm25` and `/psi` | Every hour | `sources/nea.ts` |
+| Airport weather reports (visibility, haze or smoke) for 29 airports | NOAA Aviation Weather Center | `https://aviationweather.gov/api/data/metar?ids=...&format=json` | Every hour | `sources/metar.ts` |
 | Place names | Open-Meteo geocoder | `https://geocoding-api.open-meteo.com/v1/search` | On search | `sources/geocoder.ts` |
 | Coastlines, borders, towns | Natural Earth (public domain) | Packed once into `frontend/public/basemap.json` | Static | `frontend/components/map/basemap.ts` |
 
-None of these needs a key.
+Only the FIRMS archive needs a key, and only `pnpm haze:history` uses it.
 
 Things to know about each source, learned by using them:
 
@@ -99,6 +103,74 @@ Things to know about each source, learned by using them:
   their total.
 - Open-Meteo is asked one grid row at a time (15 requests of 23 points), 1.5 s apart. Its last
   forecast hours can be empty for some variables; the grid stops at the first incomplete hour.
+- NEA's regions are stations (`network = 'nea'`, ids `SGCENTRAL` to `SGWEST`, placed where NEA
+  labels them). Their reading in `readings` is the 24-hour PSI, built the same way as the API and
+  on the same bands, so the map, the panel, the model's station correction and the assistant
+  treat them like any station. The run's hour is DOE's newest, not NEA's, because NEA posts a few
+  minutes earlier. Alerts are not raised for them: the lines are Malaysian.
+- A METAR writes visibility in metres in the raw report, and `9999` means ten kilometres or
+  more. The JSON's statute miles are only a fallback. `HZ` is haze and `FU` is smoke, as the
+  observer at the airport called it. The list of airports is in `sources/metar.ts` and reaches
+  into Sumatra and Kalimantan, where visibility shows the smoke at its source.
+- NEA posts the PM2.5 and PSI feeds seconds apart; a fetch between them stores what it has, and
+  the next fetch fills the null in. That is the one update `nea_hours` allows.
+
+- The FIRMS archive has two feeds. The live one (NRT) goes back about three months and has no
+  label. The standard product runs about three months behind and labels every hotspot: vegetation
+  fire, active volcano, other static land source, offshore. It serves 5 days per request, and a
+  request for this region costs about 7 of the key's 5,000 transactions per 10 minutes.
+- Open-Meteo's reanalysis archive has no wind at 925 or 850 hPa. Its historical forecast API
+  does, from 2022, so that is the one used for past wind.
+
+### 3.1.1 Screening the fires
+
+A hotspot is not always a fire. These screens run before a detection becomes smoke in the model or
+a dot on the map, in this order. `haze/burning.ts` is the one function that applies them, used by
+both the hourly fetch and the archive replay:
+
+| Screen | Takes out | How | File |
+| --- | --- | --- | --- |
+| Low confidence | Mostly sun glint and hot roofs | NASA's own confidence column | `sources/firms.ts` |
+| Sun glint | The sun's reflection off the sea, seen as a wall of saturated pixels | A sunlit half-degree block of one pass with 50 or more detections, 90% of them at the sensor's ceiling | `haze/fire-screen.ts` |
+| Open sea | Gas flares on platforms | More than 10 km from any coast | `haze/fire-screen.ts`, `haze/land.ts` |
+| Fixed sources | Gas flares on land, smelters, power plants, volcanoes | Within one 0.01 degree cell of a place NASA's labelled archive marked on 3 or more days | `haze/fixed-sources.ts` |
+| Unconfirmed | A single faint pixel seen once: a hot roof, a reflection, a burn-off too small to make haze | A cell-day is kept only if two or more satellite passes saw it, or its fire power is 10 MW or more | `haze/fire-confirm.ts` |
+
+The fixed source list comes from two years of the labelled archive (`fixed_source_days`). Built on
+10 October 2026 from 1 July 2024 to 30 June 2026 it held 19,423 sightings, almost all "static land
+source" or "offshore" and 11 "volcano", which make 370 sites. Those sites and their neighbouring
+cells cover 97.5% of NASA's own labelled sightings.
+
+What it removed, measured on the live feed from 1 July to 10 October 2026: 15,777 of 903,230
+detections (1.7%). In July, before the burning season, it was 3,223 of 33,603 (9.6%). In the week
+of 3 to 10 October it was 0.4% of the fire power. So the screen removes a steady set of false
+fires, and in a haze episode nearly everything left on the map is vegetation burning.
+
+The confirmation rule is the strict one. Over 1 July to 10 October 2026 all the screens together
+took out 34,553 of 99,947 cell-days (35%) and left 96.2% of the fire power. On the map of the
+newest three days that was 1,473 dots before and 1,033 after. The cost is real small fires that
+only one pass saw, under cloud for the rest of the day.
+
+`fire_cells.frp_mw` stays what was fetched. `burning_mw` is what is left after the screens, zero
+for a cell-day that was all taken out, and every read uses it. Nothing is deleted when a rule
+changes: bump `SCREEN_VERSION` in `haze/burning.ts` and `haze:history` works the burning part out
+again for every day the live archive still serves.
+
+### 3.1.2 Shared data: the seed
+
+Every developer runs their own Postgres, and three things in it cannot simply be fetched again:
+DOE serves one week of readings, the fire archive needs a key, and the fixed sources take a two
+year replay. So they are kept in the repository, in `backend/db/seed/` (four gzipped tab-separated
+files, under 1 MB together): `stations`, `readings`, `fixed_source_days`, `fire_cells`.
+
+- `node db/seed.mjs` (`pnpm db:seed`) loads them. The compose `migrate` service runs it after the
+  migrations. It only adds rows, records each file's hash in `seed_files`, and loads a file again
+  only when a newer one is committed.
+- `pnpm db:export-seed` writes them from the local database. Run it on the machine that has been
+  fetching longest and commit the result, at least once a week: a teammate who starts more than 7
+  days after the last export has a gap in the readings that DOE can no longer fill.
+- Wind is not in the seed (too large). The jobs service fetches it for the seeded days by itself,
+  with no key, on its first start (about 7 minutes).
 
 ### 3.2 The region and the two grids
 
@@ -121,7 +193,8 @@ Migrations `backend/db/migrations/002_haze.sql` and `003_source_fetches.sql`. Ne
 | --- | --- | --- |
 | `stations` | A DOE station | Upserted every hour. |
 | `readings` | One station, one hour, one API value | Insert only. The history is the only backtest there is. |
-| `fire_cells` | Fire power in one 0.1 degree cell on one UTC day | Upsert keeps the larger value. |
+| `fire_cells` | Fire power in one 0.1 degree cell on one UTC day | Upsert keeps the larger value. `burning_mw` is the part left after fixed sources (migration `004_fixed_sources.sql`); null on a row stored before any were known. |
+| `fixed_source_days` | One 0.01 degree cell on one UTC day that NASA's archive labelled volcano, static or offshore | Insert only. A cell seen on 3 or more days is a fixed source. |
 | `weather_hours` | Wind and rain over the whole weather grid for one hour | Upsert replaces an hour. See the note below. |
 | `forecast_runs` | One run of the model | `as_of` is the newest reading it saw. `kind` is `live` or `backfill`. `fit` holds how well smoke matched readings. |
 | `forecast_frames` | The API field at one time for one run | One byte a cell, API / 2. |
@@ -129,6 +202,9 @@ Migrations `backend/db/migrations/002_haze.sql` and `003_source_fetches.sql`. Ne
 | `alert_subscriptions` | A browser following a station | No login. `session_id` is made by the browser. |
 | `source_fetches` | One fetch of a source by the jobs process | Migration `003_source_fetches.sql`. Insert only: when, how long, what came back or why it failed. The Sources page reads it. |
 | `alert_events` | One alert | `open` stays true while its condition holds. A unique index allows only one open alert per station, kind and line. |
+| `airports`, `metar_obs` | An airport; one of its weather reports | Migration `005_context_sources.sql`. Insert only. Visibility in metres, 10000 for ten kilometres or more; the present weather codes; the raw report. |
+| `nea_hours` | One Singapore region for one hour | The one-hour PM2.5 and the 24-hour PSI and PM2.5. A null filled in by a later fetch is the only update. The PSI is also a row in `readings`. |
+| `cams_hours` | Empty | Made by migration `005` for a composition forecast that was then dropped from the product. Nothing writes it. |
 
 Note on `weather_hours`: this is the one table where a later fetch overwrites an earlier value. An
 hour first arrives as a forecast and is later replaced by the weather model's analysis of what
@@ -143,9 +219,13 @@ in a new migration).
 
 Page `/map` (also the home page).
 
-- A map with four layers that can each be switched off: Haze (the coloured field), Stations (a
-  dot per DOE station, coloured by its value), Fires (satellite detections of the last two days,
-  sized by fire power), Wind (moving streaks that follow the wind carrying the smoke).
+- A map with five layers that can each be switched off: Haze (the coloured field), Stations (a
+  dot per DOE station and NEA region, coloured by its value), Fires (satellite detections of the
+  last two days, sized by fire power), Wind (moving streaks that follow the wind carrying the
+  smoke), Visibility (a square per airport, darker the shorter its observer could see at the
+  timeline's moment, the distance written under it below ten kilometres, a red ring for
+  reported smoke). Visibility follows the timeline through the past week and is blank in the
+  forecast half, because it is observed, never forecast.
 - A timeline under the map: the past 7 days and the next 3.5 days. Play, drag, or press Now.
   Left of the Now mark the map shows what was read. Right of it the map shows the forecast, and
   the label turns blue and says how many hours ahead.
@@ -159,6 +239,13 @@ Page `/map` (also the home page).
 - `/map?station=CA24N` opens on that station. Alerts and assistant answers link this way.
 - The page asks for new data every 5 minutes, so a new hourly run appears without a reload. If the
   timeline is on Now, it stays on Now when new data lands.
+
+Looking back. Between the map and the timeline is the History strip: one bar per stored UTC day,
+its height the day's fire power. Pressing a bar puts that day on the map: its fires, its wind, and
+the haze field where one exists. The timeline then spans that one day. Days before the first DOE
+reading (3 October 2026) have fires and wind only, and the timeline says so. Stations are not
+drawn on a past day. Live goes back to now. Files: `history-strip.tsx`, `use-haze-day.ts`,
+`unpackDay` in `map-data.ts`; backend `services/history.ts`.
 
 Page `/sources` lists every outside source: what it gives, the endpoint, how often it is asked, and
 its newest good and failed fetch with what came back (stations, readings added, detections, weather
@@ -369,36 +456,42 @@ the model, a one-line preview for the page, and a `source` shown as a chip.
 
 | Tool | Arguments | Returns | Source chip |
 | --- | --- | --- | --- |
-| `get_air_quality` | `place` | Reading now and the last 24 hour range, with the station it came from | DOE |
+| `get_air_quality` | `place` | Reading now and the last 24 hour range, with the station it came from. For a Singapore region, NEA's PSI and its measured one-hour PM2.5. | DOE, or NEA Singapore |
 | `get_forecast` | `place` | Each day's forecast peak, range and chance of passing 100, 150, 180, 200; a value every 6 hours | Haze model |
 | `get_guidelines` | none | The official lines, and that there is none for events or flights | Ministry guidance |
 | `get_track_record` | none | Measured error at 24, 48, 72 hours beside "no change" | Haze model |
 | `get_fires` | `place` optional | Burning cells and fire power by region for three days; distance and direction of the strongest from the place | NASA FIRMS |
 | `get_wind` | `place` | Direction, speed and rain every 12 hours for three days | Open-Meteo |
+| `get_visibility` | `place` | Visibility at the nearest airport now and the lowest in a day, what the observer reported in the air, and every airport in the region under 5 km | METAR |
 | `create_alert` | `place` | Follows the nearest station for this browser | none |
 | `get_time`, `load_skill` | | From the starter | none |
 
 `place` can be a station id, a station name or any place name. `services/places.ts`
 (`resolveStation`) tries the station names first, then the geocoder and the nearest station. If
 the geocoder is down, station names still work. A tool that cannot find a place refuses, and the
-model is told to say so rather than guess.
+model is told to say so rather than guess. `get_visibility` uses `resolvePoint` from the same
+file, which gives the spot itself rather than a station, trying airport codes and usual names
+("KLIA", "Changi", the list is `AIRPORT_ALIASES` in `sources/metar.ts`) before the geocoder,
+because the geocoder reads "KLIA" as a village in Sabah.
 
 `create_alert` needs to know which browser asked. The frontend sends its session id with each
 question (`sessionId` on `POST /chat/:id/messages`), and the route passes it to the tools.
 
 ### 6.4 The prompt and the skill
 
-- `agents/prompts/chat/v2.md` is the system prompt. It sets the scope (haze and air quality in
+- `agents/prompts/chat/v4.md` is the system prompt. It sets the scope (haze and air quality in
   Malaysia), tells the model to refuse anything else in one sentence, forbids stating a fact that
-  did not come from a tool, lists what the app has no data for (visibility, flights, PM2.5,
-  hospitals), and fixes the answer format. `v1.md` is the starter's and is kept, because prompts
-  are never edited: a change is `v3.md` and a bump of `CHAT_PROMPT` in `loop.ts`.
+  did not come from a tool, says that Singapore's regions are stations on NEA's PSI and that a
+  METAR is what an observer saw and not whether flights run, lists what the app has no data for
+  (PM2.5 in Malaysia, flight delays, traffic, hospitals), and fixes the answer format. `v1.md`
+  is the starter's; `v2.md` and `v3.md` are earlier versions and are kept, because prompts are
+  never edited: a change is `v5.md` and a bump of `CHAT_PROMPT` in `loop.ts`.
 - `agents/chat/skills/haze-decision/SKILL.md` is the procedure for "should we" questions: what to
   gather, how to turn a chance into go ahead, go ahead with a fallback, or do not go ahead
   (under 30%, 30 to 60%, over 60%), and which line applies to which activity. For events it says
   there is no official line and that using 100 and 200 is its own reading of the school and
-  workplace rules. For flights it says the decision is about visibility, which the app does not
-  have.
+  workplace rules. For flights it says to give the visibility the nearest airport reported and
+  that airlines decide against their own minima, which the app does not know.
 
 ### 6.5 What it should and should not do
 
@@ -407,7 +500,9 @@ question (`sessionId` on `POST /chat/:id/messages`), and the route passes it to 
 | "How is the air in Shah Alam?" | Reading from the nearest station, named, with the time. |
 | "Will schools in Seremban close tomorrow?" | Forecast peak, chance of passing 180, the rule and its issuer, one sentence on trust. |
 | "Should the Sepang event go ahead on Sunday?" | A recommendation with a fallback, says there is no official event line. |
-| "Is it safe to fly from KLIA?" | Says it has no visibility data, gives reading and forecast, says to check the airline. |
+| "Is it safe to fly from KLIA?" | Gives the visibility KLIA reported and whether haze or smoke was in the report, the reading and forecast, says airlines decide on their own minima, says to check the airline. |
+| "How is the air in Singapore?" | The nearest NEA region's PSI and measured PM2.5, named as NEA's. |
+| "What is the PM2.5 in Klang?" | Says DOE publishes no concentration, gives the index. |
 | "What about next month?" | Says the forecast reaches 3.5 days. |
 | "Write me a poem" | One sentence refusal. |
 | "Alert me about Klang" | Calls `create_alert`, confirms the station. |
@@ -430,6 +525,8 @@ Change both together.
 | Method | Path | Returns |
 | --- | --- | --- |
 | GET | `/haze/map` | `HazeMap`: latest run, both grids, stations with newest reading, frames for 7 days back and 84 hours ahead, wind at each frame, strongest 1500 fire cells of 2 days |
+| GET | `/haze/days` | `HazeDays`: every stored UTC day with its burning cells and fire power, and the first hour a haze field exists for |
+| GET | `/haze/days/:day` | `HazeDay`: one past day for the map: strongest 1500 fire cells, wind every 3 hours, and the frames of that day (empty before the first readings) |
 | GET | `/haze/stations/:id` | `StationOutlook`: station, a week of readings, 84 hours of forecast, the day outlooks |
 | GET | `/haze/accuracy` | `Accuracy`: error by lead for model and persistence |
 | GET | `/haze/guidelines` | `GuidelineList` |
@@ -477,6 +574,21 @@ pnpm haze:loop           # then keep running: once now, then at 20 past every ho
 cd ../frontend && pnpm install && pnpm dev    # http://localhost:3000
 ```
 
+`pnpm haze:history` (`jobs/history.ts`) runs in the compose jobs service on every start, after the
+first cycle. Without `FIRMS_MAP_KEY` it does only step 3, and the fires of the past are what the
+seed loaded. With the key it does all three:
+
+1. Stores two years of labelled fixed sources (about 290 requests).
+2. Stores the live feed's fires from its first day (1 July 2026 on the first run) to today,
+   screened, and works out `burning_mw` again for days already stored.
+3. Stores wind and rain from that same day up to the first hour already stored, newest first.
+
+The first run took 16 minutes. Each 30 day span that came back is a row in `source_fetches`, so a
+run that is stopped can be started again and asks only for what is missing, plus the newest days,
+which are still filling in. The map's History strip shows these days (section 4.1). The model does
+not read the fires and wind before the first DOE reading yet: they are there for tuning it once
+there are readings to score it against.
+
 What the loop does each hour (`jobs/cycle.ts`): fetch readings (as many days back as needed to
 join up with what is stored, up to 7), fetch fires on every third turn, fetch weather, run the
 model on the newest reading, evaluate alerts. A step that fails is logged and the rest still run:
@@ -503,6 +615,9 @@ Frontend: `cd frontend && pnpm test`.
 | `test/haze/sources.test.ts` | Parsing real recorded DOE, FIRMS and Open-Meteo answers |
 | `test/haze/model.test.ts` | Transport, calibration, chances, frames |
 | `test/haze/alert-rules.test.ts` | Each alert rule, including not repeating |
+| `test/haze/fire-confirm.test.ts` | The two-pass or 10 MW rule on recorded detections |
+| `test/haze/fixed-sources.test.ts` | Reading the archive, and the fixed source screen on recorded rows of the Kerteh gas complex |
+| `test/jobs/history.test.ts` | The history job into the database: sites, screened fires, picking up where it stopped, wind with no hole |
 | `test/jobs/cycle.test.ts` | One whole cycle into the database, then every haze and alert endpoint |
 | `test/agents/haze-tools.test.ts` | Every assistant tool over that cycle |
 | `frontend/components/map/map.test.ts` | Frame decoding, colour scale, projection, Malaysian time |
@@ -523,7 +638,9 @@ Limits, in the order they matter:
    tested on recorded real answers, but the first full run from a developer machine is the first
    time all three are fetched from Node end to end. Watch the first `pnpm haze:once`.
 3. Chances come from few past errors until the app has run for some weeks.
-4. Fires under cloud are missed, and future fires are assumed to continue as they were.
+4. Fires under cloud are missed, and future fires are assumed to continue as they were. A fixed
+   heat source that started up after June 2026 is not in NASA's labelled archive yet and still
+   counts as a fire. Runs stored before 10 October 2026 16:30 UTC burned the unscreened fires.
 5. Stations are sparse in Sabah, Sarawak and the east coast. Away from stations the map is the
    model with little correction.
 6. Alerts only reach an open tab.
@@ -538,7 +655,6 @@ Next, roughly in value order:
 - Store weather by fetch time so skill can be measured against the wind that was really forecast.
 - Try to beat persistence: fit the gain per lead time, add fire growth, or blend with a simple
   statistical model. Judge only by the Track record table.
-- A visibility source (airport METAR) so flight questions can be answered.
 - Bahasa Malaysia for alerts and the assistant.
 - An API key for the model and auth, before any public launch.
 

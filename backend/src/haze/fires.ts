@@ -31,6 +31,21 @@ export interface FireCellDay {
   frpMw: number;
 }
 
+/**
+ * A cell-day as it is stored: everything the satellites saw, and the part of
+ * it that is confirmed vegetation burning. `burningMw` is null only on a row
+ * stored before there was a screen, which says "not screened", not "nothing burns".
+ */
+export interface StoredCellDay extends FireCellDay {
+  burningMw: number | null;
+}
+
+/** Pairs each cell-day with what is left of it after the screens: zero where all of it was taken out. */
+export function pairCellDays(all: FireCellDay[], burning: FireCellDay[]): StoredCellDay[] {
+  const left = new Map(burning.map((cell) => [`${cell.day}|${cell.lat10}|${cell.lon10}`, cell.frpMw]));
+  return all.map((cell) => ({ ...cell, burningMw: left.get(`${cell.day}|${cell.lat10}|${cell.lon10}`) ?? 0 }));
+}
+
 export function toCellDays(detections: Detection[]): FireCellDay[] {
   const perSatellite = new Map<string, number>();
   for (const hit of detections) {

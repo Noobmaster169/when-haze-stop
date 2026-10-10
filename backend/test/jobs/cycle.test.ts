@@ -32,7 +32,15 @@ describe("one cycle, then what the api serves", () => {
   it("serves a map with the run, its frames, the wind and the fires", async () => {
     const map = HazeMap.parse((await request(app).get("/haze/map").expect(200)).body);
     expect(map.run?.asOf).toBe(LAST_HOUR.toISOString());
-    expect(map.stations.map((station) => station.id)).toEqual(expect.arrayContaining(STATIONS.map((station) => station.id)));
+    expect(map.stations.map((station) => station.id)).toEqual(expect.arrayContaining([...STATIONS.map((station) => station.id), "SGCENTRAL", "SGWEST"]));
+    expect(map.stations.find((station) => station.id === "SGCENTRAL")).toMatchObject({ network: "nea", state: "Singapore" });
+    expect(map.airports.length).toBe(29);
+    // A Singapore region reads like any station, on NEA's PSI, with the measured PM2.5 that only NEA has.
+    const singapore = StationOutlook.parse((await request(app).get("/haze/stations/SGCENTRAL").expect(200)).body);
+    expect(singapore.readings.at(-1)).toEqual({ at: LAST_HOUR.toISOString(), api: 173 });
+    expect(singapore.pm25).toMatchObject({ at: "2026-10-09T15:00:00.000Z" });
+    const klia = map.airports.find((airport) => airport.icao === "WMKK");
+    expect(klia?.reports.at(-1)).toEqual({ at: "2026-10-10T08:00:00.000Z", m: 6000, wx: "VCSH" });
     const now = map.frames.find((frame) => frame.validAt === LAST_HOUR.toISOString());
     expect(now?.observed).toBe(true);
     expect(Buffer.from(now?.field ?? "", "base64")).toHaveLength(FIELD_CELLS);

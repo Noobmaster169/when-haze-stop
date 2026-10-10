@@ -4,9 +4,31 @@ import { dayName, malaysiaMidnights, malaysiaWhen } from "@/lib/malaysia-time";
 
 import { bracket, decodeBytes, sampleField, sampleWind } from "./field";
 import { clampView, fitScale, toLat, toLon, toX, toY, zoomAt } from "./geo";
+import { visibilityAt } from "./map-data";
 import { band, colourAt, parseHex, type Stop } from "./scale";
 
 const GRID = { lon0: 96, lat0: -6, nx: 2, ny: 2, step: 1 };
+
+describe("reading an airport's reports", () => {
+  const airport = {
+    icao: "WMKK",
+    name: "Kuala Lumpur Intl",
+    lat: 2.74,
+    lon: 101.71,
+    reports: [
+      { at: "2026-10-10T07:00:00Z", m: 5000, wx: "HZ" },
+      { at: "2026-10-10T08:00:00Z", m: 6000, wx: null },
+    ],
+    times: [Date.parse("2026-10-10T07:00:00Z"), Date.parse("2026-10-10T08:00:00Z")],
+  };
+
+  it("gives the newest report at or before a moment, and nothing once the airport has been silent three hours", () => {
+    expect(visibilityAt(airport, Date.parse("2026-10-10T07:30:00Z"))).toEqual({ at: "2026-10-10T07:00:00Z", m: 5000, wx: "HZ" });
+    expect(visibilityAt(airport, Date.parse("2026-10-10T09:00:00Z"))?.m).toBe(6000);
+    expect(visibilityAt(airport, Date.parse("2026-10-10T06:00:00Z"))).toBeNull();
+    expect(visibilityAt(airport, Date.parse("2026-10-10T12:00:00Z"))).toBeNull();
+  });
+});
 
 describe("reading a frame", () => {
   it("decodes one byte a cell and reads it back as API", () => {

@@ -9,13 +9,18 @@ import { z } from "zod";
  * commit.
  */
 
+/** Whose station it is: DOE Malaysia reads the API, NEA Singapore the PSI. Both are 24 hour indices on the same bands. */
+export const Network = z.enum(["doe", "nea"]);
+export type Network = z.infer<typeof Network>;
+
 export const Station = z.object({
   id: z.string(),
   name: z.string(),
   state: z.string(),
+  network: Network,
   lat: z.number(),
   lon: z.number(),
-  /** The newest DOE reading, or null for a station that has reported nothing yet. */
+  /** The newest reading, or null for a station that has reported nothing yet. */
   api: z.number().int().nullable(),
   observedAt: z.string().nullable(),
 });
@@ -61,6 +66,26 @@ export const RunSummary = z.object({
 });
 export type RunSummary = z.infer<typeof RunSummary>;
 
+/** One airport weather report, thinned to the newest in each hour. */
+export const VisibilityReport = z.object({
+  at: z.string(),
+  /** Prevailing visibility in metres; 10000 is ten kilometres or more. Null when the report gave none. */
+  m: z.number().int().nullable(),
+  /** The present weather as reported ("HZ" haze, "FU" smoke), or null. */
+  wx: z.string().nullable(),
+});
+export type VisibilityReport = z.infer<typeof VisibilityReport>;
+
+export const Airport = z.object({
+  icao: z.string(),
+  name: z.string(),
+  lat: z.number(),
+  lon: z.number(),
+  /** The last week, oldest first. */
+  reports: z.array(VisibilityReport),
+});
+export type Airport = z.infer<typeof Airport>;
+
 export const HazeMap = z.object({
   /** Null until the model has run once. The page says so instead of drawing an empty sea. */
   run: RunSummary.nullable(),
@@ -70,8 +95,38 @@ export const HazeMap = z.object({
   frames: z.array(Frame),
   wind: z.array(WindFrame),
   fires: z.array(FireCell),
+  /** The visibility layer: every airport with its reports over the map's past week. */
+  airports: z.array(Airport),
 });
 export type HazeMap = z.infer<typeof HazeMap>;
+
+/** One stored UTC day of fires, for choosing a day to look back at. */
+export const FireDay = z.object({
+  /** UTC calendar day, `YYYY-MM-DD`. */
+  day: z.string(),
+  /** Burning 0.1 degree cells that day. */
+  cells: z.number().int(),
+  frpMw: z.number(),
+});
+export type FireDay = z.infer<typeof FireDay>;
+
+export const HazeDays = z.object({
+  days: z.array(FireDay),
+  /** The first hour the haze field exists for, or null before the first run. Earlier days have fires and wind only: DOE serves no readings from before the app first ran. */
+  hazeFrom: z.string().nullable(),
+});
+export type HazeDays = z.infer<typeof HazeDays>;
+
+/** One past UTC day as the map draws it. `frames` is empty for a day before the first readings. */
+export const HazeDay = z.object({
+  day: z.string(),
+  grid: FieldGrid,
+  windGrid: FieldGrid,
+  frames: z.array(Frame),
+  wind: z.array(WindFrame),
+  fires: z.array(FireCell),
+});
+export type HazeDay = z.infer<typeof HazeDay>;
 
 /** One day of a station's outlook against the official lines. */
 export const DayOutlook = z.object({
@@ -91,6 +146,8 @@ export const StationOutlook = z.object({
   readings: z.array(z.object({ at: z.string(), api: z.number().int() })),
   forecast: z.array(z.object({ at: z.string(), api: z.number() })),
   days: z.array(DayOutlook),
+  /** NEA's measured one-hour PM2.5 for a Singapore region, which DOE has no equivalent of. Null elsewhere. */
+  pm25: z.object({ at: z.string(), value: z.number() }).nullable(),
 });
 export type StationOutlook = z.infer<typeof StationOutlook>;
 
@@ -114,7 +171,7 @@ export const Place = z.object({
   lat: z.number(),
   lon: z.number(),
   /** The closest DOE station, which is where its readings and alerts come from. */
-  nearest: z.object({ id: z.string(), name: z.string(), km: z.number() }).nullable(),
+  nearest: z.object({ id: z.string(), name: z.string(), network: Network, km: z.number() }).nullable(),
 });
 export type Place = z.infer<typeof Place>;
 

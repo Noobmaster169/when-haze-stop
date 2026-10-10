@@ -1,3 +1,4 @@
+import type { Network, Station } from "../../../contracts";
 import { band } from "../../../haze/guidelines";
 
 /** How the tools write times and readings, so every answer reads the same way. */
@@ -17,8 +18,16 @@ export function dayName(day: string): string {
   return new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${day}T00:00:00Z`)).replace(",", "");
 }
 
-export function reading(api: number): string {
-  return `API ${Math.round(api)} (${band(api)})`;
+/** "API 182 (Unhealthy)" for a DOE station; NEA's reading is its PSI, built the same way and on the same bands. */
+export function reading(api: number, network: Network = "doe"): string {
+  return `${INDEX[network]} ${Math.round(api)} (${band(api)})`;
+}
+
+export const INDEX: Record<Network, string> = { doe: "API", nea: "PSI" };
+
+/** "DOE station CA24N" or "NEA region SGCENTRAL". */
+export function stationLabel(station: Pick<Station, "id" | "network">): string {
+  return station.network === "nea" ? `NEA region ${station.id}` : `DOE station ${station.id}`;
 }
 
 export function percent(chance: number): string {

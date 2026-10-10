@@ -23,6 +23,8 @@ async function load(): Promise<{ accuracy: Accuracy; lines: GuidelineList } | nu
 
 const SOURCES = [
   { name: "Readings", href: "https://eqms.doe.gov.my/APIMS/main", detail: "Department of Environment Malaysia. The hourly Air Pollutant Index at 68 stations. Fetched every hour." },
+  { name: "Singapore readings", href: "https://www.haze.gov.sg/", detail: "National Environment Agency Singapore. The 24-hour PSI and one-hour PM2.5 for five regions, shown as stations. Fetched every hour." },
+  { name: "Visibility", href: "https://aviationweather.gov/data/api/", detail: "Airport weather reports (METARs) from 29 airports in Malaysia, Singapore, Brunei, Sumatra and Kalimantan: how far the observer could see, and whether it was haze or smoke. Fetched every hour." },
   { name: "Fires", href: "https://firms.modaps.eosdis.nasa.gov/", detail: "NASA FIRMS. Fire detections from the VIIRS instrument on three satellites. Fetched every three hours." },
   { name: "Wind and rain", href: "https://open-meteo.com/", detail: "Open-Meteo. Hourly wind at 925 and 850 hPa and rain, on a one degree grid. Fetched every hour." },
   { name: "Coastlines and towns", href: "https://www.naturalearthdata.com/", detail: "Natural Earth, public domain." },

@@ -10,6 +10,8 @@ const HOME: Record<string, { href: string; title: string }> = {
   DOE: { href: "https://eqms.doe.gov.my/APIMS/main", title: "Department of Environment Malaysia, hourly Air Pollutant Index" },
   "NASA FIRMS": { href: "https://firms.modaps.eosdis.nasa.gov/", title: "NASA FIRMS, VIIRS satellite fire detections" },
   "Open-Meteo": { href: "https://open-meteo.com/", title: "Open-Meteo, wind and rain forecast" },
+  METAR: { href: "https://aviationweather.gov/data/api/", title: "Airport weather reports (METARs) from NOAA's Aviation Weather Center" },
+  "NEA Singapore": { href: "https://www.haze.gov.sg/", title: "National Environment Agency Singapore, hourly PM2.5 and PSI by region" },
   "Haze model": { href: "/accuracy", title: "This app's own smoke model, and how well it has done" },
   "Ministry guidance": { href: "/accuracy#lines", title: "Thresholds published by the Ministries of Education and Health" },
 };

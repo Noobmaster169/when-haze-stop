@@ -1,8 +1,11 @@
 import { getPool } from "../../src/db";
 import type { Detection } from "../../src/haze/fires";
 import { runCycle } from "../../src/jobs/cycle";
-import { FakeDoeClient, FakeFiresClient, FakeWeatherClient } from "../../src/sources/__fakes__/fake.sources";
+import { FakeDoeClient, FakeFiresClient, FakeMetarClient, FakeNeaClient, FakeWeatherClient } from "../../src/sources/__fakes__/fake.sources";
+import { parseMetars } from "../../src/sources/metar";
+import { parseNea } from "../../src/sources/nea";
 import { FIRE_CELLS, LAST_HOUR, READINGS, STATIONS } from "./recorded";
+import { METAR_JSON, NEA_PM25_DAY_JSON, NEA_PSI_DAY_JSON, NEA_PSI_TODAY_JSON } from "./recorded-context";
 import { steadyWind } from "./steady-wind";
 
 /**
@@ -22,6 +25,9 @@ const DETECTIONS: Detection[] = FIRE_CELLS.map((cell) => ({
 }));
 const WEATHER_START = new Date("2026-10-06T00:00:00Z");
 
+/** The 9 October day feeds and the 10th's PSI hours, as two day fetches would bring them. */
+const NEA_HOURS = [...parseNea(NEA_PM25_DAY_JSON, NEA_PSI_DAY_JSON), ...parseNea(JSON.stringify({ items: [] }), NEA_PSI_TODAY_JSON)];
+
 /**
  * One whole cycle over the recorded sample, twenty minutes after its last
  * reading. Safe to run from more than one test file: everything it stores is
@@ -30,7 +36,14 @@ const WEATHER_START = new Date("2026-10-06T00:00:00Z");
 export async function recordedCycle(): Promise<FakeDoeClient> {
   const doe = new FakeDoeClient(STATIONS, READINGS);
   await runCycle(
-    { pool: getPool(), doe, fires: new FakeFiresClient(DETECTIONS), weather: new FakeWeatherClient(steadyWind(WEATHER_START, 200, 3, 3)) },
+    {
+      pool: getPool(),
+      doe,
+      fires: new FakeFiresClient(DETECTIONS),
+      weather: new FakeWeatherClient(steadyWind(WEATHER_START, 200, 3, 3)),
+      metar: new FakeMetarClient(parseMetars(METAR_JSON)),
+      nea: new FakeNeaClient(NEA_HOURS),
+    },
     new Date(LAST_HOUR.getTime() + 20 * 60_000),
     { fires: true },
   );

@@ -47,8 +47,13 @@ export function alertsRouter(deps: { pool: Pool }): Router {
       res.status(400).json({ error: "invalid subscription", issues: body.error.issues });
       return;
     }
-    if (!(await stations.find(deps.pool, body.data.stationId))) {
+    const station = await stations.find(deps.pool, body.data.stationId);
+    if (!station) {
       res.status(404).json({ error: "no such station" });
+      return;
+    }
+    if (station.network !== "doe") {
+      res.status(422).json({ error: "alerts follow Malaysia's official lines, which do not apply to a Singapore region" });
       return;
     }
     res.status(201).json(await alerts.subscribe(deps.pool, body.data.sessionId, body.data.stationId, body.data.push));

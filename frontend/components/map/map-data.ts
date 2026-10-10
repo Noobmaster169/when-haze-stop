@@ -1,4 +1,4 @@
-import type { FieldGrid, FireCell, HazeMap, Station } from "@/lib/api/haze-schemas";
+import type { Airport, FieldGrid, FireCell, HazeDay, HazeMap, Station, VisibilityReport } from "@/lib/api/haze-schemas";
 
 import { bracket, decodeBytes, sampleField, sampleWind } from "./field";
 
@@ -14,6 +14,12 @@ export interface MapData {
   winds: Int8Array[];
   stations: Station[];
   fires: FireCell[];
+  airports: UnpackedAirport[];
+}
+
+/** An airport with its report times parsed once, so the layer can find the report for a moment without parsing dates each frame. */
+export interface UnpackedAirport extends Airport {
+  times: number[];
 }
 
 export function unpackMap(map: HazeMap): MapData | null {
@@ -28,6 +34,37 @@ export function unpackMap(map: HazeMap): MapData | null {
     winds: map.wind.map((frame) => new Int8Array(decodeBytes(frame.uv).buffer)),
     stations: map.stations,
     fires: map.fires,
+    airports: map.airports.map((airport) => ({ ...airport, times: airport.reports.map((report) => Date.parse(report.at)) })),
+  };
+}
+
+/** A report older than this is not what the airport is seeing at a moment. */
+const REPORT_STALE_MS = 3 * 3_600_000;
+
+/** The newest report at or before a moment, or null when the airport had said nothing for three hours by then. */
+export function visibilityAt(airport: UnpackedAirport, at: number): VisibilityReport | null {
+  let found = -1;
+  for (let index = 0; index < airport.times.length && airport.times[index] <= at; index++) found = index;
+  if (found < 0 || at - airport.times[found] > REPORT_STALE_MS) return null;
+  return airport.reports[found];
+}
+
+/**
+ * A past day in the same shape. `fields` is empty for a day before the first
+ * readings, and no station is given: a station's value belongs to the live map.
+ */
+export function unpackDay(day: HazeDay): MapData {
+  return {
+    grid: day.grid,
+    windGrid: day.windGrid,
+    asOf: Date.parse(`${day.day}T00:00:00Z`) + 86_400_000,
+    times: day.frames.map((frame) => Date.parse(frame.validAt)),
+    fields: day.frames.map((frame) => decodeBytes(frame.field)),
+    windTimes: day.wind.map((frame) => Date.parse(frame.validAt)),
+    winds: day.wind.map((frame) => new Int8Array(decodeBytes(frame.uv).buffer)),
+    stations: [],
+    fires: day.fires,
+    airports: [],
   };
 }
 

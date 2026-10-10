@@ -28,12 +28,15 @@ docker compose up -d --build llm-proxy   # after changing proxy/
 
 # backend, inside backend/
 pnpm install && pnpm db:migrate
+pnpm db:seed                        # load the shared data in db/seed/ (only adds; compose does it for you)
+pnpm db:export-seed                 # write db/seed/ from this database, to commit for the team
 pnpm dev                            # api on :8091
 pnpm test                           # vitest; needs postgres up (uses database haze_test)
 pnpm type-check
 pnpm haze:once                      # fetch the sources, run the model, raise alerts
 pnpm haze:backfill                  # replay the model over the stored week
 pnpm haze:loop                      # haze:once now, then every hour
+pnpm haze:history                   # wind for the seeded months; with FIRMS_MAP_KEY the fire archive too
 
 # frontend, inside frontend/
 pnpm dev                            # :3000

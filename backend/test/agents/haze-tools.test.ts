@@ -22,7 +22,9 @@ describe("the assistant's haze tools, over one recorded cycle", () => {
   }, 120_000);
 
   it("offers every haze tool by name", () => {
-    expect(TOOL_NAMES).toEqual(expect.arrayContaining(["get_air_quality", "get_forecast", "get_guidelines", "get_track_record", "get_fires", "get_wind", "create_alert"]));
+    expect(TOOL_NAMES).toEqual(
+      expect.arrayContaining(["get_air_quality", "get_forecast", "get_guidelines", "get_track_record", "get_fires", "get_wind", "get_visibility", "create_alert"]),
+    );
   });
 
   it("reads a station by its own name and says where the reading is from", async () => {
@@ -35,6 +37,21 @@ describe("the assistant's haze tools, over one recorded cycle", () => {
     const outcome = await callTool("get_air_quality", { place: "Shah Alam" }, context());
     expect(outcome.ok).toBe(true);
     expect(outcome.text).toContain("Petaling Jaya, Selangor (DOE station CA19B, the nearest to Shah Alam,");
+  });
+
+  it("reads a Singapore region as a station, on NEA's PSI, with its measured PM2.5", async () => {
+    const outcome = await callTool("get_air_quality", { place: "Singapore Central" }, context());
+    expect(outcome).toMatchObject({ ok: true, source: "NEA Singapore" });
+    // The run's hour is DOE's newest, 11:00 on the 10th, which the recorded PSI day covers; the one-hour PM2.5 recording ends on the 9th.
+    expect(outcome.text).toMatch(/^Singapore Central, Singapore \(NEA region SGCENTRAL\): PSI 173 \(Unhealthy\) at Sat 10 Oct, 11:00 Malaysian time\. Over the last 24 hours it ranged from \d+ to \d+\./);
+    expect(outcome.text).toMatch(/NEA's measured one-hour PM2.5 there was \d+ ug\/m3 at Fri 9 Oct, 23:00\./);
+    expect(await callTool("create_alert", { place: "Singapore Central" }, context({ sessionId: SESSION }))).toMatchObject({ ok: false, preview: expect.stringContaining("NEA region") });
+  });
+
+  it("reads an airport by its usual name from the station nearest to it", async () => {
+    const outcome = await callTool("get_air_quality", { place: "KLIA" }, context());
+    expect(outcome.ok).toBe(true);
+    expect(outcome.text).toContain("Seremban, Negeri Sembilan (DOE station CA24N, the nearest to Kuala Lumpur Intl, 28 km away)");
   });
 
   it("still finds a station by name when the geocoder is down", async () => {
@@ -81,6 +98,18 @@ describe("the assistant's haze tools, over one recorded cycle", () => {
     const outcome = await callTool("get_wind", { place: "Klang" }, context());
     expect(outcome).toMatchObject({ ok: true, source: "Open-Meteo" });
     expect(outcome.text).toContain("- Sat 10 Oct, 11:00: from the");
+  });
+
+  it("reports the visibility at the nearest airport and which airports are in smoke", async () => {
+    const outcome = await callTool("get_visibility", { place: "Seremban" }, context());
+    expect(outcome).toMatchObject({ ok: true, source: "METAR" });
+    expect(outcome.text).toContain("Visibility at Kuala Lumpur Intl (WMKK), 28 km from Seremban");
+    expect(outcome.text).toContain("Now (Sat 10 Oct, 16:00 Malaysian time): 6 km, with showers nearby reported.");
+    expect(outcome.text).toContain("Palembang/Badaruddin Arpt 350 m (smoke)");
+    expect(outcome.text).toContain("Singapore/Changi Intl 3.5 km (haze)");
+    // The geocoder knows a Klias in Sabah; the airport list is asked first.
+    const klia = await callTool("get_visibility", { place: "KLIA" }, context());
+    expect(klia.text).toContain("Visibility at Kuala Lumpur Intl (WMKK), 0 km from Kuala Lumpur Intl");
   });
 
   it("follows a station for the browser that asked, and only when it said who it is", async () => {

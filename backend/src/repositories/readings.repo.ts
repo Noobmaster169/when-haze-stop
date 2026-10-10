@@ -1,3 +1,4 @@
+import type { Network } from "../contracts";
 import type { Queryable } from "../db";
 
 /** DOE's hourly readings. Append-only in effect: an hour already stored is left as it was first read. */
@@ -32,9 +33,12 @@ export async function insertMany(db: Queryable, readings: Reading[]): Promise<nu
   return rowCount ?? 0;
 }
 
-/** The hour of the newest reading from any station, or null before the first fetch. */
-export async function newestAt(db: Queryable): Promise<Date | null> {
-  const { rows } = await db.query<{ at: Date | null }>("select max(observed_at) as at from readings");
+/** The hour of the newest reading from any station, or from one network's, or null before the first fetch. */
+export async function newestAt(db: Queryable, network?: Network): Promise<Date | null> {
+  const { rows } = await db.query<{ at: Date | null }>(
+    network ? "select max(r.observed_at) as at from readings r join stations s on s.id = r.station_id where s.network = $1" : "select max(observed_at) as at from readings",
+    network ? [network] : [],
+  );
   return rows[0]?.at ?? null;
 }
 

@@ -12,9 +12,9 @@ assistant's tools. Nothing has been pushed. `main` is untouched.
 | Check | Result |
 | --- | --- |
 | Backend `pnpm type-check` | Clean |
-| Backend `pnpm test` | 63 tests pass, 9 files |
+| Backend `pnpm test` | 99 tests pass, 15 files |
 | Frontend `pnpm lint`, `pnpm type-check` | Clean |
-| Frontend `pnpm test` | 26 tests pass |
+| Frontend `pnpm test` | 32 tests pass |
 | Pages in a browser (dev server) | Map, station panel, search, timeline, alerts, track record and chat all render and work |
 
 ## What has not been verified
@@ -81,7 +81,17 @@ Open http://localhost:3000 and go through this list:
 5. Push `haze-product` and merge.
 
 After that, the backlog is section 10 of `docs/FEATURES.md`: Web Push, counting three days above
-150, storing weather by fetch time, trying to beat persistence, a visibility source for flights.
+150, storing weather by fetch time, trying to beat persistence.
+
+Two sources were added after the first handover (10 October 2026, later the same day). Singapore's
+five NEA regions are stations now (migration `006_station_network.sql` adds `network` to
+`stations`; their PSI is a reading like DOE's API), so they are on the map, in the panel and in
+the model's correction, with no alerts because the lines are Malaysian. Airport weather reports
+from 29 airports are a fifth map layer, Visibility, and the `get_visibility` assistant tool.
+Both are fetched in the hourly cycle and shown on the Sources page. A CAMS composition forecast
+was tried the same day and dropped as a model rather than a measurement; its empty table
+`cams_hours` from migration `005` remains. Prompt `v4.md` and version 3 of the `haze-decision`
+skill describe the two sources.
 
 ## Things that will surprise you
 
@@ -92,6 +102,16 @@ After that, the backlog is section 10 of `docs/FEATURES.md`: Web Push, counting 
 - **`weather_hours` is overwritten by design.** It is the one exception to the no overwrite rule.
 - **The forecast ties with "no change".** This is measured and stated in the app on purpose. Do
   not remove those sentences unless the Track record table shows the model winning.
+- **A hotspot is not always a fire.** Detections on NASA's labelled fixed sources (370 sites:
+  flares, industry, volcanoes) are dropped, and so is any cell-day that only one satellite pass saw
+  at under 10 MW. That is 35% of cell-days and 4% of the fire power. `fire_cells.frp_mw` is what
+  was fetched and `burning_mw` is what the model burns and the map draws. See section 3.1.1 of
+  `docs/FEATURES.md`.
+- **The data teammates share is in the repo.** `backend/db/seed/` is loaded by the migrate service.
+  Export and commit it about once a week (`pnpm db:export-seed`), or a teammate who starts later
+  has a hole in the readings that DOE cannot fill. See section 3.1.2.
+- **The months before 3 October have fires and wind but no readings.** DOE cannot serve them, so
+  the model cannot be scored there. Tuning on more than one week needs a readings history first.
 - **Chances use hard-coded first test percentiles** (`haze/chance.ts`) until 300 checked forecasts
   exist per lead bucket, then switch to the database's own automatically.
 - **Test data is real.** `backend/test/fixtures/recorded*.ts` are values fetched on 10 October
@@ -117,6 +137,8 @@ After that, the backlog is section 10 of `docs/FEATURES.md`: Web Push, counting 
 | When an alert fires and what it says | `backend/src/haze/alert-rules.ts` |
 | What the hourly job does | `backend/src/jobs/cycle.ts` |
 | A data source | `backend/src/sources/` |
+| Which hotspots count as fires | `backend/src/haze/fire-screen.ts`, `backend/src/haze/fixed-sources.ts` |
+| The one-off history fetch | `backend/src/jobs/history.ts` |
 | An assistant tool | `backend/src/agents/chat/tools/`, registered in `index.ts` |
 | How the assistant decides | `backend/src/agents/chat/skills/haze-decision/SKILL.md` |
 | The map | `frontend/components/map/haze-map.tsx` is the entry |

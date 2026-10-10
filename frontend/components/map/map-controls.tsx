@@ -14,6 +14,7 @@ const LAYERS: { key: keyof Layers; label: string }[] = [
   { key: "stations", label: "Stations" },
   { key: "fires", label: "Fires" },
   { key: "wind", label: "Wind" },
+  { key: "visibility", label: "Visibility" },
 ];
 
 export function LayerToggles({ layers, onChange }: { layers: Layers; onChange(layers: Layers): void }) {
@@ -64,6 +65,7 @@ export function Legend() {
         ))}
       </div>
       <p className="mt-1.5 text-micro text-ink-tertiary">Above 100 is unhealthy. Schools close above 180.</p>
+      <p className="mt-1 text-micro text-ink-tertiary">Squares are airports: darker, the shorter the observer could see. A red ring is reported smoke.</p>
     </div>
   );
 }

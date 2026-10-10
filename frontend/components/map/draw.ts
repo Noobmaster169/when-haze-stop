@@ -1,3 +1,4 @@
+import { drawAirports } from "./airports";
 import type { Basemap } from "./basemap";
 import { REGION, type Size, toX, toY, type View } from "./geo";
 import { apiAt, type MapData } from "./map-data";
@@ -65,6 +66,8 @@ export interface Marks {
   at: number;
   fires: boolean;
   stations: boolean;
+  visibility: boolean;
+  fontFamily: string;
   selectedId: string | null;
   pin: { lon: number; lat: number } | null;
 }
@@ -91,6 +94,8 @@ export function drawMarks(context: CanvasRenderingContext2D, scene: Scene, marks
       context.stroke();
     }
   }
+
+  if (marks.visibility) drawAirports(context, scene, marks.data.airports, marks.at, marks.fontFamily);
 
   if (marks.stations) {
     for (const station of marks.data.stations) {

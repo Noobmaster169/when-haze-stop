@@ -5,7 +5,7 @@ import { SourceReport } from "../../src/contracts";
 import { closePool, getPool } from "../../src/db";
 import { WEATHER_POINTS } from "../../src/haze/grid";
 import { ingestWeather } from "../../src/jobs/ingest";
-import { FakeDoeClient, FakeFiresClient, SilentWeatherClient } from "../../src/sources/__fakes__/fake.sources";
+import { FakeDoeClient, FakeFiresClient, FakeMetarClient, FakeNeaClient, SilentWeatherClient } from "../../src/sources/__fakes__/fake.sources";
 import { testApp } from "../app";
 import { recordedCycle } from "../fixtures/cycle";
 import { FIRE_CELLS, LAST_HOUR, READINGS, STATIONS } from "../fixtures/recorded";
@@ -18,7 +18,14 @@ describe("every fetch of a source is kept and served", () => {
 
   beforeAll(async () => {
     await recordedCycle();
-    const silent = { pool: getPool(), doe: new FakeDoeClient(STATIONS, READINGS), fires: new FakeFiresClient([]), weather: new SilentWeatherClient() };
+    const silent = {
+      pool: getPool(),
+      doe: new FakeDoeClient(STATIONS, READINGS),
+      fires: new FakeFiresClient([]),
+      weather: new SilentWeatherClient(),
+      metar: new FakeMetarClient([]),
+      nea: new FakeNeaClient([]),
+    };
     await expect(ingestWeather(silent)).rejects.toThrow("did not answer");
     report = SourceReport.parse((await request(app).get("/sources").expect(200)).body);
   }, 120_000);
@@ -48,6 +55,12 @@ describe("every fetch of a source is kept and served", () => {
     expect(weather.lastFailure).toMatchObject({ ok: false, error: "Open-Meteo forecast did not answer", detail: {} });
     expect(weather.day.failed).toBeGreaterThan(0);
     expect(report.recent[0]).toMatchObject({ source: "open-meteo", ok: false });
+  });
+
+  it("records the airports' reports and Singapore's hours", () => {
+    expect(source("metar").lastSuccess?.detail).toMatchObject({ airports: 29, reports: 29, newestReport: "2026-10-10T08:30:00.000Z" });
+    expect(source("nea").lastSuccess?.detail).toMatchObject({ stations: 5, newestReading: "2026-10-10T09:00:00.000Z" });
+    expect(Number(source("nea").lastSuccess?.detail.hours)).toBeGreaterThanOrEqual(23 * 5 + 5);
   });
 
   it("lists the sources that are not fetched on a schedule, with no history", () => {

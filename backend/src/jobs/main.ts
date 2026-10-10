@@ -1,7 +1,9 @@
 import { closePool, getPool } from "../db";
 import { childLogger } from "../lib/logger";
-import { doeClient, firmsClient, openMeteoClient } from "../sources";
+import { config } from "../config";
+import { doeClient, firmsArchiveClient, firmsClient, metarClient, neaClient, openMeteoClient } from "../sources";
 import { backfill, runCycle } from "./cycle";
+import { runHistory } from "./history";
 import type { IngestDeps } from "./ingest";
 
 /**
@@ -11,6 +13,7 @@ import type { IngestDeps } from "./ingest";
  *   pnpm haze:once       fetch everything, run the model, raise alerts
  *   pnpm haze:backfill   replay the model over the stored week, for the accuracy page
  *   pnpm haze:loop       once now, then again every hour
+ *   pnpm haze:history    the months before the app started: wind always, and with FIRMS_MAP_KEY the fire archive too
  */
 
 const log = childLogger({ module: "jobs" });
@@ -49,12 +52,21 @@ async function loop(deps: IngestDeps): Promise<void> {
 
 async function main(): Promise<void> {
   const command = process.argv[2] ?? "once";
-  const deps: IngestDeps = { pool: getPool(), doe: doeClient(), fires: firmsClient(), weather: openMeteoClient() };
+  const deps: IngestDeps = {
+    pool: getPool(),
+    doe: doeClient(),
+    fires: firmsClient(),
+    weather: openMeteoClient(),
+    metar: metarClient(),
+    nea: neaClient(),
+  };
   try {
     if (command === "once") await runCycle(deps, new Date(), { fires: true });
     else if (command === "backfill") await backfill(deps);
     else if (command === "loop") await loop(deps);
-    else throw new Error(`unknown command "${command}". Use once, backfill or loop.`);
+    else if (command === "history") {
+      await runHistory({ pool: deps.pool, archive: config.FIRMS_MAP_KEY ? firmsArchiveClient(config.FIRMS_MAP_KEY) : null, weather: deps.weather }, new Date());
+    } else throw new Error(`unknown command "${command}". Use once, backfill, loop or history.`);
   } finally {
     await closePool();
   }
