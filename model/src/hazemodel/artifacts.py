@@ -62,4 +62,6 @@ def live_version(directory: pathlib.Path) -> str | None:
 
 def set_live(directory: pathlib.Path, version: str) -> None:
     directory.mkdir(parents=True, exist_ok=True)
-    (directory / "live").write_text(version + "\n")
+    staging = directory / "live.tmp"
+    staging.write_text(version + "\n")
+    os.replace(staging, directory / "live")

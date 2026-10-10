@@ -1,4 +1,5 @@
 import datetime as dt
+import pathlib
 
 import lightgbm as lgb
 import numpy as np
@@ -55,7 +56,7 @@ def test_predict_rows_gives_three_days_with_sorted_quantiles(data):
 @pytest.fixture
 def app_env(tmp_path, monkeypatch, data):
     monkeypatch.setenv("MODEL_ARTIFACTS", str(tmp_path))
-    monkeypatch.setenv("MODEL_SOURCE_CSV", str(__import__("pathlib").Path(__file__).parent / "fixtures"))
+    monkeypatch.setenv("MODEL_SOURCE_CSV", str(pathlib.Path(__file__).parent / "fixtures"))
     return tmp_path
 
 
@@ -82,3 +83,30 @@ def test_predict_with_live_artifact(app_env, data):
     assert set(first) == {"instrumentId", "day", "p10", "p50", "p90"}
     assert first["day"] == "2026-10-09"
     assert np.isfinite(first["p50"])
+
+
+@pytest.mark.parametrize("as_of", ["not-a-date", ""])
+def test_malformed_as_of_is_422(app_env, data, as_of):
+    artifact = fit_on_fixture(data)
+    save_artifact(app_env, artifact)
+    set_live(app_env, artifact.version)
+    answer = TestClient(create_app()).post("/predict", json={"asOf": as_of})
+    assert answer.status_code == 422
+    assert answer.json() == {"error": "asOf must be an ISO 8601 timestamp"}
+
+
+def test_live_pointer_is_re_read_per_request(app_env, data):
+    client = TestClient(create_app())
+    assert client.post("/predict", json={"asOf": ISSUE.isoformat()}).status_code == 503
+    artifact = fit_on_fixture(data)
+    save_artifact(app_env, artifact)
+    set_live(app_env, artifact.version)
+    assert client.get("/health").json()["modelVersion"] == artifact.version
+    assert client.post("/predict", json={"asOf": ISSUE.isoformat()}).status_code == 200
+
+
+def test_blank_live_file_is_no_live_model(app_env):
+    (app_env / "live").write_text("\n")
+    client = TestClient(create_app())
+    assert client.get("/health").json()["modelVersion"] is None
+    assert client.post("/predict", json={"asOf": ISSUE.isoformat()}).status_code == 503

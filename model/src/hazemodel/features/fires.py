@@ -1,4 +1,5 @@
 """Group 2: screened fire power by sector and ring around each instrument, over complete UTC days."""
+
 import numpy as np
 import pandas as pd
 

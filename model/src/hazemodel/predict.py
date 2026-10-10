@@ -1,4 +1,10 @@
-"""Run an artifact over feature rows: day +1 and +2 directly, day +3 (and +2 without a direct model) by recursion."""
+"""Run an artifact over feature rows.
+
+Day +1 and day +2 are scored on the original frame whenever their direct boosters exist, since those are the
+features they were trained on. Recursion is used only where no direct model exists: day +2 without `d2_*` is the
+`d1` boosters on the frame rolled once with the day +1 median; day +3 is always the `d1` boosters on the frame
+rolled twice, first with the day +1 median, then with the day +2 median (direct if present, else the recursive one).
+"""
 
 import numpy as np
 import pandas as pd
@@ -26,16 +32,19 @@ def _rolled(frame: pd.DataFrame, median: np.ndarray) -> pd.DataFrame:
     return rolled
 
 
+def _score(artifact: Artifact, prefix: str, frame: pd.DataFrame) -> np.ndarray:
+    return _quantiles(artifact, prefix, frame[artifact.features].to_numpy(dtype=float))
+
+
 def predict_rows(artifact: Artifact, frame: pd.DataFrame) -> pd.DataFrame:
-    features = artifact.features
     ids = frame.index.get_level_values("instrument_id")
     issue_days = (frame.index.get_level_values("issue_at") + MALAYSIA_OFFSET).date
-    current = frame
+    q1 = _score(artifact, "d1", frame)
+    rolled_once = _rolled(frame, q1[:, 1])
+    q2 = _score(artifact, "d2", frame) if "d2_q50" in artifact.boosters else _score(artifact, "d1", rolled_once)
+    q3 = _score(artifact, "d1", _rolled(rolled_once, q2[:, 1]))
     rows = []
-    for d in (1, 2, 3):
-        direct = f"d{d}_q50" in artifact.boosters
-        x = current[features].to_numpy(dtype=float)
-        q = _quantiles(artifact, f"d{d}" if direct else "d1", x)
+    for d, q in ((1, q1), (2, q2), (3, q3)):
         rows.append(
             pd.DataFrame(
                 {
@@ -47,7 +56,6 @@ def predict_rows(artifact: Artifact, frame: pd.DataFrame) -> pd.DataFrame:
                 }
             )
         )
-        current = _rolled(current, q[:, 1])
     out = pd.concat(rows, ignore_index=True)
     out["day"] = pd.to_datetime(out["day"]).dt.date
     return out

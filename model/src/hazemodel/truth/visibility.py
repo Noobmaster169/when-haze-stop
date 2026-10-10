@@ -5,6 +5,7 @@ cannot tell one clean day from another: a 24 h mean built only from capped repor
 and carries no information on the clean side. Rain, mist and fog shorten visibility too and are
 dropped before a report is read as smoke.
 """
+
 import numpy as np
 import pandas as pd
 

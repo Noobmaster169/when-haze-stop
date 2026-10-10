@@ -1,4 +1,5 @@
 """Assemble one row per instrument and issue time: every feature group, the kind, the weights and the targets."""
+
 import hashlib
 import pathlib
 

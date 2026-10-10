@@ -4,6 +4,7 @@ DOE publishes the index of the 24 h mean, converted back through the DOE table. 
 publishes the 24 h mean itself. OpenAQ publishes hourly values, averaged here over a trailing 24
 hours when at least 18 of them exist, because a mean of fewer hours is a different quantity.
 """
+
 import pandas as pd
 
 from hazemodel.index import api_to_pm25

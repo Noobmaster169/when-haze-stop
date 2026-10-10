@@ -1,4 +1,5 @@
 """Group 3: the transport model's own view, from smoke_hindcasts, when the hindcast job has run."""
+
 import pandas as pd
 
 COLUMNS = ["smoke_now", "smoke_24h", "smoke_48h", "smoke_change", "has_physics"]

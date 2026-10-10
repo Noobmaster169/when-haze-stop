@@ -1,4 +1,5 @@
 """Group 1: the state of the air at the issue time, from the instrument's own 24 h series and its neighbours."""
+
 import numpy as np
 import pandas as pd
 

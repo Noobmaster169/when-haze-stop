@@ -4,6 +4,7 @@ weather_hours holds the newest fetch: the analysis for past hours. A training ro
 knows the real wind, which a live row never does; the from_forecast flag records which it was,
 and track B's weather_forecasts table is what makes from_forecast = 1 rows possible later.
 """
+
 import numpy as np
 import pandas as pd
 

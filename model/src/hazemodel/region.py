@@ -3,6 +3,7 @@
 The grid layout must equal backend/src/haze/grid.ts: a weather_hours row holds nx * ny values,
 row by row from the south-west corner, so index = row * nx + column.
 """
+
 import datetime as dt
 import os
 from dataclasses import dataclass

@@ -3,6 +3,7 @@
 The model works in ug/m3 and converts at the edges, because the index bands are very unequal
 (101 to 150 spans five ug/m3) and a tree trained on index points would learn the table, not the air.
 """
+
 import numpy as np
 
 BAND_EDGES = [

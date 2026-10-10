@@ -56,14 +56,16 @@ def create_app() -> FastAPI:
 
     @app.post("/predict")
     def predict(body: PredictBody):
+        try:
+            as_of = pd.Timestamp(body.asOf)
+        except ValueError:
+            as_of = pd.NaT
+        if pd.isna(as_of):
+            return JSONResponse(status_code=422, content={"error": "asOf must be an ISO 8601 timestamp"})
+        as_of = as_of.tz_convert("UTC") if as_of.tzinfo else as_of.tz_localize("UTC")
         artifact = live()
         if artifact is None:
             return JSONResponse(status_code=503, content={"error": "no live model"})
-        as_of = (
-            pd.Timestamp(body.asOf).tz_convert("UTC")
-            if pd.Timestamp(body.asOf).tzinfo
-            else pd.Timestamp(body.asOf).tz_localize("UTC")
-        )
         frame, _ = build_rows(_source(as_of), region, pd.DatetimeIndex([as_of]), with_targets=False)
         out = predict_rows(artifact, frame)
         forecasts = [

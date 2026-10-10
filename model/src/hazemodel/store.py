@@ -1,4 +1,5 @@
 """Every SQL read the package makes, and the same frames from CSV for tests and offline runs. Read-only."""
+
 import os
 import pathlib
 from dataclasses import dataclass
@@ -62,14 +63,36 @@ def load_source_data(conn, start: pd.Timestamp, end: pd.Timestamp, hindcast_mode
     first_day = (start - pd.Timedelta(days=LOOKBACK_DAYS)).date()
     return SourceData(
         stations=read_frame(conn, "select id, name, lat, lon, network from stations order by id", ()),
-        sensors=read_frame(conn, "select sensor_id, name, provider, reference, lat, lon from openaq_sensors order by sensor_id", ()),
+        sensors=read_frame(
+            conn, "select sensor_id, name, provider, reference, lat, lon from openaq_sensors order by sensor_id", ()
+        ),
         airports=read_frame(conn, "select icao, name, lat, lon from airports order by icao", ()),
-        readings=read_frame(conn, "select station_id, observed_at, api from readings where observed_at >= %s and observed_at < %s", span),
-        nea_hours=read_frame(conn, "select region, observed_at, pm25_hourly, pm25_24h, psi_24h from nea_hours where observed_at >= %s and observed_at < %s", span),
-        openaq_hours=read_frame(conn, "select sensor_id, observed_at, pm25 from openaq_hours where observed_at >= %s and observed_at < %s", span),
-        metar_obs=read_frame(conn, "select icao, observed_at, visibility_m, weather from metar_obs where observed_at >= %s and observed_at < %s", span),
-        fire_cells=read_frame(conn, "select day, lat10, lon10, frp_mw, burning_mw from fire_cells where day >= %s and day < %s", (first_day, end.date())),
-        weather_hours=read_frame(conn, "select valid_at, u_ms, v_ms, rain_mm from weather_hours where valid_at >= %s and valid_at < %s", span),
+        readings=read_frame(
+            conn, "select station_id, observed_at, api from readings where observed_at >= %s and observed_at < %s", span
+        ),
+        nea_hours=read_frame(
+            conn,
+            "select region, observed_at, pm25_hourly, pm25_24h, psi_24h from nea_hours where observed_at >= %s and observed_at < %s",
+            span,
+        ),
+        openaq_hours=read_frame(
+            conn,
+            "select sensor_id, observed_at, pm25 from openaq_hours where observed_at >= %s and observed_at < %s",
+            span,
+        ),
+        metar_obs=read_frame(
+            conn,
+            "select icao, observed_at, visibility_m, weather from metar_obs where observed_at >= %s and observed_at < %s",
+            span,
+        ),
+        fire_cells=read_frame(
+            conn,
+            "select day, lat10, lon10, frp_mw, burning_mw from fire_cells where day >= %s and day < %s",
+            (first_day, end.date()),
+        ),
+        weather_hours=read_frame(
+            conn, "select valid_at, u_ms, v_ms, rain_mm from weather_hours where valid_at >= %s and valid_at < %s", span
+        ),
         smoke_hindcasts=read_frame(
             conn,
             "select as_of, instrument_id, smoke_now, smoke_24h, smoke_48h, model from smoke_hindcasts where model = %s and as_of >= %s and as_of < %s",
