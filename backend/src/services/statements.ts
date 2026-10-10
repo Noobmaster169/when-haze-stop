@@ -1,7 +1,8 @@
 import type { Station, Statement, StatementPage } from "../contracts";
 import type { Queryable } from "../db";
 import { localDay } from "../haze/outlook";
-import { type DistrictCentre, ordersFor, resolveStatements } from "../haze/statements";
+import { type DistrictCentre, ordersFor } from "../haze/statement-areas";
+import { resolveStatements } from "../haze/statements";
 import { statements } from "../repositories";
 import { normalise, searchGazetteer } from "../sources/gazetteer";
 

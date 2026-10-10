@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { quoteFound, announces } from "../../src/haze/statement-text";
-import { covers, ordersFor, resolveStatements, type StoredStatement } from "../../src/haze/statements";
+import { covers, ordersFor } from "../../src/haze/statement-areas";
+import { resolveStatements, type StoredStatement, usable } from "../../src/haze/statements";
 import { MOE_PAGE_BREAK_TEXT, MOE_PDF_TEXT } from "../fixtures/recorded-statements";
 
 /**
@@ -126,5 +127,25 @@ describe("a district's state", () => {
     const { tidyAreas } = await import("../../src/services/statements");
     expect(tidyAreas({ states: ["Johor"], districts: ["Batu Pahat"] })).toEqual({ states: [], districts: ["Batu Pahat"] });
     expect(tidyAreas({ states: ["WP Kuala Lumpur", "WP Putrajaya"], districts: ["Rompin"] }).states).toEqual(["WP Kuala Lumpur", "WP Putrajaya"]);
+  });
+});
+
+describe("which readings can be acted on", () => {
+  // Headlines of 9 October 2026 from the English news search, as the reader recorded them.
+  const vague = statement(20, { nationwide: true, publishedAt: new Date("2026-10-09T08:00:00Z") });
+  const unnamed = statement(11, { publishedAt: new Date("2026-10-09T05:00:00Z") });
+
+  it("drops a nationwide order that only a headline claims, and one that names no area", () => {
+    expect(usable(vague)).toBe(false);
+    expect(usable(unnamed)).toBe(false);
+    expect(usable({ ...vague, channel: "moe-statements" })).toBe(true);
+    expect(usable(RULE_180)).toBe(true);
+    expect(usable(NEGERI_SEMBILAN)).toBe(true);
+  });
+
+  it("so a vague report cannot widen a real closure to the whole country", () => {
+    const closure = resolveStatements([NEGERI_SEMBILAN, { ...vague, effectiveFrom: "2026-10-09" }], "2026-10-10");
+    expect(closure).toHaveLength(1);
+    expect(closure[0]).toMatchObject({ nationwide: false, states: ["Negeri Sembilan"], reports: 1 });
   });
 });

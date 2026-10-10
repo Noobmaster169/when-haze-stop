@@ -109,10 +109,22 @@ function statusOf(statement: StoredStatement, later: StoredStatement[], today: s
   return until && until < today ? "ended" : "in-force";
 }
 
+/**
+ * Whether a reading can be acted on. An order or a lift must say where: "Malaysia
+ * closes schools in several states" names nothing a station can be matched to.
+ * And a headline cannot make an order nationwide; international reports call a
+ * closure in six states "nationwide", so only a ministry or DOE original can.
+ */
+export function usable(statement: StoredStatement): boolean {
+  if (statement.kind !== "order" && statement.kind !== "lift") return true;
+  if (statement.nationwide) return ORIGINALS.has(statement.channel);
+  return statement.states.length > 0 || statement.districts.length > 0;
+}
+
 /** Every statement once, newest first, each with its status on `today` (a Malaysian `YYYY-MM-DD`). */
 export function resolveStatements(stored: StoredStatement[], today: string): Statement[] {
   const groups = new Map<string, StoredStatement[]>();
-  for (const statement of [...stored].sort((a, b) => a.publishedAt.getTime() - b.publishedAt.getTime() || a.id - b.id)) {
+  for (const statement of stored.filter(usable).sort((a, b) => a.publishedAt.getTime() - b.publishedAt.getTime() || a.id - b.id)) {
     const key = sameKey(statement);
     groups.set(key, [...(groups.get(key) ?? []), statement]);
   }
@@ -147,43 +159,4 @@ export function resolveStatements(stored: StoredStatement[], today: string): Sta
     };
   });
   return resolved.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt) || b.id - a.id);
-}
-
-export interface Place {
-  name: string;
-  state: string;
-  lat: number;
-  lon: number;
-}
-
-/** Where a district is, from the gazetteer, or null when it is not known. */
-export type DistrictCentre = (name: string) => { lat: number; lon: number } | null;
-
-const DISTRICT_KM = 40;
-
-function km(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
-  const rad = Math.PI / 180;
-  const x = (b.lon - a.lon) * rad * Math.cos(((a.lat + b.lat) / 2) * rad);
-  const y = (b.lat - a.lat) * rad;
-  return Math.sqrt(x * x + y * y) * 6371;
-}
-
-/** The statement names this place's state, its district, or the whole country. */
-export function covers(statement: Pick<Statement, "nationwide" | "states" | "districts">, place: Place, centre: DistrictCentre): boolean {
-  if (statement.nationwide || statement.states.includes(place.state)) return true;
-  return statement.districts.some((district) => {
-    if (flatten(district) === flatten(place.name)) return true;
-    const at = centre(district);
-    return at !== null && km(at, place) <= DISTRICT_KM;
-  });
-}
-
-/** The actions worth an alert: they change what a person does tomorrow. */
-export const ACTING: ReadonlySet<StatementAction> = new Set(["schools-close", "outdoor-stop", "emergency", "work-from-home"]);
-
-/** Orders that cover a place and are in force or about to be. */
-export function ordersFor(statements: Statement[], place: Place, centre: DistrictCentre): Statement[] {
-  return statements.filter(
-    (statement) => statement.kind === "order" && ACTING.has(statement.action) && (statement.status === "in-force" || statement.status === "upcoming") && covers(statement, place, centre),
-  );
 }

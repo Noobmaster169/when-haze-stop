@@ -394,13 +394,16 @@ Fetched by the jobs process every cycle (`jobs/statements.ts`), from three chann
 | `news-statements` | Google News RSS, "jerebu" (ms) and "haze Malaysia" (en), 7 days | The headline only, and only one that announces something (`haze/statement-text.ts`) |
 
 - An item is read once, by URL, newest first, at most 20 per channel per cycle. Prompt
-  `agents/prompts/statement/v3.md` turns it into one flat object: issuer, kind (`rule`, `order`,
+  `agents/prompts/statement/v4.md` turns it into one flat object: issuer, kind (`rule`, `order`,
   `lift`, `advice`), action, states (the 16 station state names), districts, the line and days
   for a rule, start and end dates, an English summary and a verbatim quote. Every call is a row in
   `llm_calls`.
 - The quote must be found word for word in the fetched text (case, spacing, punctuation and a
   PDF's page numbers set aside). A statement whose quote is not found is stored and never shown.
 - A district's own state is dropped from `states` (`services/statements.ts`, `tidyAreas`).
+- An order or lift that names no area is not shown and covers nothing, and an order is nationwide
+  only from a ministry or DOE original: foreign headlines call a closure in six states
+  "nationwide" (`usable` in `haze/statements.ts`).
 - `haze/statements.ts` decides what is in force, at read time:
   - Reports of one decision are one statement: a rule by its issuer, action and line; an order by
     its issuer, action and start day, with every report's areas joined. The ministry's own copy
@@ -408,7 +411,7 @@ Fetched by the jobs process every cycle (`jobs/statements.ts`), from three chann
   - A later rule of the same issuer, action and length replaces an earlier one (180 replaced 200).
   - An order ends on its stated last day, on a later lift or reopening for its areas, or a week
     after it began when nothing more is said (closures run "until further notice").
-- An order covers a station by its state, by a district of the station's name, or by a gazetteer
+- An order covers a station (`haze/statement-areas.ts`) by its state, by a district of the station's name, or by a gazetteer
   district within 40 km.
 - The thresholds alerts use stay hand-checked in `haze/guidelines.ts`. A fetched rule never
   changes who is alerted; when one differs, update the file by hand.

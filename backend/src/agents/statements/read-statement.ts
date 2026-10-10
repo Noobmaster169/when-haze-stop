@@ -6,7 +6,7 @@ import { callStructured, type StructuredDeps } from "../structured";
 
 /** One fetched item read once by the model into what an authority decided in it. */
 
-export const STATEMENT_PROMPT = "v3";
+export const STATEMENT_PROMPT = "v4";
 
 const Day = z
   .string()
