@@ -26,6 +26,9 @@ def _rolled(frame: pd.DataFrame, median: np.ndarray) -> pd.DataFrame:
     rolled["lag48"] = rolled["lag24"]
     rolled["lag24"] = rolled["level"]
     rolled["level"] = median
+    # In training peak24 >= level always; a rolled row keeping the old peak24 below its new level would sit in a
+    # region the trees never saw, and the median is the best estimate of the rolled day's peak anyway.
+    rolled["peak24"] = median
     rolled["d24"] = rolled["level"] - rolled["lag24"]
     rolled["d48"] = rolled["level"] - rolled["lag48"]
     rolled["slope3h"] = rolled["d24"] / 24.0

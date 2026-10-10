@@ -41,7 +41,9 @@ def _hourly_extinction(reports: pd.DataFrame) -> pd.DataFrame:
     mean = hourly["extinction"].rolling("24h", min_periods=MIN_REPORTS_IN_MEAN).mean()
     all_capped = hourly["capped"].rolling("24h", min_periods=MIN_REPORTS_IN_MEAN).min().astype(bool)
     out = pd.DataFrame({"extinction_24h": mean, "censored": all_capped}).dropna(subset=["extinction_24h"])
-    hourly_out = out.resample("1h").last().dropna(subset=["extinction_24h"])
+    # Label each hour by its right edge so a mean is stamped at or after the newest report in it: a left label
+    # would put a 06:30 report into the 06:00 value, half an hour before anyone could have read it.
+    hourly_out = out.resample("1h", label="right", closed="right").last().dropna(subset=["extinction_24h"])
     hourly_out["censored"] = hourly_out["censored"].astype(bool)
     return hourly_out
 

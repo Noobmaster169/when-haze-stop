@@ -1,6 +1,15 @@
 from hazemodel.instruments import instruments
 from hazemodel.truth.reference import reference_series
-from hazemodel.truth.visibility import CAP_M, CENSOR_UGM3, KOSCHMIEDER, airport_series, extinction, is_dry
+from hazemodel.truth.visibility import (
+    CAP_M,
+    CENSOR_UGM3,
+    KOSCHMIEDER,
+    MIN_REPORTS_IN_MEAN,
+    MIN_VISIBILITY_M,
+    airport_series,
+    extinction,
+    is_dry,
+)
 
 
 def test_wet_reports_are_dropped_and_dry_kept():
@@ -24,6 +33,19 @@ def test_airports_get_a_series_and_a_fit(data):
     assert set(decisions["instrument_id"]) == set(table[table["kind"] == "airport"]["instrument_id"])
     assert {"instrument_id", "observed_at", "pm25_24h", "censored"} <= set(proxy.columns)
     assert (decisions["slope"] > 0).all()
+
+
+def test_a_proxy_hour_never_precedes_the_report_that_fed_it(data):
+    series = reference_series(data)
+    table = instruments(data)
+    proxy, _ = airport_series(data, series, table)
+    icao = "WMKK"
+    reports = data.metar_obs[data.metar_obs["icao"] == icao]
+    usable = reports["visibility_m"].notna() & (reports["visibility_m"] >= MIN_VISIBILITY_M)
+    dry = reports[usable & reports["weather"].map(is_dry)].sort_values("observed_at")
+    first = proxy[proxy["instrument_id"] == icao]["observed_at"].min()
+    # The first 24 h mean needs MIN_REPORTS_IN_MEAN dry reports, so it cannot be stamped before the 12th one.
+    assert first >= dry["observed_at"].iloc[MIN_REPORTS_IN_MEAN - 1]
 
 
 def test_visibility_censors_at_cap(data):

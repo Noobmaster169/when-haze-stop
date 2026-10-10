@@ -6,7 +6,7 @@ import pandas as pd
 from hazemodel.artifacts import Artifact
 from hazemodel.predict import _rolled, predict_rows
 
-FEATURES = ["level", "lag24", "lag48", "lag72", "d24", "d48", "slope3h"]
+FEATURES = ["level", "lag24", "lag48", "lag72", "d24", "d48", "slope3h", "peak24"]
 
 
 class RecordingBooster:
@@ -34,6 +34,7 @@ def frame() -> pd.DataFrame:
             "d24": [-10.0],
             "d48": [-20.0],
             "slope3h": [0.0],
+            "peak24": [25.0],
         },
         index=index,
     )
@@ -59,6 +60,7 @@ def test_direct_days_see_original_features_and_day3_sees_both_medians():
     # day +3 is the d1 booster on the frame rolled twice: level is the day +2 median, lag24 the day +1 median
     assert col(d1, 1, "level") == 250.0
     assert col(d1, 1, "lag24") == 150.0
+    assert col(d1, 1, "peak24") == 250.0
     assert list(out["p50"]) == [150.0, 250.0, 150.0]
 
 
@@ -67,9 +69,9 @@ def test_d1_only_artifact_rolls_once_for_day_two_and_twice_for_day_three():
     predict_rows(art, frame())
     d1 = art.boosters["d1_q50"]
     assert len(d1.calls) == 3
-    assert (col(d1, 0, "level"), col(d1, 0, "lag24")) == (10.0, 20.0)
-    assert (col(d1, 1, "level"), col(d1, 1, "lag24")) == (55.0, 10.0)
-    assert (col(d1, 2, "level"), col(d1, 2, "lag24")) == (55.0, 55.0)
+    assert (col(d1, 0, "level"), col(d1, 0, "lag24"), col(d1, 0, "peak24")) == (10.0, 20.0, 25.0)
+    assert (col(d1, 1, "level"), col(d1, 1, "lag24"), col(d1, 1, "peak24")) == (55.0, 10.0, 55.0)
+    assert (col(d1, 2, "level"), col(d1, 2, "lag24"), col(d1, 2, "peak24")) == (55.0, 55.0, 55.0)
 
 
 def test_roll_shifts_the_lag_chain():
@@ -77,6 +79,7 @@ def test_roll_shifts_the_lag_chain():
     row = rolled.iloc[0]
     assert (row["level"], row["lag24"], row["lag48"], row["lag72"]) == (7.0, 10.0, 20.0, 30.0)
     assert row["d24"] == -3.0 and row["d48"] == -13.0
+    assert row["peak24"] == 7.0 and row["peak24"] >= row["level"]
 
 
 def test_quantiles_are_floored_at_zero_and_sorted():
