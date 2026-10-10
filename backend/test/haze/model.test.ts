@@ -153,8 +153,8 @@ describe("a run on the learned forecast", () => {
   const learned = runModel({ ...RUN_INPUT, instruments, learnedVersion: ISSUE_VERSION });
   const seremban = STATIONS.find((station) => station.id === "CA24N");
   if (!seremban) throw new Error("the recorded sample has no Seremban");
-  const cell = Math.floor((seremban.lat - DOMAIN.lat0) / FIELD.step) * FIELD.nx + Math.floor((seremban.lon - DOMAIN.lon0) / FIELD.step);
-  const apiAt = (frame: Uint8Array): number => frame[cell] * 2;
+  const cellOf = (at: { lat: number; lon: number }): number => Math.floor((at.lat - DOMAIN.lat0) / FIELD.step) * FIELD.nx + Math.floor((at.lon - DOMAIN.lon0) / FIELD.step);
+  const apiAt = (frame: Uint8Array, at: { lat: number; lon: number }): number => frame[cellOf(at)] * 2;
 
   it("covers the four placed instruments and names the issue", () => {
     expect(instruments.map((instrument) => instrument.id).sort()).toEqual(["CA19B", "CA24N", "SGCENTRAL", "WMKK"]);
@@ -175,9 +175,18 @@ describe("a run on the learned forecast", () => {
     }
     expect(series).toHaveLength(24);
     const expected = pm25ToApi(shaped(row, series, physics[index(at)]));
-    expect(Math.abs(apiAt(frame.field) - expected)).toBeLessThanOrEqual(2);
-    // The hourly forecast carried Seremban's 182 on; the learned median for the day is well below that.
-    expect(apiAt(frame.field)).toBeLessThan(apiAt(plain.frames[learned.frames.indexOf(frame)].field) - 5);
+    expect(Math.abs(apiAt(frame.field, seremban) - expected)).toBeLessThanOrEqual(2);
+  });
+
+  it("pulls a place with no hourly forecast of its own, Singapore Central, to its learned value alone", () => {
+    const at = new Date("2026-10-11T06:00:00Z");
+    const index = learned.frames.findIndex((item) => item.validAt.getTime() === at.getTime());
+    const central = instruments.find((instrument) => instrument.id === "SGCENTRAL");
+    const row = central?.days.get("2026-10-11");
+    if (index < 0 || !central || !row) throw new Error("the run has no frame or row for Singapore Central on 11 October");
+    // No DOE station is near, so the hourly run leaves the field there to the smoke alone, far below the learned median.
+    expect(Math.abs(apiAt(plain.frames[index].field, central) - pm25ToApi(row.p50))).toBeGreaterThan(20);
+    expect(Math.abs(apiAt(learned.frames[index].field, central) - pm25ToApi(row.p50))).toBeLessThanOrEqual(2);
   });
 
   it("leaves every frame of today and before exactly as the hourly run drew it", () => {
