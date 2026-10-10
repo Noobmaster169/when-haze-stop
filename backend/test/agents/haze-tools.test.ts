@@ -1,12 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { callTool, TOOL_NAMES, type ToolContext } from "../../src/agents/chat/tools";
+import { describeSource, sourceChip } from "../../src/agents/chat/tools/get-forecast";
+import type { ForecastSource } from "../../src/contracts";
 import { closePool, getPool } from "../../src/db";
 import { RetryableError } from "../../src/lib/errors";
 import { alerts } from "../../src/repositories";
 import { FakeGeocoder } from "../../src/sources/__fakes__/fake.sources";
 import { recordedCycle } from "../fixtures/cycle";
 import { PLACES } from "../fixtures/recorded";
+import { ISSUE_AT, ISSUE_VERSION } from "../fixtures/recorded-model-issue";
 
 afterAll(closePool);
 
@@ -66,10 +69,27 @@ describe("the assistant's haze tools, over one recorded cycle", () => {
 
   it("gives a forecast by day with the chance of passing each official line", async () => {
     const outcome = await callTool("get_forecast", { place: "Seremban" }, context());
-    expect(outcome).toMatchObject({ ok: true, source: "Haze model" });
+    expect(outcome).toMatchObject({ ok: true, source: "Hourly forecast" });
     expect(outcome.text).toContain("- Sun 11 Oct:");
     expect(outcome.text).toMatch(/Chance the peak passes 100: \d+%, 150: \d+%, 180: \d+%, 200: \d+%/);
+    expect(outcome.text).toContain("Source: every day and hour is the hourly forecast.");
     expect(outcome.text).toContain("only about as accurate beyond a day");
+  });
+
+  it("names the learned model and its record when the days ahead are its forecast", () => {
+    const source: ForecastSource = {
+      kind: "learned",
+      modelVersion: ISSUE_VERSION,
+      issuedAt: ISSUE_AT.toISOString(),
+      trial: true,
+      record: { checkedDays: 3, gain: null, backtest: { model: 11.98, persistence: 13.6, v2: 14.2 } },
+    };
+    expect(sourceChip(source)).toBe(`Learned model ${ISSUE_VERSION}`);
+    const line = describeSource(source);
+    expect(line).toContain(`the learned model ${ISSUE_VERSION}'s forecast, issued Sat 10 Oct, 08:00 (on trial until its live record passes)`);
+    expect(line).toContain("In its backtest on hazy days it was 12% closer than assuming no change");
+    expect(line).toContain("Checked on 3 live days so far.");
+    expect(describeSource({ ...source, trial: false, record: { checkedDays: 20, gain: 0.08, backtest: null } })).toContain("Its backtest figure is not available right now. Checked on 20 live days so far, where it was 8% closer than the hourly forecast.");
   });
 
   it("tells a place the orders that cover it and the rules in force, with the original wording", async () => {
