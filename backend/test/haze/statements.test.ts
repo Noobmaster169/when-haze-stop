@@ -149,3 +149,12 @@ describe("which readings can be acted on", () => {
     expect(closure[0]).toMatchObject({ nationwide: false, states: ["Negeri Sembilan"], reports: 1 });
   });
 });
+
+describe("two state bodies on one day", () => {
+  it("stay two statements, since a state is a kind of body and not one body", () => {
+    // The religious school closures of 9 October 2026 in Selangor and Negeri Sembilan.
+    const jais = statement(30, { issuer: "state", issuerName: "JAIS", states: ["Selangor"], effectiveFrom: "2026-10-09", publishedAt: new Date("2026-10-08T16:37:00Z") });
+    const jheains = statement(32, { issuer: "state", issuerName: "JHEAINS", states: ["Negeri Sembilan"], effectiveFrom: "2026-10-09", publishedAt: new Date("2026-10-09T02:00:00Z") });
+    expect(resolveStatements([jais, jheains], "2026-10-10").map((item) => item.states)).toEqual([["Negeri Sembilan"], ["Selangor"]]);
+  });
+});

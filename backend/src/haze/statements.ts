@@ -53,8 +53,12 @@ function malaysianDay(at: Date): string {
  * press as five headlines each naming some of the states, and is one decision
  * covering all of them.
  */
+/** Issuers that are one body each. "state", "ruler" and "other" are kinds of body, so their name says which. */
+const SINGLE_BODIES: ReadonlySet<StatementIssuer> = new Set(["moe", "doe", "nadma", "moh", "federal"]);
+
 function sameKey(statement: StoredStatement): string {
-  const { issuer, kind, action } = statement;
+  const { kind, action } = statement;
+  const issuer = SINGLE_BODIES.has(statement.issuer) ? statement.issuer : `${statement.issuer}:${flatten(statement.issuerName)}`;
   if (kind === "rule") return [issuer, kind, action, statement.threshold, statement.sustainedDays ?? 1].join("|");
   return [issuer, kind, action, statement.effectiveFrom ?? malaysianDay(statement.publishedAt)].join("|");
 }
