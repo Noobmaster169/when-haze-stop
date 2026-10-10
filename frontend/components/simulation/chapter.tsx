@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
 
-import { CHAPTERS } from "./chapters";
+import { CHAPTERS, type Chapter as ChapterEntry } from "./chapters";
 
-/** One numbered chapter: its number, title and one-line summary from the shared list, then its content. */
-export function Chapter({ id, children }: { id: string; children: ReactNode }) {
-  const index = CHAPTERS.findIndex((chapter) => chapter.id === id);
-  const chapter = CHAPTERS[index];
+/** One numbered chapter: its number, title and one-line summary from the page's list (the Simulation page's by default), then its content. */
+export function Chapter({ id, children, chapters = CHAPTERS }: { id: string; children: ReactNode; chapters?: readonly ChapterEntry[] }) {
+  const index = chapters.findIndex((chapter) => chapter.id === id);
+  const chapter = chapters[index];
   return (
     <section id={id} className="scroll-mt-6 border-t border-hairline-faint pt-8 pb-4 first:border-t-0 first:pt-2">
       <div className="flex items-baseline gap-3">

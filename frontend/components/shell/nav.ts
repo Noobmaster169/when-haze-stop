@@ -13,6 +13,7 @@ export const DESTINATIONS: Destination[] = [
   { key: "city", label: "KL in 3D", href: "/city", icon: "city" },
   { key: "alerts", label: "Alerts", href: "/alerts", icon: "bell" },
   { key: "simulation", label: "Simulation", href: "/simulation", icon: "chart" },
+  { key: "model", label: "Model", href: "/model", icon: "grid" },
   { key: "sources", label: "Sources", href: "/sources", icon: "database" },
 ];
 

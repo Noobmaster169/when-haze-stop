@@ -88,6 +88,11 @@
   --api-300: #7d2bb8;
   --api-400: #4a1680;
 
+  /* the Model page's three series, one value for both schemes: what was read, the learned model, no change */
+  --series-real: #2a78d6;
+  --series-model: #d9552e;
+  --series-same: #1f8a5a;
+
   /* the one shadow in the product, and the focus ring */
   --shadow-overlay: 0 8px 24px -8px rgb(17 24 39 / 0.18), 0 1px 2px rgb(17 24 39 / 0.06);
   --focus-ring: 0 0 0 2px var(--canvas), 0 0 0 4px var(--accent);
@@ -194,6 +199,9 @@
   --color-api-200: var(--api-200);
   --color-api-300: var(--api-300);
   --color-api-400: var(--api-400);
+  --color-series-real: var(--series-real);
+  --color-series-model: var(--series-model);
+  --color-series-same: var(--series-same);
 
   --font-display: var(--font-newsreader), Georgia, serif;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;

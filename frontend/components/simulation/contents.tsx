@@ -2,43 +2,44 @@
 
 import { useEffect, useState } from "react";
 
-import { CHAPTERS } from "./chapters";
+import { CHAPTERS, type Chapter } from "./chapters";
 
 /**
  * The table of contents: a sticky numbered list beside the chapters on a wide
  * screen, a row of chips above them on a narrow one. The chapter being read is
- * marked as the page's own column scrolls.
+ * marked as the page's own column scrolls. The Simulation page's list and
+ * column are the defaults; the Model page passes its own.
  */
 
 export const SCROLL_ID = "simulation-scroll";
 
-export function Contents() {
-  const [current, setCurrent] = useState(CHAPTERS[0].id);
+export function Contents({ chapters = CHAPTERS, scrollId = SCROLL_ID }: { chapters?: readonly Chapter[]; scrollId?: string }) {
+  const [current, setCurrent] = useState(chapters[0].id);
 
   useEffect(() => {
-    const root = document.getElementById(SCROLL_ID);
+    const root = document.getElementById(scrollId);
     if (!root) return;
     // The chapter being read is the last one whose top has passed the upper third of the column.
     const update = (): void => {
       const line = root.getBoundingClientRect().top + root.clientHeight / 3;
-      let reading = CHAPTERS[0].id;
-      for (const chapter of CHAPTERS) {
+      let reading = chapters[0].id;
+      for (const chapter of chapters) {
         const element = document.getElementById(chapter.id);
         if (element && element.getBoundingClientRect().top <= line) reading = chapter.id;
       }
       // At the very bottom the last chapters may never reach the line; the last one is then being read.
-      if (root.scrollTop + root.clientHeight >= root.scrollHeight - 4) reading = CHAPTERS[CHAPTERS.length - 1].id;
+      if (root.scrollTop + root.clientHeight >= root.scrollHeight - 4) reading = chapters[chapters.length - 1].id;
       setCurrent(reading);
     };
     update();
     root.addEventListener("scroll", update, { passive: true });
     return () => root.removeEventListener("scroll", update);
-  }, []);
+  }, [chapters, scrollId]);
 
   return (
     <nav aria-label="Contents">
       <ol className="flex gap-2 overflow-x-auto pb-2 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:pb-0">
-        {CHAPTERS.map((chapter, index) => {
+        {chapters.map((chapter, index) => {
           const active = chapter.id === current;
           return (
             <li key={chapter.id} className="shrink-0">
