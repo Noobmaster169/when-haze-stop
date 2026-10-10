@@ -70,7 +70,7 @@ export function StationPanel({ station, at, via, onClose }: { station: Station; 
               <DayRows days={outlook.days} />
               <p className="mt-1 text-caption text-ink-tertiary">
                 Ranges cover 8 in 10 past forecasts.{" "}
-                <Link href="/simulation" className="text-accent underline-offset-2 hover:underline">
+                <Link href="/accuracy" className="text-accent underline-offset-2 hover:underline">
                   Simulation
                 </Link>
               </p>
