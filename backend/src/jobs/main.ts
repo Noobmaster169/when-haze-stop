@@ -18,7 +18,7 @@ import {
 import { backfill, runCycle } from "./cycle";
 import { evaluate, formatScores } from "./evaluate";
 import { runHistory } from "./history";
-import type { IngestDeps } from "./ingest";
+import { type IngestDeps, rescreenRecentFires } from "./ingest";
 
 /**
  * The data side of the app, run as its own process so a model run never holds
@@ -28,6 +28,7 @@ import type { IngestDeps } from "./ingest";
  *   pnpm haze:backfill   replay the model over the stored week, for the accuracy page
  *   pnpm haze:loop       once now, then the backfill, then again every hour
  *   pnpm haze:history    the months before the app started: wind always, and with FIRMS_MAP_KEY the fire archive too
+ *   pnpm haze:rescreen   screen the days the live fire files hold again, after a change to the fire screen
  *   pnpm haze:evaluate   replay the stored week and score it against no change; writes nothing
  *                        (optional: hours between runs, default 6; an ISO instant to score from)
  */
@@ -93,11 +94,13 @@ async function main(): Promise<void> {
     else if (command === "loop") await loop(deps);
     else if (command === "history") {
       await runHistory({ pool: deps.pool, archive: config.FIRMS_MAP_KEY ? firmsArchiveClient(config.FIRMS_MAP_KEY) : null, weather: deps.weather }, new Date());
+    } else if (command === "rescreen") {
+      await rescreenRecentFires(deps);
     } else if (command === "evaluate") {
       const from = process.argv[4] ? new Date(process.argv[4]) : undefined;
       const rows = await evaluate(deps.pool, { everyHours: Number(process.argv[3] ?? 6), from });
       process.stdout.write(`${formatScores(rows)}\n`);
-    } else throw new Error(`unknown command "${command}". Use once, backfill, loop, history or evaluate.`);
+    } else throw new Error(`unknown command "${command}". Use once, backfill, loop, history, rescreen or evaluate.`);
   } finally {
     await closePool();
   }

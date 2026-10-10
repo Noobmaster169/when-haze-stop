@@ -92,7 +92,7 @@ export async function ingestFireHistory(deps: HistoryDeps, now: Date): Promise<v
     const settled = addDays(record.from, record.days - 1) < addDays(today, -SETTLED_AFTER_DAYS);
     if (settled && fetched.has(`${screen}|${record.from}|${record.days}`)) continue;
     const detail = await recordFetch(deps.pool, "firms-archive", async () => {
-      const tally = { detections: 0, glintDropped: 0, offshoreDropped: 0, fixedDropped: 0, unconfirmedDropped: 0, cellDays: 0 };
+      const tally = { detections: 0, glintDropped: 0, offshoreDropped: 0, fixedDropped: 0, notVegetationDropped: 0, unconfirmedDropped: 0, cellDays: 0 };
       for (const window of spansOf(record.from, addDays(record.from, record.days - 1), ARCHIVE_MAX_DAYS)) {
         const detections: Detection[] = [];
         for (const span of live) {
@@ -105,6 +105,7 @@ export async function ingestFireHistory(deps: HistoryDeps, now: Date): Promise<v
         tally.glintDropped += screened.glint;
         tally.offshoreDropped += screened.offshore;
         tally.fixedDropped += screened.fixed;
+        tally.notVegetationDropped += screened.notVegetation;
         tally.unconfirmedDropped += screened.unconfirmed;
         tally.cellDays += screened.cells.length;
       }

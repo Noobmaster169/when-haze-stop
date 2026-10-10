@@ -136,6 +136,7 @@ both the hourly fetch and the archive replay:
 | Sun glint | The sun's reflection off the sea, seen as a wall of saturated pixels | A sunlit half-degree block of one pass with 50 or more detections, 90% of them at the sensor's ceiling | `haze/fire-screen.ts` |
 | Open sea | Gas flares on platforms | More than 10 km from any coast | `haze/fire-screen.ts`, `haze/land.ts` |
 | Fixed sources | Gas flares on land, smelters, power plants, volcanoes | Within one 0.01 degree cell of a place NASA's labelled archive marked on 3 or more days | `haze/fixed-sources.ts` |
+| Not vegetation | Heat on a refinery, a town, a port, an open-cut mine, or glint and ships on coastal water that the sea screen leaves | Under half of the 0.01 degree cell around it is tree cover, shrub, grass, cropland, wetland or mangrove in ESA WorldCover 2021 (10 m, CC BY 4.0) | `haze/vegetation.ts`, `scripts/pack-vegetation.py` |
 | Unconfirmed | A single faint pixel seen once: a hot roof, a reflection, a burn-off too small to make haze | A cell-day is kept only if two or more satellite passes saw it, or its fire power is 10 MW or more | `haze/fire-confirm.ts` |
 
 The fixed source list comes from two years of the labelled archive (`fixed_source_days`). Built on
@@ -152,6 +153,18 @@ The confirmation rule is the strict one. Over 1 July to 10 October 2026 all the 
 took out 34,553 of 99,947 cell-days (35%) and left 96.2% of the fire power. On the map of the
 newest three days that was 1,473 dots before and 1,033 after. The cost is real small fires that
 only one pass saw, under cloud for the rest of the day.
+
+The vegetation screen (screen version 3, 11 October 2026) was checked three ways on the week to 10
+October. Of 252 hotspots of 100 MW or more it dropped none, so no large fire is lost. It dropped 54%
+of the raw detections in Malaysia and 0.9% in Indonesia. And of NASA's own 181 labelled static sites
+it would catch only 29% alone: most are gas flares at wells inside plantation and forest, which
+look like vegetation at 1 km. So it adds to the fixed-source labels and does not replace them.
+After all screens, 4 to 10 October, Malaysia's fire power fell 22% (2,225 to 1,726 MW, 0.45% of the
+region's) and Indonesia's 0.5%. Malaysia's own hotspots are not zero: DOE reports a handful most days
+of a dry spell, mostly in Sarawak, and those left here are on vegetation and seasonal, not steady.
+
+`pnpm haze:rescreen` works the burning part out again for the days the live seven-day files hold,
+without a key. Older days need `haze:history` with FIRMS_MAP_KEY.
 
 `fire_cells.frp_mw` stays what was fetched. `burning_mw` is what is left after the screens, zero
 for a cell-day that was all taken out, and every read uses it. Nothing is deleted when a rule

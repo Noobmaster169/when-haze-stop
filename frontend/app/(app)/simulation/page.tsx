@@ -36,6 +36,7 @@ const SOURCES = [
   { name: "Fires", href: "https://firms.modaps.eosdis.nasa.gov/", detail: "NASA FIRMS, every 3 hours" },
   { name: "Wind and rain", href: "https://open-meteo.com/", detail: "Open-Meteo, hourly" },
   { name: "Index table", href: "https://eqms.doe.gov.my/Documents/APIMS/API_Calculation.pdf", detail: "DOE, January 2025" },
+  { name: "Land cover", href: "https://esa-worldcover.org", detail: "ESA WorldCover 2021, CC BY 4.0, to keep only fires on vegetation" },
 ];
 
 const card = "rounded-lg border border-hairline bg-surface p-4";
