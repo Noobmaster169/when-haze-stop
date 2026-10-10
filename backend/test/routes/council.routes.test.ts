@@ -43,6 +43,18 @@ describe("the council routes", () => {
     expect(page.status).toBe("queued");
   });
 
+  it("deletes a finished run and its events, and refuses one in session", async () => {
+    const pool = getPool();
+    const run = (await council.queue(pool, "klang-valley", 8_000_000))!;
+    await council.appendEvent(pool, run.id, { seq: 0, kind: "stage", actor: "system", payload: { stage: "situation", title: "The situation", index: 1, of: 9 } });
+    expect((await request(testApp()).delete(`/council/runs/${run.id}`)).status).toBe(409);
+    await council.fail(pool, run.id, "a test run");
+    expect((await request(testApp()).delete(`/council/runs/${run.id}`)).status).toBe(204);
+    expect(await council.find(pool, run.id)).toBeNull();
+    expect(await council.eventsAfter(pool, run.id, -1)).toEqual([]);
+    expect((await request(testApp()).delete(`/council/runs/${run.id}`)).status).toBe(404);
+  });
+
   it("answers 404 for a run that does not exist", async () => {
     expect((await request(testApp()).get("/council/runs/999999999")).status).toBe(404);
   });

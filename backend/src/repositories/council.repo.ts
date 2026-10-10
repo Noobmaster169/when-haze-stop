@@ -163,3 +163,16 @@ export async function failAbandoned(db: Queryable, reason: string): Promise<numb
   }
   return rows.map((row) => Number(row.id));
 }
+
+/**
+ * Deletes a finished or failed run and its event log, at the user's request
+ * from the page. A queued or running run is not deleted: the worker is
+ * writing to it. Returns false where nothing was deleted.
+ */
+export async function deleteRun(db: Queryable, id: number): Promise<boolean> {
+  const { rows } = await db.query<{ status: RunStatus }>("select status from council_runs where id = $1", [id]);
+  if (!rows[0] || rows[0].status === "queued" || rows[0].status === "running") return false;
+  await db.query("delete from council_events where run_id = $1", [id]);
+  const deleted = await db.query("delete from council_runs where id = $1 and status in ('done', 'failed')", [id]);
+  return (deleted.rowCount ?? 0) > 0;
+}

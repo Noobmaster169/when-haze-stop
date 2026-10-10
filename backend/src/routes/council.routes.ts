@@ -7,7 +7,8 @@ import { council } from "../repositories";
 import type { StoredRun } from "../repositories/council.repo";
 
 /**
- * The Suppression Council: queue a run, list runs, read one and its event log.
+ * The Suppression Council: queue a run, list runs, read one and its event log,
+ * delete a finished one.
  * The run itself is executed by the council worker in the jobs image, never
  * here: it takes many minutes and many model calls.
  */
@@ -51,6 +52,21 @@ export function councilRouter(deps: { pool: Pool }): Router {
       return;
     }
     res.json(toContract(run));
+  });
+
+  router.delete("/runs/:id", async (req, res) => {
+    const id = Id.safeParse(req.params.id);
+    const run = id.success ? await council.find(deps.pool, id.data) : null;
+    if (!run) {
+      res.status(404).json({ error: "no such council run" });
+      return;
+    }
+    if (run.status === "queued" || run.status === "running") {
+      res.status(409).json({ error: "a meeting in session cannot be deleted; wait for it to finish" });
+      return;
+    }
+    await council.deleteRun(deps.pool, run.id);
+    res.status(204).end();
   });
 
   router.get("/runs/:id/events", async (req, res) => {
