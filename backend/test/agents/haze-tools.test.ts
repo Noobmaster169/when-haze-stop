@@ -54,7 +54,7 @@ describe("the assistant's haze tools, over one recorded cycle", () => {
     expect(outcome).toMatchObject({ ok: true, source: "Haze model" });
     expect(outcome.text).toContain("- Sun 11 Oct:");
     expect(outcome.text).toMatch(/Chance the peak passes 100: \d+%, 150: \d+%, 180: \d+%, 200: \d+%/);
-    expect(outcome.text).toContain("only about as accurate as assuming no change");
+    expect(outcome.text).toContain("only about as accurate beyond a day");
   });
 
   it("lists the official lines and admits there is none for events or flights", async () => {

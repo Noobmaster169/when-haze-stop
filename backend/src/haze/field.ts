@@ -1,20 +1,26 @@
-import { type Calibration, toApi } from "./calibrate";
+import { pm25ToApi } from "./api-index";
+import { type Calibration, toPm25 } from "./calibrate";
 import { cellCentre, distanceKm, FIELD_CELLS } from "./grid";
 
 /**
- * The map: API over the whole grid at one hour.
+ * The map: API over the whole grid at one hour, worked out in PM2.5.
  *
  * Away from any station it is the model alone. Near stations it is pulled to
- * what they read, by spreading each station's error (reading minus model) over
- * the cells around it. A forecast frame carries the errors from `asOf`
- * forward and damps the modelled change, the same way a station forecast does.
+ * what they read, by spreading each station's error (reading minus model, in
+ * ug/m3) over the cells around it. A forecast frame starts from the frame at
+ * `asOf` and adds the same two things a station forecast adds: the stations'
+ * recent slope carried on, and the modelled change. So the map agrees with the
+ * dots on it, and the first forecast frame follows on from the last observed
+ * one instead of jumping. Near stations the forecast is theirs: the slope, not
+ * the model's change, which did not beat "no change" there. Far from every
+ * station the model is all there is, and its change is taken whole.
  */
 
-/** A station as the field needs it: where it is, and how wrong the model is there. */
+/** A station as the field needs it: where it is, and a value to spread around it. */
 export interface Anchor {
   lat: number;
   lon: number;
-  /** Reading minus modelled API. */
+  /** For errors, reading minus model in ug/m3; for slopes, ug/m3 an hour. */
   error: number;
 }
 
@@ -56,35 +62,43 @@ export function stationWeight(anchors: { lat: number; lon: number }[]): Float32A
   return weight;
 }
 
+/** Modelled PM2.5 in every cell. */
 export function modelled(calibration: Calibration, smoke: Float32Array): Float32Array {
-  const api = new Float32Array(smoke.length);
-  for (let cell = 0; cell < smoke.length; cell++) api[cell] = toApi(calibration, smoke[cell]);
-  return api;
+  const pm25 = new Float32Array(smoke.length);
+  for (let cell = 0; cell < smoke.length; cell++) pm25[cell] = toPm25(calibration, smoke[cell]);
+  return pm25;
 }
 
 /** One byte a cell holding API / 2, which reaches 510 and loses nothing a map can show. */
-export function encode(api: Float32Array): Uint8Array {
-  const bytes = new Uint8Array(api.length);
-  for (let cell = 0; cell < api.length; cell++) bytes[cell] = Math.max(0, Math.min(255, Math.round(api[cell] / 2)));
+export function encode(pm25: Float32Array): Uint8Array {
+  const bytes = new Uint8Array(pm25.length);
+  for (let cell = 0; cell < pm25.length; cell++) bytes[cell] = Math.max(0, Math.min(255, Math.round(pm25ToApi(Math.max(0, pm25[cell])) / 2)));
   return bytes;
 }
 
 /** A frame at or before `asOf`: the model plus the errors measured at that same hour. */
 export function observedFrame(model: Float32Array, errors: Float32Array): Uint8Array {
-  const api = new Float32Array(model.length);
-  for (let cell = 0; cell < model.length; cell++) api[cell] = model[cell] + errors[cell];
-  return encode(api);
+  const pm25 = new Float32Array(model.length);
+  for (let cell = 0; cell < model.length; cell++) pm25[cell] = model[cell] + errors[cell];
+  return encode(pm25);
 }
 
-/**
- * A frame after `asOf`. Near stations the modelled change is scaled by `gain`,
- * because the model's changes have been about that much too large; far from
- * them the model is left as it is.
- */
-export function forecastFrame(model: Float32Array, modelAtAsOf: Float32Array, errorsAtAsOf: Float32Array, weight: Float32Array, gain: number): Uint8Array {
-  const api = new Float32Array(model.length);
+export interface ForecastFrameInput {
+  /** Modelled PM2.5 at the frame's hour and at `asOf`. */
+  model: Float32Array;
+  modelAtAsOf: Float32Array;
+  errorsAtAsOf: Float32Array;
+  /** The stations' slopes spread over the grid, already multiplied by how much has built up by this hour. */
+  trend: Float32Array;
+  weight: Float32Array;
+}
+
+/** A frame after `asOf`: the stations' forecast near them, fading to the model's own change far from them. */
+export function forecastFrame(input: ForecastFrameInput): Uint8Array {
+  const { model, modelAtAsOf, errorsAtAsOf, trend, weight } = input;
+  const pm25 = new Float32Array(model.length);
   for (let cell = 0; cell < model.length; cell++) {
-    api[cell] = model[cell] + errorsAtAsOf[cell] - weight[cell] * (1 - gain) * (model[cell] - modelAtAsOf[cell]);
+    pm25[cell] = modelAtAsOf[cell] + errorsAtAsOf[cell] + trend[cell] + (1 - weight[cell]) * (model[cell] - modelAtAsOf[cell]);
   }
-  return encode(api);
+  return encode(pm25);
 }

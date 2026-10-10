@@ -6,5 +6,6 @@ export * from "./api/alerts-client";
 export * from "./api/chat-client";
 export * from "./api/city-client";
 export * from "./api/haze-client";
+export * from "./api/simulation-client";
 export * from "./api/sources-client";
 export { BackendError } from "./api/transport";

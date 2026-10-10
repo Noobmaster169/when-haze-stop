@@ -2,6 +2,7 @@ import type { RunSummary } from "../contracts";
 import type { Queryable } from "../db";
 import type { Calibration } from "../haze/calibrate";
 import { GRID_KEY } from "../haze/grid";
+import { MODEL_VERSION } from "../haze/run";
 
 /** Runs of the model: the map frames and the station forecasts each one wrote. */
 
@@ -19,14 +20,14 @@ function toSummary(row: RunRow): RunSummary {
 }
 
 export async function exists(db: Queryable, asOf: Date, kind: RunKind): Promise<boolean> {
-  const { rowCount } = await db.query("select 1 from forecast_runs where as_of = $1 and kind = $2 and grid = $3", [asOf, kind, GRID_KEY]);
+  const { rowCount } = await db.query("select 1 from forecast_runs where as_of = $1 and kind = $2 and grid = $3 and model = $4", [asOf, kind, GRID_KEY, MODEL_VERSION]);
   return (rowCount ?? 0) > 0;
 }
 
 export async function insertRun(db: Queryable, asOf: Date, kind: RunKind, calibration: Calibration): Promise<number> {
   const { rows } = await db.query<{ id: string }>(
-    "insert into forecast_runs (as_of, kind, intercept, slope, fit, grid) values ($1, $2, $3, $4, $5, $6) returning id",
-    [asOf, kind, calibration.intercept, calibration.slope, JSON.stringify({ rankCorrelation: calibration.rankCorrelation, pairs: calibration.pairs, fallback: calibration.fallback }), GRID_KEY],
+    "insert into forecast_runs (as_of, kind, intercept, slope, fit, grid, model) values ($1, $2, $3, $4, $5, $6, $7) returning id",
+    [asOf, kind, calibration.intercept, calibration.slope, JSON.stringify({ rankCorrelation: calibration.rankCorrelation, pairs: calibration.pairs, fallback: calibration.fallback }), GRID_KEY, MODEL_VERSION],
   );
   return Number(rows[0].id);
 }
@@ -46,9 +47,9 @@ export async function insertStationForecasts(db: Queryable, runId: number, forec
   }
 }
 
-/** The newest run on the current grid by what it knew, which is the one the map and the assistant read. */
+/** The newest run on the current grid and method by what it knew, which is the one the map and the assistant read. */
 export async function latest(db: Queryable): Promise<RunSummary | null> {
-  const { rows } = await db.query<RunRow>("select id, as_of, made_at, fit from forecast_runs where grid = $1 order by as_of desc, id desc limit 1", [GRID_KEY]);
+  const { rows } = await db.query<RunRow>("select id, as_of, made_at, fit from forecast_runs where grid = $1 and model = $2 order by as_of desc, id desc limit 1", [GRID_KEY, MODEL_VERSION]);
   return rows[0] ? toSummary(rows[0]) : null;
 }
 
@@ -61,15 +62,16 @@ export interface StoredFrame {
  * The map's timeline: for every hour in the window, the frame from the run
  * that knew the most. Hours before a run's `asOf` are therefore what was
  * observed, and hours after the newest run's are its forecast. Only runs on
- * the current grid: a frame on an older grid cannot be drawn on this one.
+ * the current grid and method: a frame on an older grid cannot be drawn on this
+ * one, and an older method's frames would not join up with this one's.
  */
 export async function timeline(db: Queryable, from: Date, to: Date): Promise<StoredFrame[]> {
   const { rows } = await db.query<{ valid_at: Date; field: Buffer }>(
     `select distinct on (f.valid_at) f.valid_at, f.field
        from forecast_frames f join forecast_runs r on r.id = f.run_id
-      where f.valid_at between $1 and $2 and r.grid = $3
+      where f.valid_at between $1 and $2 and r.grid = $3 and r.model = $4
       order by f.valid_at, r.as_of desc, r.id desc`,
-    [from, to, GRID_KEY],
+    [from, to, GRID_KEY, MODEL_VERSION],
   );
   return rows.map((row) => ({ validAt: row.valid_at, field: row.field }));
 }

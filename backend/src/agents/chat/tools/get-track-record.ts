@@ -21,7 +21,7 @@ export const getTrackRecord: ChatTool<Input> = {
     if (checked.length === 0) {
       return {
         ok: true,
-        text: "No forecast has been checked against a later reading yet, so there is no track record. In its first test, 6 to 10 October 2026, the model was about as accurate as assuming no change.",
+        text: "No live forecast has been checked against a later reading yet. Replayed over every hour of 3 to 10 October 2026, the forecast was about a fifth closer than assuming no change up to 12 hours ahead and about as accurate beyond a day.",
         preview: "no checked forecasts yet",
         source: "Haze model",
       };

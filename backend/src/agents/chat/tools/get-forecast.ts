@@ -41,7 +41,7 @@ export const getForecast: ChatTool<Input> = {
         `Forecast for ${found.station.name}, ${found.station.state}${found.via ? ` (the nearest station to ${found.via})` : ""}, in Malaysian time.`,
         ...days,
         `Every six hours: ${steps.join("; ")}.`,
-        "The range covers 8 in 10 past errors. In its first test this forecast was only about as accurate as assuming no change; call get_track_record before leaning on it.",
+        "The range covers 8 in 10 past errors. Replayed over every hour of 3 to 10 October 2026, this forecast was about a fifth closer than assuming no change up to 12 hours ahead and only about as accurate beyond a day; call get_track_record before leaning on a day or more ahead.",
       ].join("\n"),
       preview: tomorrow?.forecastPeak ? `${found.station.name} tomorrow peak ${tomorrow.forecastPeak}` : `${found.station.name} forecast`,
       source: "Haze model",

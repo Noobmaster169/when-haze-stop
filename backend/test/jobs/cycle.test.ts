@@ -1,7 +1,7 @@
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { Accuracy, AlertFeed, GuidelineList, HazeMap, PlaceList, StationOutlook, Subscription, SubscriptionList } from "../../src/contracts";
+import { Accuracy, AlertFeed, GuidelineList, Simulation, HazeMap, PlaceList, StationOutlook, Subscription, SubscriptionList } from "../../src/contracts";
 import { closePool } from "../../src/db";
 import { FIELD_CELLS } from "../../src/haze/grid";
 import { type FakeDoeClient, FakeGeocoder } from "../../src/sources/__fakes__/fake.sources";
@@ -39,6 +39,15 @@ describe("one cycle, then what the api serves", () => {
     expect(map.frames.some((frame) => !frame.observed)).toBe(true);
     expect(map.wind.length).toBeGreaterThan(0);
     expect(map.fires[0].frpMw).toBeGreaterThan(1000);
+  });
+
+  it("explains the run and replays the stored readings against no change", async () => {
+    const simulation = Simulation.parse((await request(app).get("/haze/simulation").expect(200)).body);
+    expect(simulation.run?.members).toBe(10);
+    expect(simulation.period.stations).toBeGreaterThan(0);
+    const oneHour = simulation.skill.find((row) => row.lead === 1);
+    expect(oneHour?.cases).toBeGreaterThan(0);
+    expect(simulation.histogram.reduce((sum, bin) => sum + bin.count, 0)).toBe(simulation.period.readings);
   });
 
   it("gives a station a forecast and a day-by-day outlook against the official lines", async () => {

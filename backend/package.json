@@ -12,7 +12,8 @@
     "db:migrate": "node --env-file-if-exists=.env db/migrate.mjs",
     "haze:once": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts once",
     "haze:backfill": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts backfill",
-    "haze:loop": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts loop"
+    "haze:loop": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts loop",
+    "haze:evaluate": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts evaluate"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

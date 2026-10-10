@@ -2,6 +2,7 @@ import { closePool, getPool } from "../db";
 import { childLogger } from "../lib/logger";
 import { doeClient, firmsClient, openMeteoClient } from "../sources";
 import { backfill, runCycle } from "./cycle";
+import { evaluate, formatScores } from "./evaluate";
 import type { IngestDeps } from "./ingest";
 
 /**
@@ -11,6 +12,8 @@ import type { IngestDeps } from "./ingest";
  *   pnpm haze:once       fetch everything, run the model, raise alerts
  *   pnpm haze:backfill   replay the model over the stored week, for the accuracy page
  *   pnpm haze:loop       once now, then the backfill, then again every hour
+ *   pnpm haze:evaluate   replay the stored week and score it against no change; writes nothing
+ *                        (optional: hours between runs, default 6; an ISO instant to score from)
  */
 
 const log = childLogger({ module: "jobs" });
@@ -56,7 +59,11 @@ async function main(): Promise<void> {
     if (command === "once") await runCycle(deps, new Date(), { fires: true });
     else if (command === "backfill") await backfill(deps);
     else if (command === "loop") await loop(deps);
-    else throw new Error(`unknown command "${command}". Use once, backfill or loop.`);
+    else if (command === "evaluate") {
+      const from = process.argv[4] ? new Date(process.argv[4]) : undefined;
+      const rows = await evaluate(deps.pool, { everyHours: Number(process.argv[3] ?? 6), from });
+      process.stdout.write(`${formatScores(rows)}\n`);
+    } else throw new Error(`unknown command "${command}". Use once, backfill, loop or evaluate.`);
   } finally {
     await closePool();
   }

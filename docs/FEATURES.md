@@ -32,9 +32,9 @@ Two rules shaped every decision:
 
 - Real data only. Nothing in the product is made up. Every number on a screen came from DOE,
   NASA, Open-Meteo or the model run on them.
-- Honest about skill. The forecast was tested and is about as accurate as assuming no change. The
-  app says so on the station panel, on the Track record page and in every assistant answer that
-  leans on the forecast.
+- Honest about skill. The forecast was replayed at every stored hour, leak-free: about a fifth
+  closer than assuming no change up to 12 hours ahead, level with it beyond a day. The app says so
+  on the Simulation page and in every assistant answer that leans on the forecast.
 
 "API" in this document and in the app means Malaysia's Air Pollutant Index, the number DOE
 publishes. It does not mean a programming interface unless the section is called "The API".
@@ -166,8 +166,12 @@ its newest good and failed fetch with what came back (stations, readings added, 
 hours). A source is marked late when two of its cycles pass without a good fetch. Below is the log
 of the newest fetches. Every fetch is a row in `source_fetches`, written by `jobs/record-fetch.ts`.
 
-Page `/accuracy` (Track record) shows the forecast's measured error beside "no change", the
-official lines with their issuers, the data sources and the limits.
+Page `/simulation` explains the simulation in numbered chapters with a table of contents: the
+answer, how one run works, what DOE's index is, the backtest, replayed haze arrivals, the checks
+on each part, the limits with the live runs' own scores, and the official lines and sources. Every
+figure comes from `GET /haze/simulation`, worked out from the database on each visit
+(`services/simulation.ts`, `haze/backtest.ts`). `/accuracy`, the old Track record, redirects there.
+The method and every test behind it are in `docs/FORECAST.md`.
 
 ### 4.2 The model
 
@@ -191,20 +195,23 @@ Step by step for one run at hour `asOf` (`haze/run.ts`, `runModel`):
    the ten is used.
 4. Smoke at a station (`smoke.ts`). The mass within 50 km, as a trailing 24 hour mean. DOE's index
    is itself a 24 hour average, which is why.
-5. Calibration (`calibrate.ts`). Over the last 120 hours before `asOf` (skipping the first 72
-   hours of the run, when smoke released earlier is missing), fit
-   `API = intercept + slope x sqrt(smoke)` across all stations. With fewer than 300 pairs or a
-   slope that is not positive, the first real fit is used instead: 64.0 and 6.79. The rank
-   correlation of that fit is stored with the run.
-6. Station forecast. `forecast(h) = latest reading + 0.4 x (model(h) - model(asOf))`. The model
-   is used for the change, not the level: the level comes from the reading. The 0.4 (GAIN) is
-   there because the modelled changes tested about that much too large. A station silent for more
-   than 6 hours gets no forecast.
+5. Calibration (`calibrate.ts`). DOE's API is the PM2.5 sub-index of the 24 hour mean
+   (`api-index.ts`, DOE's January 2025 table), so each reading is turned back into PM2.5 and
+   `PM2.5 = intercept + slope x smoke` is fitted over the last 120 hours before `asOf` (skipping
+   the first 72 hours of the run, when smoke released earlier is missing). With fewer than 300
+   pairs or a slope that is not positive, `FIRST_FIT` stands in. The rank correlation is stored.
+6. Station forecast (`station-forecast.ts`). `PM2.5(h) = PM2.5(now) + slope x (0.9 + ... +
+   0.9^h)`, the slope being the last 3 hours' change of the 24 hour mean: today's air against the
+   same hours yesterday, carried on and fading. The smoke model's change is not added: replayed
+   with the wind as forecast at the time it made forecasts beyond a day worse. A station silent for
+   more than 6 hours gets no forecast. See `docs/FORECAST.md` section 4.
 7. Map frames (`field.ts`). A frame every 3 hours from 24 hours before `asOf` to 84 hours after,
-   plus one exactly at `asOf`. Each frame is the modelled field corrected by the stations: every
-   station's error (reading minus model) is spread to nearby cells, full weight within 15 km and
-   fading to nothing at 200 km. Past frames use the readings of their own hour. Future frames use
-   the station forecasts. So the map always agrees with the dots on it.
+   plus one exactly at `asOf`, in PM2.5 and converted to API cell by cell. Each frame is the
+   modelled field plus every station's error, spread to nearby cells and fading to nothing at 200
+   km. The frame at `asOf` uses the same anchor reading as each station's forecast, and forecast
+   frames start from it, adding the stations' slope near them and the model's change far from
+   them. So the map agrees with the dots, and Now runs into the forecast without a jump.
+   Runs record `model` (`v2`); only the current method's runs are drawn or scored.
 
 The wind level matters. Smoke travels around a kilometre up. The mean of the 925 and 850 hPa
 winds matched a week of DOE readings with a rank correlation of 0.77, against 0.66 for wind at
@@ -223,8 +230,8 @@ For each local day (UTC+8) the outlook gives: the peak read so far, the forecast
 high (10th and 90th percentile, so the range covers 8 in 10 past errors), and the chance for each
 line. A day that has already passed a line in the readings has chance 1 for that line.
 
-Until the database holds 300 checked forecasts for a bucket, the percentiles of the first test
-(6 to 10 October 2026, hard-coded in `chance.ts`) are used. After that the app's own are used
+Until the database holds 300 checked forecasts for a bucket, the percentiles of the v2 forecast
+replayed on every hour of 3 to 10 October 2026 (hard-coded in `chance.ts`) are used. After that the app's own are used
 automatically (`services/outlook.ts`, `loadErrors`).
 
 Known simplification: the day's peak is treated like a single forecast value, which understates
@@ -232,7 +239,7 @@ the chance a little.
 
 ### 4.4 Thresholds
 
-`haze/guidelines.ts` is the only place they are written. The map, the alerts, the Track record
+`haze/guidelines.ts` is the only place they are written. The map, the alerts, the Simulation
 page and the assistant all read it.
 
 | API | Who | What happens | Issued by |
@@ -258,22 +265,22 @@ and to the reading the run started from. It reports the mean absolute error of t
 precomputed: the page always reflects what is in the database.
 
 `pnpm haze:backfill` replays the model every 6 hours over the stored week, each run seeing only
-the fires and readings known at its hour, and stores them as `backfill` runs. This gives the
-Track record page checked forecasts on day one. Backfilled runs use analysed wind, not the wind
-that was forecast at the time, so they flatter the model slightly.
+the fires and readings known at its hour, and stores them as `backfill` runs, so the live scores
+start on day one. `pnpm haze:evaluate` replays the week without storing anything and prints the
+table. The Simulation page replays the station forecast at every stored hour on each visit.
 
-The first test, on real data fetched 10 October 2026:
+Leak-free, readings only, every hour of 3 to 10 October 2026 (85,000 forecasts):
 
-| Lead | This model | No change | Cases |
+| Lead | No change | v2 | Change |
 | --- | --- | --- | --- |
-| 24 h | 15.2 | 14.9 | 858 |
-| 48 h | 20.2 | 20.6 | 594 |
-| 72 h | 29.4 | 28.6 | 330 |
+| 1 h | 1.08 | 0.82 | -24% |
+| 6 h | 5.61 | 4.20 | -25% |
+| 12 h | 10.23 | 8.56 | -16% |
+| 24 h | 16.84 | 16.57 | -2% |
+| 72 h | 37.02 | 35.55 | -4% |
 
-Average miss in API points. Modelled smoke against readings: Spearman 0.84 over 8,184 station
-hours. Reading: the model places smoke well, but as a forecast it ties with assuming no change.
-The wind level, the square-root conversion and the 0.4 gain were all chosen on that same week, so
-these numbers are optimistic. Report them as they are.
+The first test's figures (v1, a tie at 24 to 72 hours) were made with analysed wind and settings
+chosen on the same week; `docs/FORECAST.md` section 5 measures that leak and supersedes them.
 
 ### 4.6 How the map is drawn
 
@@ -476,7 +483,7 @@ not meant to serve other users.
 ## 7. The API
 
 Backend, on `127.0.0.1:8091`. The browser never calls it; it calls the Next routes under
-`/api/...`, which forward; the Track record and Sources pages read it from the Next server. Contracts
+`/api/...`, which forward; the Simulation and Sources pages read it from the Next server. Contracts
 are zod schemas in `backend/src/contracts.haze.ts`, `contracts.alerts.ts` and `contracts.sources.ts`,
 mirrored by hand in `frontend/lib/api/haze-schemas.ts`, `alert-schemas.ts` and `source-schemas.ts`
 (the `CityAir` part of `contracts.haze.ts` in `city-schemas.ts`).
@@ -486,7 +493,8 @@ Change both together.
 | --- | --- | --- |
 | GET | `/haze/map` | `HazeMap`: latest run, both grids, stations with newest reading, frames for 7 days back and 84 hours ahead, wind at each frame, strongest 1500 fire cells of 2 days |
 | GET | `/haze/stations/:id` | `StationOutlook`: station, a week of readings, 84 hours of forecast, the day outlooks |
-| GET | `/haze/accuracy` | `Accuracy`: error by lead for model and persistence |
+| GET | `/haze/accuracy` | `Accuracy`: error by lead for model and persistence, current method's runs |
+| GET | `/haze/simulation` | `Simulation`: newest run's inputs, readings histogram, the readings-only backtest by lead and by day, replayed haze arrivals |
 | GET | `/haze/guidelines` | `GuidelineList` |
 | GET | `/haze/places?q=` | `PlaceList`: stations by name first, then geocoded places, each with its nearest station |
 | GET | `/haze/cities/:key` | `CityAir`: a city (only `kl`) blended from its stations, hour by hour with API, PM2.5, estimated visibility and optical depth; 404 for an unknown city |
@@ -526,7 +534,7 @@ pnpm dev                 # api on :8091
 
 # data, in a second terminal
 pnpm haze:once           # fetch everything, run the model once, raise alerts (a few minutes)
-pnpm haze:backfill       # once, on day one: replay the stored week (fills the timeline's past and the Track record)
+pnpm haze:backfill       # once, on day one: replay the stored week (fills the timeline's past and the live scores)
 pnpm haze:loop           # then keep running: once now, the backfill, then at 20 past every hour
 
 # frontend, in a third terminal
@@ -573,8 +581,8 @@ rows and never delete, so they can be run repeatedly.
 
 Limits, in the order they matter:
 
-1. Forecast skill ties with "no change". The model adds the picture (where smoke is, where it is
-   heading) and the chances, not a more accurate number.
+1. The forecast beats "no change" up to about 12 hours and ties with it beyond a day. The smoke
+   model adds the picture (where smoke is, where it is heading), not a better number past a day.
 2. The live source clients were verified against real responses for shape, and their parsers are
    tested on recorded real answers, but the first full run from a developer machine is the first
    time all three are fetched from Node end to end. Watch the first `pnpm haze:once`.
@@ -594,8 +602,9 @@ Next, roughly in value order:
 - Web Push, so alerts arrive with the tab closed (section 5.3).
 - Count consecutive days above 150 and alert on the third.
 - Store weather by fetch time so skill can be measured against the wind that was really forecast.
-- Try to beat persistence: fit the gain per lead time, add fire growth, or blend with a simple
-  statistical model. Judge only by the Track record table.
+- Beat persistence beyond a day: store weather by fetch time, test a faster ensemble wind (the
+  stored wind runs 20% slow against radiosondes), slower decay of assumed fires. Judge only by
+  `pnpm haze:evaluate` and the Simulation page. See `docs/FORECAST.md` section 9.
 - A visibility source (airport METAR) so flight questions can be answered.
 - Bahasa Malaysia for alerts and the assistant.
 - An API key for the model and auth, before any public launch.

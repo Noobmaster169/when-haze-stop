@@ -15,7 +15,7 @@ assistant's tools. Nothing has been pushed. `main` is untouched.
 | Backend `pnpm test` | 63 tests pass, 9 files |
 | Frontend `pnpm lint`, `pnpm type-check` | Clean |
 | Frontend `pnpm test` | 26 tests pass |
-| Pages in a browser (dev server) | Map, station panel, search, timeline, alerts, track record and chat all render and work |
+| Pages in a browser (dev server) | Map, station panel, search, timeline, alerts, simulation and chat all render and work |
 
 ## What has not been verified
 
@@ -66,7 +66,7 @@ Open http://localhost:3000 and go through this list:
 - Play the timeline. The label turns blue past Now.
 - Search "Shah Alam". The panel opens on the nearest station and says so.
 - Press "Alert me here". `/alerts` lists the station.
-- `/accuracy` shows a table under "Since this app started running" after backfill.
+- `/simulation` shows the backtest and, after backfill, the live runs' scores. `/accuracy` redirects there.
 - Ask the five starter questions in the dock. Check each answer has numbers from tools, source
   chips, and a map link. Ask something off topic and check it refuses.
 
@@ -90,9 +90,15 @@ After that, the backlog is section 10 of `docs/FEATURES.md`: Web Push, counting 
 - **Readings cannot be refetched.** DOE serves about 7 days. Do not drop or reset the dev database
   casually; the stored history is the backtest.
 - **`weather_hours` is overwritten by design.** It is the one exception to the no overwrite rule.
-- **The forecast ties with "no change".** This is measured and stated in the app on purpose. Do
-  not remove those sentences unless the Track record table shows the model winning.
-- **Chances use hard-coded first test percentiles** (`haze/chance.ts`) until 300 checked forecasts
+- **The forecast beats "no change" only up to about 12 hours.** Beyond a day it ties. This is
+  measured (`docs/FORECAST.md`) and stated in the app on purpose; change the wording only when
+  `pnpm haze:evaluate` and the Simulation page show otherwise.
+- **The backtest has one known leak: the wind.** `weather_hours` keeps the analysis, so a replayed
+  run knows the real future wind. The station forecast uses no weather, so its proof is clean; any
+  claim about the smoke model's own change needs weather stored by fetch time first.
+- **Runs carry `model`.** Migration 005. A method change is a new `MODEL_VERSION` in
+  `haze/run.ts`; the map, outlook and scores read only the current one, so deploy jobs with it.
+- **Chances use hard-coded replay percentiles** (`haze/chance.ts`) until 300 checked forecasts
   exist per lead bucket, then switch to the database's own automatically.
 - **Test data is real.** `backend/test/fixtures/recorded*.ts` are values fetched on 10 October
   2026. `steady-wind.ts` is a uniform wind test vector for the transport maths and is labelled as

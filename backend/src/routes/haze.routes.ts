@@ -9,6 +9,7 @@ import { cityAir } from "../services/city";
 import { hazeMap } from "../services/map";
 import { stationOutlook } from "../services/outlook";
 import { findPlaces } from "../services/places";
+import { simulation } from "../services/simulation";
 import type { Geocoder } from "../sources";
 
 /** The haze map and everything behind it, read-only. The jobs process is what writes. */
@@ -57,6 +58,10 @@ export function hazeRouter(deps: HazeRouteDeps): Router {
     const { since, leads } = await scores.byLead(deps.pool);
     const body: Accuracy = { since: since ? since.toISOString() : null, leads };
     res.json(body);
+  });
+
+  router.get("/simulation", async (_req, res) => {
+    res.json(await simulation(deps.pool));
   });
 
   router.get("/guidelines", (_req, res) => {

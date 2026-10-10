@@ -16,7 +16,7 @@
  */
 
 /** The band edges as [ug/m3, API]. DOE's 0.1 gaps between bands are closed so the curve is continuous. */
-const KNOTS: readonly (readonly [number, number])[] = [
+export const BAND_EDGES: readonly (readonly [number, number])[] = [
   [0, 0],
   [12.0, 50],
   [50.4, 100],
@@ -30,10 +30,10 @@ const KNOTS: readonly (readonly [number, number])[] = [
 function interpolate(value: number, from: 0 | 1): number {
   const to = from === 0 ? 1 : 0;
   if (value <= 0) return 0;
-  for (let k = 1; k < KNOTS.length; k++) {
-    if (value <= KNOTS[k][from] || k === KNOTS.length - 1) {
+  for (let k = 1; k < BAND_EDGES.length; k++) {
+    if (value <= BAND_EDGES[k][from] || k === BAND_EDGES.length - 1) {
       // Past the last edge the top band's slope carries on: an index above 500 has happened in Malaysia.
-      const [a, b] = [KNOTS[k - 1], KNOTS[k]];
+      const [a, b] = [BAND_EDGES[k - 1], BAND_EDGES[k]];
       return a[to] + ((value - a[from]) * (b[to] - a[to])) / (b[from] - a[from]);
     }
   }

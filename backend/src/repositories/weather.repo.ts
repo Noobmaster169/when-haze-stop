@@ -64,3 +64,9 @@ export async function windAt(db: Queryable, hours: Date[]): Promise<{ validAt: D
   const { rows } = await db.query<HourRow>("select valid_at, u_ms, v_ms, rain_mm from weather_hours where valid_at = any($1) order by valid_at", [hours]);
   return rows.filter((row) => row.u_ms.length === WEATHER_POINTS).map((row) => ({ validAt: row.valid_at, u: row.u_ms, v: row.v_ms }));
 }
+
+/** How many hours of wind are stored on the current grid. */
+export async function hoursStored(db: Queryable): Promise<number> {
+  const { rows } = await db.query<{ hours: string }>("select count(*) as hours from weather_hours where array_length(u_ms, 1) = $1", [WEATHER_POINTS]);
+  return Number(rows[0]?.hours ?? 0);
+}

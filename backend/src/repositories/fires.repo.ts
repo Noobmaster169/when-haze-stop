@@ -47,3 +47,9 @@ export async function newestDay(db: Queryable): Promise<string | null> {
   const { rows } = await db.query<{ day: string | null }>("select to_char(max(day), 'YYYY-MM-DD') as day from fire_cells");
   return rows[0]?.day ?? null;
 }
+
+/** The burning cells and their total fire power on one UTC day. */
+export async function dayTotal(db: Queryable, day: string): Promise<{ cells: number; frpMw: number }> {
+  const { rows } = await db.query<{ cells: string; frp: number | null }>("select count(*) as cells, sum(frp_mw) as frp from fire_cells where day = $1", [day]);
+  return { cells: Number(rows[0]?.cells ?? 0), frpMw: Math.round(Number(rows[0]?.frp ?? 0)) };
+}
