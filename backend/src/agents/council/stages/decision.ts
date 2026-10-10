@@ -4,7 +4,7 @@ import { loadPrompt } from "../../prompts/registry";
 import { SEATS, seat } from "../seats";
 import { runTurn } from "../turn";
 import { DecisionAnswer } from "./answers";
-import { matrix } from "./comparison";
+import { BAR, matrix } from "./comparison";
 import { say } from "./say";
 import { describePlan, type Session } from "./session";
 import { buildVerdict } from "./verdict";
@@ -22,7 +22,8 @@ export async function decision(session: Session): Promise<Verdict> {
   const rows = matrix(session);
   const chosen = rows[0] ? session.deps.ctx.plan(rows[0].planId) : undefined;
   if (!chosen) throw new TerminalError("no feasible plan reached the decision");
-  const table = rows.map((row) => `${row.planId}: weighted ${row.weighted.toFixed(3)} | ${Object.entries(row.scores).map(([key, value]) => `${key} ${value.toFixed(2)}`).join(", ")}`);
+  // Rows come eligible first, so the first row is the winner either way; when none clears the bar the best score stands, and the Chair says so.
+  const table = rows.map((row) => `${row.planId}: weighted ${row.weighted.toFixed(3)}${row.eligible ? "" : ` (barred: rated below ${10 * BAR} of 10 on feasibility or diplomacy)`} | ${Object.entries(row.scores).map(([key, value]) => `${key} ${value.toFixed(2)}`).join(", ")}`);
   const baselines = session.deps.ctx.plans().filter((plan) => plan.baseline);
   const against = session.critiques.filter((item) => item.planId === chosen.id).map((item) => `${seat(item.by)?.title} (${item.answer.verdict}): ${item.answer.strongestObjection}`);
   const premortem = session.premortem?.premortems.find((item) => item.planId === chosen.id);

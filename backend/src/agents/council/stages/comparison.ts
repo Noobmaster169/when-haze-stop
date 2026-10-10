@@ -64,7 +64,12 @@ export interface MatrixRow {
   planId: string;
   scores: Record<keyof Weights, number>;
   weighted: number;
+  /** False when the seats that own feasibility or diplomacy rate the plan below the bar: their veto, made by ratings. */
+  eligible: boolean;
 }
+
+/** Below 3 out of 10 on feasibility or diplomacy, a plan cannot win while another clears both (run 3, docs/council/13). */
+export const BAR = 0.3;
 
 /** Every shortlisted plan on every criterion, 0 to 1, and the weighted total. A criterion nobody rated counts as middling. */
 export function matrix(session: Session): MatrixRow[] {
@@ -89,7 +94,7 @@ export function matrix(session: Session): MatrixRow[] {
         sideBenefits: rated("sideBenefits"),
       };
       const weighted = (Object.keys(scores) as (keyof Weights)[]).reduce((sum, key) => sum + weights[key] * scores[key], 0);
-      return { planId: plan.id, scores, weighted };
+      return { planId: plan.id, scores, weighted, eligible: scores.feasibility >= BAR && scores.diplomacy >= BAR };
     })
-    .sort((a, b) => b.weighted - a.weighted);
+    .sort((a, b) => Number(b.eligible) - Number(a.eligible) || b.weighted - a.weighted);
 }

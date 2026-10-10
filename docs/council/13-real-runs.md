@@ -78,6 +78,37 @@ km from open sea.
 
 Long runs are now started detached (`nohup`), so a session ending cannot kill them.
 
-## Run 3
+## Run 3, 10 October 2026, 21:29 to 21:58 MYT (run id 7)
 
-Started 21:29 MYT (run id 7); recorded here when read.
+The first complete run with the run-1 fixes (before the money budget and plain English). 90 model
+calls, 28.6 minutes. The verdict carried the first before and after maps.
+
+| Plan | Made by | Expected | Worst wind |
+| --- | --- | --- | --- |
+| P13, chosen | Greedy search, if Indonesia agrees (computer) | 16.4% | 8.8% |
+| P3 | Air Quality: strike on the most influential Sumatra fires, Johor at home | 13.5% | |
+| P22 | Air Quality, revised: aircraft on C014, peat teams on C005, task force on C018 and C020 | 13.4% | 7.1% |
+| P14 | Air Operations' variant: Peat Science's plan plus aircraft where they can scoop | 12.0% | |
+| P23 | Health, revised: Johor at home plus aircraft and peat crews on C005 | 11.5% | 7.9% |
+| P12 | Greedy search, within accepted consent (computer) | 6.4% | |
+| P1 | Domestic Fire: Bomba on the Johor fires | 5.7% | |
+
+The council's own plans rose to 13.4% (run 1: 11.1%), but the matrix chose the computer's plan,
+and the Chair said so plainly: "It was written by code, by greedy search. The Committee's
+judgement did not beat it ... Judgement added the honest price: feasibility 0.36, diplomacy 0.10,
+nine of eleven lines waiting on Sumatra consent." The minority report is the problem: Foreign
+Affairs opposed (every consent-dependent asset goes to Sumatra, where a comparable request was
+refused in 2019, while accepted Kalimantan gets nothing) and the Red Cell showed the plan splits
+the task force into thirds too thin to finish any complex. "The Committee adopted the score, not
+these answers."
+
+**Fix (applied after run 3, for run 5 on):** the seats' ratings are no longer only a weighted
+term. A plan whose owners rate it below 3 out of 10 on feasibility or on diplomacy is not eligible
+while any plan clears both bars; the decision says when that happened. This is the veto the
+research describes (Foreign Affairs or Force Command may block a plan on a hard constraint),
+made by the ratings rather than by one voice.
+
+## Run 4
+
+Started 21:58 MYT (run id 8), the first run with the money budget (RM 8 million) and the
+plain-English prompts; recorded here when read.
