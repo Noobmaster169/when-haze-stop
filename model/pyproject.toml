@@ -36,3 +36,8 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "B", "BLE"]
+
+[tool.ruff.lint.per-file-ignores]
+# SQL strings and the docstring command line read better unwrapped.
+"src/hazemodel/store.py" = ["E501"]
+"tests/fixtures/extract.py" = ["E501"]
