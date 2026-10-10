@@ -1,14 +1,16 @@
-import { unstable_rethrow } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 
-import { CouncilExperience, type View } from "@/components/council/council-experience";
+import { CouncilExperience } from "@/components/council/council-experience";
+import { parsePlace, resolvePlace } from "@/components/council/route-state";
 import { getCouncilEvents, getCouncilRun, getCouncilRuns } from "@/lib/api-client";
 import type { CouncilEvent, CouncilRun, CouncilRunSummary } from "@/lib/api/council-schemas";
 
 /**
  * The Suppression Council: convene it, replay a meeting, read its verdict.
- * The newest run (or the one in the address) is read here with its events, so
- * a replay starts without a round trip; a live run's tail is polled by the
- * browser.
+ * The address says which run and which view (components/council/route-state.ts
+ * has the table); this page reads that run with its events on every
+ * navigation, so a replay starts without a round trip, and a live run's tail
+ * is then polled by the browser.
  */
 
 interface Loaded {
@@ -33,12 +35,8 @@ async function load(wanted: number | null): Promise<Loaded | null> {
 }
 
 export default async function CouncilPage({ searchParams }: PageProps<"/council">) {
-  const query = await searchParams;
-  const wanted = Number.parseInt(String(query.run ?? ""), 10);
-  const loaded = await load(Number.isInteger(wanted) && wanted > 0 ? wanted : null);
-  const asked = query.view === "replay" || query.view === "verdict" ? query.view : "start";
-  const view: View = asked === "verdict" && !loaded?.run?.verdict ? (loaded?.run ? "replay" : "start") : loaded?.run ? asked : "start";
-
+  const asked = parsePlace(await searchParams);
+  const loaded = await load(asked.runId);
   if (!loaded) {
     return (
       <main className="flex min-w-0 grow flex-col px-6 pt-20 md:px-10">
@@ -47,5 +45,19 @@ export default async function CouncilPage({ searchParams }: PageProps<"/council"
       </main>
     );
   }
-  return <CouncilExperience key={loaded.run?.id ?? "none"} runs={loaded.runs} run={loaded.run} events={loaded.events} initialView={view} />;
+  const facts = loaded.run ? { status: loaded.run.status, hasVerdict: loaded.run.verdict !== null } : null;
+  const { shown, replaceWith, missing } = resolvePlace(asked, loaded.runs[0]?.id ?? null, facts);
+  // Outside load's try: a redirect is Next's control flow, thrown on purpose.
+  if (replaceWith) redirect(replaceWith);
+  return (
+    <CouncilExperience
+      key={loaded.run?.id ?? "none"}
+      runs={loaded.runs}
+      run={missing ? null : loaded.run}
+      events={missing ? [] : loaded.events}
+      view={shown.view}
+      named={asked.runId !== null && !missing}
+      missingRun={missing ? asked.runId : null}
+    />
+  );
 }

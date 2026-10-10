@@ -81,7 +81,8 @@ export function Replay({ events, live, targetName, arrived, onVerdict, header }:
           <div className="px-5 pt-20 md:px-8">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <ObjectiveCard targetName={targetName} arrived={arrived} />
-              {header}
+              {/* On a wide screen the views switcher sits in the rail, clear of the alerts that hang under the island. */}
+              <div className="lg:hidden">{header}</div>
             </div>
             <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
               {stage && beat?.event.kind !== "stage" ? (
@@ -105,6 +106,7 @@ export function Replay({ events, live, targetName, arrived, onVerdict, header }:
           <p className="px-5 pb-2 text-caption text-ink-tertiary md:px-8">The seats are offices, role-played by AI. Every figure they cite comes from the engine or the stored data.</p>
         </div>
         <aside className="flex min-h-0 w-full shrink-0 flex-col border-t border-hairline bg-surface lg:w-[360px] lg:border-t-0 lg:border-l lg:pt-16">
+          <div className="hidden justify-end border-b border-hairline px-5 pt-1 pb-3 lg:flex">{header}</div>
           <Rail timeline={timeline} index={index} onSeek={(position) => seek(timeline.beats[position].start + 0.01)} />
         </aside>
       </div>

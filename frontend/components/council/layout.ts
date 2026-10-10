@@ -17,8 +17,8 @@ export interface Frame {
 export const WIDE: Frame = { width: 1000, height: 620, node: 21, label: 13 };
 export const NARROW: Frame = { width: 560, height: 640, node: 19, label: 15 };
 
-/** The table's seating order clockwise from the top. An agent this does not know sits after these. */
-const ORDER = ["chair", "air_quality", "meteorology", "peat_science", "force_command", "air_operations", "red_cell", "domestic_fire", "health", "sarawak", "foreign_affairs", "treasury"];
+/** The table's seating order clockwise from the top. Seats retired from new runs stay listed so old replays still lay out. An agent this does not know sits after these. */
+const ORDER = ["chair", "air_quality", "meteorology", "peat_science", "fire_operations", "force_command", "air_operations", "red_cell", "domestic_fire", "health", "sarawak", "foreign_affairs", "treasury"];
 
 export interface Seat {
   x: number;

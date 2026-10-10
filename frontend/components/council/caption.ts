@@ -67,6 +67,6 @@ export function captionFor(event: CouncilEvent | null, agents: Agent[]): string 
     case "run_finished":
       return `The council rises after ${event.payload.calls} model calls.`;
     case "run_failed":
-      return `The run stopped: ${event.payload.error}`;
+      return `The meeting stopped before a decision: ${event.payload.error.replace(/^stopped:\s*/i, "")}.`;
   }
 }

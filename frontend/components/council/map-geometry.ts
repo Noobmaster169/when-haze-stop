@@ -1,5 +1,5 @@
 import type { Basemap } from "@/components/map/basemap";
-import { colourAt, type Stop } from "@/components/map/scale";
+import { colourAt, type Rgb, type Stop } from "@/components/map/scale";
 import type { StrikeLine, VerdictMaps } from "@/lib/api/council-schemas";
 
 import { pm25ToApi } from "./pm25";
@@ -96,4 +96,66 @@ export function fieldImage(bytes: Uint8Array, grid: VerdictMaps["grid"], stops: 
   }
   context.putImageData(image, 0, 0);
   return canvas.toDataURL("image/png");
+}
+
+/** What the plan removes in each cell, before minus after, never below zero; and the most removed anywhere. */
+export function removal(before: Uint8Array, after: Uint8Array): { cells: Float32Array; max: number } {
+  const cells = new Float32Array(Math.min(before.length, after.length));
+  let max = 0;
+  for (let index = 0; index < cells.length; index++) {
+    cells[index] = Math.max(0, before[index] - after[index]);
+    if (cells[index] > max) max = cells[index];
+  }
+  return { cells, max };
+}
+
+/** The removal as a picture on one hue, clear at zero and solid at the most removed, north up. */
+export function removalImage(cells: Float32Array, max: number, grid: VerdictMaps["grid"], rgb: Rgb): string {
+  const canvas = document.createElement("canvas");
+  canvas.width = grid.nx;
+  canvas.height = grid.ny;
+  const context = canvas.getContext("2d");
+  if (!context || max <= 0) return "";
+  const image = context.createImageData(grid.nx, grid.ny);
+  for (let row = 0; row < grid.ny; row++) {
+    const source = (grid.ny - 1 - row) * grid.nx;
+    for (let column = 0; column < grid.nx; column++) {
+      // The maps store whole ug/m3, so a difference of one can be rounding alone: it is left clear rather than speckling the sea.
+      const value = cells[source + column] ?? 0;
+      const share = value <= 1 ? 0 : value / max;
+      image.data.set([rgb[0], rgb[1], rgb[2], Math.round(235 * Math.sqrt(share))], (row * grid.nx + column) * 4);
+    }
+  }
+  context.putImageData(image, 0, 0);
+  return canvas.toDataURL("image/png");
+}
+
+/**
+ * Markers pushed apart until none sits closer than `gap` to another, each
+ * remembering where it belongs so a short leader can point back. A few rounds
+ * of pairwise repulsion: the points are a handful of strikes, not a crowd.
+ */
+export function fanOut(points: { x: number; y: number }[], gap: number): { x: number; y: number; atX: number; atY: number }[] {
+  const placed = points.map((point) => ({ x: point.x, y: point.y, atX: point.x, atY: point.y }));
+  for (let round = 0; round < 40; round++) {
+    let moved = false;
+    for (let a = 0; a < placed.length; a++) {
+      for (let b = a + 1; b < placed.length; b++) {
+        const dx = placed[b].x - placed[a].x;
+        const dy = placed[b].y - placed[a].y;
+        const distance = Math.hypot(dx, dy);
+        if (distance >= gap) continue;
+        // Coincident points part along a fixed diagonal, so the result does not depend on chance.
+        const [ux, uy] = distance < 1e-6 ? [Math.SQRT1_2, -Math.SQRT1_2] : [dx / distance, dy / distance];
+        const push = (gap - distance) / 2 + 0.01;
+        placed[a].x -= ux * push;
+        placed[a].y -= uy * push;
+        placed[b].x += ux * push;
+        placed[b].y += uy * push;
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  return placed;
 }

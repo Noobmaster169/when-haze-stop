@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { CouncilRun } from "@/lib/api/council-schemas";
 
 import recorded from "./fixtures/council-run-1-run.json";
-import { fitBounds, gridBounds, project, strikePoints } from "./map-geometry";
+import { fanOut, fitBounds, gridBounds, project, removal, strikePoints } from "./map-geometry";
 
 /** Run 1 as the api answered it, verdict and all. */
 const run = CouncilRun.parse(recorded);
@@ -41,5 +41,27 @@ describe("the verdict map", () => {
     expect(view.x(96)).toBe(0);
     expect(view.y(8)).toBe(0);
     expect(view.y(-6)).toBeCloseTo(350);
+  });
+
+  it("takes what the plan removes cell by cell, never below zero", () => {
+    const { cells, max } = removal(Uint8Array.from([120, 60, 5, 0]), Uint8Array.from([117, 60, 9, 0]));
+    expect([...cells]).toEqual([3, 0, 0, 0]);
+    expect(max).toBe(3);
+  });
+
+  it("fans out markers that would sit on each other and leaves the rest alone", () => {
+    const placed = fanOut(
+      [
+        { x: 100, y: 100 },
+        { x: 104, y: 103 },
+        { x: 300, y: 300 },
+      ],
+      26,
+    );
+    expect(Math.hypot(placed[0].x - placed[1].x, placed[0].y - placed[1].y)).toBeGreaterThanOrEqual(26);
+    expect(placed[2]).toEqual({ x: 300, y: 300, atX: 300, atY: 300 });
+    expect(placed[0]).toMatchObject({ atX: 100, atY: 100 });
+    const same = fanOut([{ x: 50, y: 50 }, { x: 50, y: 50 }], 26);
+    expect(Math.hypot(same[0].x - same[1].x, same[0].y - same[1].y)).toBeGreaterThanOrEqual(26);
   });
 });

@@ -3,22 +3,22 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { type Basemap, loadBasemap } from "@/components/map/basemap";
-import { STOP_VALUES } from "@/components/map/scale";
+import { parseHex, STOP_VALUES } from "@/components/map/scale";
 import { readTheme } from "@/components/map/theme";
-import type { StrikeLine, Verdict } from "@/lib/api/council-schemas";
+import type { Verdict } from "@/lib/api/council-schemas";
 import { malaysiaWhen } from "@/lib/malaysia-time";
 
-import { type Bounds, coastPaths, fieldImage, fitBounds, gridBounds, placeNamed, project, strikePoints } from "./map-geometry";
+import { fieldImage, fitBounds, gridBounds, placeNamed, removal, removalImage, strikePoints } from "./map-geometry";
+import { MapPanel } from "./map-panel";
 import { decodeBytes } from "./pm25";
 
 /**
  * Before and after: the engine's 24-hour PM2.5 over the region at the hour the
  * plan helps most, without the plan and with it, on the map's own index
- * colours, with the struck complexes numbered in the order they are attacked.
- * A verdict without maps gets the outline and the strikes alone.
+ * colours, and a third map of the difference on its own scale, because a plan
+ * that removes a few ug/m3 from a field of hundreds leaves the first two
+ * looking alike. A verdict without maps gets the outline and the strikes alone.
  */
-
-const WIDTH = 600;
 
 function watchTheme(onChange: () => void): () => void {
   const observer = new MutationObserver(onChange);
@@ -47,44 +47,13 @@ function useBasemap(): Basemap | null {
   return basemap;
 }
 
-function Panel({ bounds, basemap, strikes, image, label }: { bounds: Bounds; basemap: Basemap | null; strikes: StrikeLine[]; image: string | null; label: string }) {
-  const view = project(bounds, WIDTH);
-  const coasts = basemap ? coastPaths(basemap, view) : null;
-  const kl = basemap ? placeNamed(basemap, "Kuala Lumpur") : null;
-  const id = `clip-${label.replace(/\W+/g, "-")}`;
+function RemovedLegend({ max }: { max: number }) {
   return (
-    <figure className="min-w-0">
-      <figcaption className="mb-1.5 text-small font-medium text-ink">{label}</figcaption>
-      <svg viewBox={`0 0 ${view.width} ${view.height}`} className="block w-full overflow-hidden rounded-lg border border-hairline" role="img" aria-label={label}>
-        <clipPath id={id}>
-          <rect width={view.width} height={view.height} />
-        </clipPath>
-        <g clipPath={`url(#${id})`}>
-          <rect width={view.width} height={view.height} fill="var(--map-sea)" />
-          {coasts && !image ? <path d={coasts.land} fill="var(--map-land)" /> : null}
-          {image ? <image href={image} x={0} y={0} width={view.width} height={view.height} preserveAspectRatio="none" /> : null}
-          {/* Over the field the map's dark coasts read; on the plain ground they vanish in the dark scheme, so they take an ink line there. */}
-          {coasts ? <path d={coasts.land} fill="none" stroke={image ? "var(--map-coast)" : "var(--ink-faint)"} strokeWidth={0.9} /> : null}
-          {coasts ? <path d={coasts.borders} fill="none" stroke={image ? "var(--map-border)" : "var(--ink-faint)"} strokeWidth={0.7} strokeDasharray="3 2" /> : null}
-          {kl ? (
-            <g transform={`translate(${view.x(kl.lon)} ${view.y(kl.lat)})`}>
-              <rect x={-4} y={-4} width={8} height={8} transform="rotate(45)" fill="var(--canvas)" stroke="var(--ink)" strokeWidth={1.5} />
-              <text x={9} y={4} fontSize={13} fontWeight={600} fill="var(--map-label)" stroke="var(--canvas)" strokeWidth={3} paintOrder="stroke">
-                KL
-              </text>
-            </g>
-          ) : null}
-          {strikes.map((line) => (
-            <g key={line.complexId} transform={`translate(${view.x(line.lon)} ${view.y(line.lat)})`}>
-              <circle r={11} fill="var(--ink)" stroke="var(--canvas)" strokeWidth={2} />
-              <text textAnchor="middle" dominantBaseline="central" fontSize={12.5} fontWeight={700} fill="var(--ink-inverse)">
-                {line.order}
-              </text>
-            </g>
-          ))}
-        </g>
-      </svg>
-    </figure>
+    <div className="flex items-center gap-2 text-caption text-ink-tertiary">
+      <span className="tabular-nums">0</span>
+      <span className="h-1.5 w-32 rounded-sm" style={{ background: "linear-gradient(to right, transparent, var(--signal))" }} />
+      <span className="tabular-nums">{max.toFixed(0)} ug/m3 less</span>
+    </div>
   );
 }
 
@@ -112,8 +81,18 @@ export function VerdictMap({ verdict }: { verdict: Verdict }) {
   const maps = verdict.maps;
   const images = useMemo(() => {
     if (!maps || theme === null) return null;
+    const style = getComputedStyle(document.documentElement);
     const stops = readTheme(document.documentElement).stops;
-    return { before: fieldImage(decodeBytes(maps.before), maps.grid, stops), after: fieldImage(decodeBytes(maps.after), maps.grid, stops), theme };
+    const before = decodeBytes(maps.before);
+    const after = decodeBytes(maps.after);
+    const removed = removal(before, after);
+    return {
+      before: fieldImage(before, maps.grid, stops),
+      after: fieldImage(after, maps.grid, stops),
+      removed: removalImage(removed.cells, removed.max, maps.grid, parseHex(style.getPropertyValue("--signal"))),
+      max: removed.max,
+      theme,
+    };
   }, [maps, theme]);
 
   if (maps) {
@@ -121,14 +100,21 @@ export function VerdictMap({ verdict }: { verdict: Verdict }) {
     return (
       <div>
         <div className="grid gap-4 md:grid-cols-2">
-          <Panel bounds={bounds} basemap={basemap} strikes={strikes} image={images?.before ?? null} label="Without the plan" />
-          <Panel bounds={bounds} basemap={basemap} strikes={strikes} image={images?.after ?? null} label="With the plan" />
+          <MapPanel bounds={bounds} basemap={basemap} strikes={strikes} image={images?.before ?? null} ground="field" label="Without the plan" />
+          <MapPanel bounds={bounds} basemap={basemap} strikes={strikes} image={images?.after ?? null} ground="field" label="With the plan" />
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <ApiLegend />
           <span className="text-caption text-ink-tertiary">24-hour PM2.5 as the index, {malaysiaWhen(maps.at)} MYT, the hour the plan helps most.</span>
         </div>
-        <p className="mt-1.5 text-caption text-ink-tertiary">{maps.note}</p>
+        <div className="mt-6 grid gap-4 md:grid-cols-2 md:items-center">
+          <MapPanel bounds={bounds} basemap={basemap} strikes={strikes} image={images?.removed || null} ground="overlay" label="Smoke removed" />
+          <div>
+            <p className="max-w-[44ch] text-small text-ink-secondary">The two maps above differ by a few ug/m3 in a field of hundreds, so they look alike. This one draws only the difference, without the plan minus with it, on its own scale from nothing to the most the plan removes anywhere at that hour. A difference of 1 ug/m3 is within the maps&apos; rounding and is left clear.</p>
+            {images ? <div className="mt-3">{images.max > 0 ? <RemovedLegend max={images.max} /> : <p className="text-caption text-ink-tertiary">At this hour the plan removes less than 1 ug/m3 anywhere.</p>}</div> : null}
+          </div>
+        </div>
+        <p className="mt-3 text-caption text-ink-tertiary">{maps.note}</p>
       </div>
     );
   }
@@ -139,7 +125,7 @@ export function VerdictMap({ verdict }: { verdict: Verdict }) {
   return (
     <div>
       <div className="max-w-[640px]">
-        <Panel bounds={fitBounds(points, 1.6)} basemap={basemap} strikes={strikes} image={null} label="KL and the complexes the plan strikes" />
+        <MapPanel bounds={fitBounds(points, 1.6)} basemap={basemap} strikes={strikes} image={null} ground="plain" label="KL and the complexes the plan strikes" />
       </div>
       <p className="mt-1.5 text-caption text-ink-tertiary">Numbered in the order the plan attacks them. The engine&apos;s before and after field is not in this run&apos;s verdict.</p>
     </div>

@@ -19,6 +19,7 @@ export const PACKAGE_LINES: PackageLine[] = [
   { label: "52 personnel", basis: "accepted", note: "Mostly air crew and support; two lance teams of six is assumed" },
   { label: "Up to 100 Bomba at home", basis: "assumption", note: "How many of about 15,000 Bomba staff can be moved is assumed" },
   { label: "14 days", basis: "assumption", note: "Days in theatre, on the 2015 Palembang cycle" },
+  { label: "Indonesia lets every aircraft and crew work where needed", basis: "assumption", note: "The council assumes Indonesia allows all air activity and every support asked, in Kalimantan and Sumatra alike" },
 ];
 
 /** Where the council's reasoning is written down, for the links that say what a number rests on. */

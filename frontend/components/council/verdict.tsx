@@ -16,8 +16,9 @@ import { VerdictStrikes } from "./verdict-strikes";
  * engine's or the stored data's; the words are the Chair's.
  */
 
+/** The plan, then what to ask and tell Indonesia: runs before the council assumed Indonesia's consent still carry those two. */
 const TRACKS: { key: "actNow" | "ask" | "share"; label: string; hint: string }[] = [
-  { key: "actNow", label: "Do now", hint: "What Malaysia can do today on its own" },
+  { key: "actNow", label: "The plan", hint: "Which fires, with what, in what order" },
   { key: "ask", label: "Ask Indonesia for", hint: "Help that needs Indonesia to say yes" },
   { key: "share", label: "Tell Indonesia", hint: "What we know that helps their own crews" },
 ];
@@ -56,26 +57,23 @@ function Fact({ label, value, note }: { label: string; value: string; note: stri
   );
 }
 
-/** The plain answer in three numbers: how much cleaner KL gets, what it costs, whether it waits on Indonesia. */
+/** The plain answer in three numbers: how much cleaner KL gets, what it costs, when KL feels it. */
 function Facts({ verdict }: { verdict: Verdict }) {
-  const waiting = [...new Set(verdict.strikeList.filter((line) => line.waitsOn).map((line) => `${line.place.replace(/^near /, "")}, ${line.province}`))];
+  const arrival = verdict.score.arrivalHours;
+  const days = arrival === null ? null : Math.max(1, Math.round(arrival / 24));
   return (
     <div className="mt-8 grid gap-3 sm:grid-cols-3">
       <Fact
         label="Cleaner air for KL"
         value={`${Math.round(100 * verdict.score.expected)}% of what is possible`}
-        note={`About ${verdict.score.meanRemoved.toFixed(1)} ug/m3 less PM2.5 on average over two weeks, if every fire out would give ${verdict.ceiling.toFixed(1)}. ${clears(verdict.score.arrivalHours)}`}
+        note={`About ${verdict.score.meanRemoved.toFixed(1)} ug/m3 less PM2.5 on average over two weeks, if every fire out would give ${verdict.ceiling.toFixed(1)}.`}
       />
       {verdict.cost ? (
         <Fact label="Cost" value={ringgit(verdict.cost.total)} note={`Of the ${ringgit(verdict.cost.budget)} the government set aside.`} />
       ) : (
         <Fact label="Cost" value="Not worked out" note="This meeting was held before budgets were part of the plan." />
       )}
-      <Fact
-        label="Needs Indonesia to agree"
-        value={waiting.length ? "Partly" : "No"}
-        note={waiting.length ? `For the work near ${waiting.join(" and ")}. The rest goes ahead without asking.` : "Everything in the plan can start without a new request."}
-      />
+      <Fact label="When KL feels it" value={days === null ? "Not within two weeks" : days === 1 ? "Within a day" : `After about ${days} days`} note={arrival === null ? clears(arrival) : `${clears(arrival)} That is when the smoke model first shows a tenth of the plan's biggest effect on KL.`} />
     </div>
   );
 }
@@ -89,22 +87,17 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-export function VerdictView({ run, verdict, events, onReplay, onStart }: { run: CouncilRun; verdict: Verdict; events: CouncilEvent[]; onReplay(): void; onStart(): void }) {
+export function VerdictView({ run, verdict, events, switcher }: { run: CouncilRun; verdict: Verdict; events: CouncilEvent[]; switcher: React.ReactNode }) {
   const asOf = run.asOf ?? events.find((event) => event.kind === "run_started")?.at ?? null;
+  const tracks = TRACKS.filter((track) => (verdict[track.key] ?? "").trim() !== "");
 
   return (
     <main className="flex min-w-0 grow flex-col">
-      <div className="min-h-0 grow overflow-y-auto px-6 pt-20 pb-16 md:px-10">
+      <div className="min-h-0 grow overflow-y-auto px-6 pt-20 pb-16 md:px-10 min-[900px]:pt-28">
         <article className="mx-auto max-w-[860px]">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-small">
-            <button type="button" onClick={onStart} className="text-ink-secondary underline-offset-2 hover:text-accent hover:underline">
-              Suppression Council
-            </button>
-            <span className="text-ink-faint">/</span>
-            <span className="text-ink-tertiary">Verdict</span>
-            <button type="button" onClick={onReplay} className="ml-auto rounded-md border border-hairline-strong px-3 py-1 text-small text-ink transition-colors hover:bg-sunken">
-              Replay the meeting
-            </button>
+          <div className="flex flex-wrap items-center justify-between gap-3 text-small">
+            <span className="text-ink-tertiary">Run {run.id}, the verdict</span>
+            {switcher}
           </div>
 
           <h1 className="mt-6 max-w-[36ch] font-display text-[28px] leading-[36px] text-ink md:text-[32px] md:leading-[40px]">{verdict.headline}</h1>
@@ -116,7 +109,7 @@ export function VerdictView({ run, verdict, events, onReplay, onStart }: { run: 
           <Facts verdict={verdict} />
 
           <dl className="mt-8 divide-y divide-hairline border-y border-hairline">
-            {TRACKS.map((track) => (
+            {tracks.map((track) => (
               <div key={track.key} className="grid gap-1 py-4 sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-6">
                 <dt>
                   <div className="text-strong font-semibold text-ink">{track.label}</div>

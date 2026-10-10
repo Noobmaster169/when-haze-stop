@@ -1,10 +1,8 @@
-import type { Consent, StrikeLine } from "@/lib/api/council-schemas";
+import type { StrikeLine } from "@/lib/api/council-schemas";
 
 import { percent } from "./words";
 
 /** One row per complex the plan attacks, in the order it attacks them. */
-
-const WAITS: Record<Consent, string> = { sumatra: "Yes, to work in Sumatra", ground_crews: "Yes, to send ground crews" };
 
 export function VerdictStrikes({ lines }: { lines: StrikeLine[] }) {
   if (lines.length === 0) return <p className="text-small text-ink-tertiary">The chosen plan sends nothing to a fire complex.</p>;
@@ -24,7 +22,7 @@ export function VerdictStrikes({ lines }: { lines: StrikeLine[] }) {
                 {line.province}, {line.country}, {Math.round(100 * line.peatShare)}% peat land
               </div>
               <div className="mt-1 text-ink-secondary">{line.assets}</div>
-              <div className={`mt-0.5 text-caption ${line.waitsOn ? "text-differ" : "text-ink-tertiary"}`}>{line.waitsOn ? `Needs Indonesia to agree: ${WAITS[line.waitsOn].replace(/^Yes, /, "")}` : "Can start without asking"}</div>
+              <div className="mt-0.5 text-caption text-ink-tertiary tabular-nums">{line.fromDay === line.toDay ? `Day ${line.fromDay}` : `Day ${line.fromDay} to ${line.toDay}`}</div>
             </div>
           </li>
         ))}
@@ -37,7 +35,6 @@ export function VerdictStrikes({ lines }: { lines: StrikeLine[] }) {
             <th className="py-2 pr-3 text-right font-normal">Peat land</th>
             <th className="py-2 pr-3 font-normal">Sent</th>
             <th className="py-2 pr-3 font-normal">Days</th>
-            <th className="py-2 pr-3 font-normal">Needs Indonesia</th>
             <th className="py-2 text-right font-normal">Smoke removed</th>
           </tr>
         </thead>
@@ -58,7 +55,6 @@ export function VerdictStrikes({ lines }: { lines: StrikeLine[] }) {
               <td className="py-2.5 pr-3 whitespace-nowrap text-ink-secondary tabular-nums">
                 {line.fromDay === line.toDay ? `Day ${line.fromDay}` : `Day ${line.fromDay} to ${line.toDay}`}
               </td>
-              <td className={`py-2.5 pr-3 ${line.waitsOn ? "text-differ" : "text-ink-tertiary"}`}>{line.waitsOn ? WAITS[line.waitsOn] : "No"}</td>
               <td className="py-2.5 text-right font-medium text-ink tabular-nums">{percent(line.share)}</td>
             </tr>
           ))}
