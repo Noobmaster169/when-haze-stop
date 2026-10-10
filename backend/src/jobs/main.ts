@@ -10,7 +10,7 @@ import type { IngestDeps } from "./ingest";
  *
  *   pnpm haze:once       fetch everything, run the model, raise alerts
  *   pnpm haze:backfill   replay the model over the stored week, for the accuracy page
- *   pnpm haze:loop       once now, then again every hour
+ *   pnpm haze:loop       once now, then the backfill, then again every hour
  */
 
 const log = childLogger({ module: "jobs" });
@@ -37,6 +37,8 @@ async function loop(deps: IngestDeps): Promise<void> {
   }
   for (let turn = 0; !stopping; turn++) {
     await runCycle(deps, new Date(), { fires: turn % FIRES_EVERY_HOURS === 0 });
+    // After a start the stored week may have hours no run covers. Backfill skips the ones that have a run, so this is cheap after the first time.
+    if (turn === 0 && !stopping) await backfill(deps);
     if (stopping) break;
     const wait = msToNextRun(new Date());
     log.info({ minutes: Math.round(wait / 60_000) }, "sleeping until the next cycle");

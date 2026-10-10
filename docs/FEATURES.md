@@ -456,8 +456,8 @@ docker compose up -d --build   # postgres, llm-proxy, migrate, api, jobs, fronte
 docker compose logs -f jobs    # the first cycle, then the backfill, then hourly
 ```
 
-The `jobs` service runs `once`, then `backfill`, then `loop`, the same three commands as below.
-Backfill skips hours already run, so restarting the container costs little.
+The `jobs` service runs `loop`: one cycle now, then the backfill, then a cycle at 20 past every
+hour. Backfill skips hours already run, so restarting the container costs one cycle.
 
 From source, with only the infrastructure in Docker:
 
@@ -471,7 +471,7 @@ pnpm dev                 # api on :8091
 # data, in a second terminal
 pnpm haze:once           # fetch everything, run the model once, raise alerts (a few minutes)
 pnpm haze:backfill       # once, on day one: replay the stored week (fills the timeline's past and the Track record)
-pnpm haze:loop           # then keep running: once now, then at 20 past every hour
+pnpm haze:loop           # then keep running: once now, the backfill, then at 20 past every hour
 
 # frontend, in a third terminal
 cd ../frontend && pnpm install && pnpm dev    # http://localhost:3000

@@ -38,6 +38,17 @@ export async function newestAt(db: Queryable): Promise<Date | null> {
   return rows[0]?.at ?? null;
 }
 
+/** How many stations reported each hour, over the `hours` before the newest reading. */
+export async function stationsPerHour(db: Queryable, hours: number): Promise<{ at: Date; stations: number }[]> {
+  const { rows } = await db.query<{ at: Date; stations: string }>(
+    `select observed_at as at, count(*) as stations from readings
+      where observed_at > (select max(observed_at) from readings) - make_interval(hours => $1)
+      group by observed_at order by observed_at`,
+    [hours],
+  );
+  return rows.map((row) => ({ at: row.at, stations: Number(row.stations) }));
+}
+
 export async function oldestAt(db: Queryable): Promise<Date | null> {
   const { rows } = await db.query<{ at: Date | null }>("select min(observed_at) as at from readings");
   return rows[0]?.at ?? null;

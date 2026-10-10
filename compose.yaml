@@ -84,19 +84,13 @@ services:
       retries: 6
     restart: unless-stopped
 
-  # The hourly fetch, model run and alert pass. One cycle now so the map has
-  # data, then a backfill of the stored week (it skips hours already run, so a
-  # restart costs little), then the hourly loop.
+  # The hourly fetch, model run and alert pass: one cycle now so the map has
+  # data, a backfill of the stored week (it skips hours already run, so a
+  # restart costs little), then a cycle at 20 past every hour.
   jobs:
     build: ./backend
     environment: *backend-env
-    command:
-      - sh
-      - -c
-      - >-
-        node --import tsx src/jobs/main.ts once;
-        node --import tsx src/jobs/main.ts backfill;
-        exec node --import tsx src/jobs/main.ts loop
+    command: ["node", "--import", "tsx", "src/jobs/main.ts", "loop"]
     depends_on:
       migrate:
         condition: service_completed_successfully

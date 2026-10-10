@@ -1,3 +1,4 @@
+import { newestCompleteHour } from "../haze/complete-hour";
 import { addHours, hoursBetween } from "../haze/grid";
 import { childLogger } from "../lib/logger";
 import { forecasts, readings } from "../repositories";
@@ -21,6 +22,9 @@ async function attempt(what: string, work: () => Promise<unknown>): Promise<void
   }
 }
 
+/** How far back to look for the usual number of reporting stations. */
+const COVERAGE_HOURS = 72;
+
 export interface CycleOptions {
   /** The fire files are large and change a few times a day, so the loop skips them on most hours. */
   fires: boolean;
@@ -31,7 +35,7 @@ export async function runCycle(deps: IngestDeps, now: Date, options: CycleOption
   if (options.fires) await attempt("fires", () => ingestFires(deps));
   await attempt("weather", () => ingestWeather(deps));
 
-  const asOf = await readings.newestAt(deps.pool);
+  const asOf = newestCompleteHour(await readings.stationsPerHour(deps.pool, COVERAGE_HOURS));
   if (!asOf) {
     log.warn("no readings stored, so there is no hour to forecast from");
     return;
