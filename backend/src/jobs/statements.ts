@@ -5,7 +5,7 @@ import { readStatement } from "../agents";
 import { quoteFound } from "../haze/statement-text";
 import { childLogger } from "../lib/logger";
 import { statements } from "../repositories";
-import type { StatementsClient } from "../sources";
+import type { StatementItem, StatementsClient } from "../sources";
 import { tidyAreas } from "../services/statements";
 import { recordFetch } from "./record-fetch";
 
@@ -19,6 +19,8 @@ const log = childLogger({ module: "jobs.statements" });
 
 /** Per channel per cycle, newest first, so a first run catches up over a few hours instead of holding one cycle up. */
 const READ_PER_CYCLE = 20;
+/** Items read at once: what the proxy serves at once. */
+const AT_ONCE = 4;
 
 export interface StatementDeps {
   pool: Pool;
@@ -35,7 +37,7 @@ async function ingestChannel(deps: StatementDeps, channel: StatementsClient): Pr
     let unverified = 0;
     let failed = 0;
 
-    for (const item of fresh.slice(0, READ_PER_CYCLE)) {
+    const read = async (item: StatementItem): Promise<void> => {
       try {
         const text = await channel.text(item);
         const { reading, promptVersion } = await readStatement({ llm: deps.llm, pool: deps.pool }, { ...item, text });
@@ -48,6 +50,10 @@ async function ingestChannel(deps: StatementDeps, channel: StatementsClient): Pr
         failed += 1;
         log.warn({ url: item.url, err: error instanceof Error ? error.message : String(error) }, "a statement could not be read");
       }
+    };
+    const batch = fresh.slice(0, READ_PER_CYCLE);
+    for (let start = 0; start < batch.length; start += AT_ONCE) {
+      await Promise.all(batch.slice(start, start + AT_ONCE).map(read));
     }
     log.info({ channel: channel.channel, listed: listed.length, fresh: fresh.length, found, unverified, failed }, "statements read");
     return { listed: listed.length, new: fresh.length, read: Math.min(fresh.length, READ_PER_CYCLE) - failed, statements: found, unverified, failed };

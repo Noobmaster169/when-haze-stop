@@ -108,9 +108,14 @@ After that, the backlog is section 10 of `docs/FEATURES.md`: Web Push, counting 
 - **Frontend is Next 16.** Read `frontend/AGENTS.md` and the docs in
   `frontend/node_modules/next/dist/docs/` before writing Next code. Files stay under 200 lines
   (lint enforces it).
-- **Contracts are mirrored by hand.** A change in `backend/src/contracts.haze.ts` or
-  `contracts.alerts.ts` or `contracts.sources.ts` needs the same change in
-  `frontend/lib/api/haze-schemas.ts`, `alert-schemas.ts` or `source-schemas.ts`.
+- **Contracts are mirrored by hand.** A change in `backend/src/contracts.haze.ts`,
+  `contracts.alerts.ts`, `contracts.sources.ts` or `contracts.statements.ts` needs the same change
+  in `frontend/lib/api/haze-schemas.ts`, `alert-schemas.ts`, `source-schemas.ts` or
+  `statement-schemas.ts`.
+- **Statements cost model calls.** The jobs process reads each new haze item once through the
+  proxy (up to 20 per channel per cycle). Without the Claude token no statement is read and
+  alerts fall back to the forecast. Push needs `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` in
+  `.env` (see `.env.example`).
 - **The commit author** on the first commit was set to `Henson Zein <hello@upshot.cards>` because
   no git identity was configured where it was made. Amend before pushing if that is wrong.
 
@@ -120,7 +125,8 @@ After that, the backlog is section 10 of `docs/FEATURES.md`: Web Push, counting 
 | --- | --- |
 | The model | `backend/src/haze/run.ts`, then `transport.ts`, `ensemble.ts`, `calibrate.ts` |
 | Thresholds and their wording | `backend/src/haze/guidelines.ts` |
-| When an alert fires and what it says | `backend/src/haze/alert-rules.ts` |
+| When an alert fires and what it says | `backend/src/haze/alert-rules.ts`, `closing.ts`, `headline.ts` |
+| How statements are read and which are in force | `backend/src/agents/prompts/statement/`, `backend/src/haze/statements.ts` |
 | What the hourly job does | `backend/src/jobs/cycle.ts` |
 | A data source | `backend/src/sources/` |
 | An assistant tool | `backend/src/agents/chat/tools/`, registered in `index.ts` |

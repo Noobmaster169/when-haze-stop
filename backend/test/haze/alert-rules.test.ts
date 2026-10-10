@@ -76,6 +76,8 @@ describe("the one alert worth raising", () => {
   it("says when the air is likely to drop back under 100", () => {
     const easing = { ...SEREMBAN, api: 130, days: [day("2026-10-10", 130, {}), day("2026-10-11", 110, { 100: 0.7 }), day("2026-10-12", 80, { 100: 0.15 })] };
     expect(alertFor(easing, never)?.message).toBe("Seremban: likely below 100 by Monday. Outdoor activities can resume then.");
+    const tomorrow = { ...easing, days: [easing.days[0], day("2026-10-11", 80, { 100: 0.2 })] };
+    expect(alertFor(tomorrow, never)?.message).toBe("Seremban: likely below 100 tomorrow. Outdoor activities can resume then.");
   });
 
   it("says nothing for a station that has not reported and no order covers", () => {

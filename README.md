@@ -1,7 +1,7 @@
 # When Haze Stop
 
 Haze over Malaysia: the official readings on a map, a forecast three and a half days ahead,
-alerts when an area crosses an official line, and an assistant that answers from the same data.
+alerts on what the government will do in an area (from the forecast and from official statements), and an assistant that answers from the same data.
 
 Three features, described in full in [docs/FEATURES.md](docs/FEATURES.md):
 
@@ -121,6 +121,9 @@ This needs Node 24 and pnpm 11. Without Docker, the proxy also runs on the host 
 | GET | `/haze/places?q=` | Place search, each result with its nearest station. |
 | GET | `/sources` | Every data source, its newest good and failed fetch, and the recent fetch log. |
 | GET | `/alerts?session=&after=` | Alerts, newest first. |
+| GET | `/alerts/areas?session=` | One card per followed area: tomorrow's forecast, four days, the order in force. |
+| GET, PUT | `/alerts/push-key`, `/alerts/push` | The Web Push key; where a browser's alerts are sent. |
+| GET | `/statements?status=current\|all&page=` | Official statements about the haze, once each, with their status. |
 | GET, POST | `/alerts/subscriptions` | The stations a browser follows; follow one. |
 | DELETE | `/alerts/subscriptions/:stationId?session=` | Stop following. |
 

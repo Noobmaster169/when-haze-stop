@@ -25,7 +25,7 @@ A web app about haze in Malaysia with three features that share one set of data.
 | Feature | What a person gets |
 | --- | --- |
 | Haze map | The official readings now, the past week, and a forecast 3.5 days ahead, on a map of Sumatra, the peninsula and Borneo, with the fires and the wind that explain it. |
-| Alerts | A banner in the app when a followed area crosses an official line, when the forecast says haze is arriving, and when it says haze is clearing. |
+| Alerts | For each followed area, what the government will do and when: an official order in force, a forecast that a school-closing line will be passed, or clearing. On screen and as a notification on the device, beside a list of the official statements. |
 | Assistant | A chat panel that answers haze questions and gives recommendations (school, outdoor work, events, travel) from the same data, and names its sources. |
 
 Two rules shaped every decision:
@@ -81,6 +81,7 @@ Backend folders added for this product (all under `backend/src/`):
 | Fire detections | NASA FIRMS, VIIRS on S-NPP, NOAA-20, NOAA-21 | Three 7-day CSV files under `https://firms.modaps.eosdis.nasa.gov/data/active_fire/` | Every 3 hours | `sources/firms.ts` |
 | Wind at 925 and 850 hPa, rain | Open-Meteo forecast API | `https://api.open-meteo.com/v1/forecast` | Every hour | `sources/weather.ts` |
 | Place names | Open-Meteo geocoder | `https://geocoding-api.open-meteo.com/v1/search` | On search | `sources/geocoder.ts` |
+| Official statements | Education Ministry press page, DOE posts, Google News search | See section 5.2 | Every hour | `sources/moe-statements.ts`, `doe-statements.ts`, `news-statements.ts` |
 | Coastlines, borders, towns | Natural Earth (public domain) | Packed once into `frontend/public/basemap.json` | Static | `frontend/components/map/basemap.ts` |
 | Buildings, parks, water, roads of central KL | OpenStreetMap (ODbL), via the Overpass API | Packed once by `frontend/scripts/bake-city.mjs` into `frontend/public/city/kl.json` | Static, re-bake by hand | `frontend/components/city/city-data.ts` |
 
@@ -129,7 +130,8 @@ Migrations `backend/db/migrations/002_haze.sql` and `003_source_fetches.sql`. Ne
 | `station_forecasts` | One station's hourly forecast for one run | 84 values, from `as_of` + 1 hour. |
 | `alert_subscriptions` | A browser following a station | No login. `session_id` is made by the browser. |
 | `source_fetches` | One fetch of a source by the jobs process | Migration `003_source_fetches.sql`. Insert only: when, how long, what came back or why it failed. The Sources page reads it. |
-| `alert_events` | One alert | `open` stays true while its condition holds. A unique index allows only one open alert per station, kind and line. |
+| `alert_events` | One alert | `open` stays true while its condition holds. A unique index allows only one open alert per station, kind and line; an `order` alert's line is the statement id. |
+| `statements` | One fetched item about the haze, as the model read it | Migration `006_statements.sql`. Insert only, one row per URL, never read twice. Only rows with `is_statement` and `verified` are shown. |
 
 Note on `weather_hours`: this is the one table where a later fetch overwrites an earlier value. An
 hour first arrives as a forecast and is later replaced by the weather model's analysis of what
@@ -357,52 +359,87 @@ Colours are `--city-*` tokens in `globals.css`, read by `city-theme.ts`.
 
 ## 5. Feature 2: alerts
 
+Alerts say what the government will do in a followed area, and when. The forecast is the
+headline; official statements are fetched, read and listed so the app keeps track of what was
+said.
+
 ### 5.1 What the person sees
 
-- Follow an area three ways: the "Alert me here" button on a station panel, the search on
-  `/alerts`, or by asking the assistant ("alert me about Klang").
-- An area is a DOE station. A town without a station follows its nearest one. This is the whole
-  of "choosing an area": one tap, no settings.
-- When a followed station has a new alert, a bar appears across the top of every page with the
-  message, its time, "Show on map" and a dismiss button. Dismissing hides everything up to that
-  alert, remembered in the browser.
-- `/alerts` lists followed areas, recent alerts (mine, or all Malaysia), and what the three kinds
-  mean.
-- There is no login. The browser makes an id on first use and keeps it in local storage
-  (`frontend/components/alerts/session.ts`). Clearing site data forgets the followed areas.
+- On the first visit the map asks "See haze where you are". "Use my location" brings up the
+  browser's prompt, flies the map there and opens that spot's forecast; the answer stays in the
+  browser (`components/map/my-location.ts`) and the map opens there on later visits. The alerts
+  page then offers to follow the nearest station.
+- `/alerts` has two sections:
+  1. **My areas.** A search to follow an area (its nearest DOE station), then one card per area:
+     the reading now; a headline that is always tomorrow's forecast against the closing lines,
+     also on a calm day ("No action expected tomorrow"); one sentence; four days of peaks coloured
+     by band; and any official order in force there, linked to its source. An open alert gives
+     the card a coloured left edge. "Notify this device" turns on Web Push.
+  2. **Official statements.** In force (default) or all, five a page. Each row: date, issuer
+     badge (KPM, JAS, NADMA, KKM, State, Ruler), a one-line English summary, a status pill (In
+     force, Coming, Replaced, Ended), the areas, the outlets that reported it with a link, and the
+     original wording on demand.
+- A new alert hangs under the island as one line on screens 900px and wider; below that the
+  island's Alerts icon carries a dot. Closing it marks it seen, remembered in the browser.
+- There is no login. The browser makes an id on first use (`components/alerts/session.ts`).
 
-### 5.2 The rules
+### 5.2 Official statements
 
-`backend/src/haze/alert-rules.ts`, pure and tested. After every model run the job
-(`jobs/alerts.ts`) asks, for each station, which conditions hold now.
+Fetched by the jobs process every cycle (`jobs/statements.ts`), from three channels:
+
+| Channel | Source | What is read |
+| --- | --- | --- |
+| `moe-statements` | Education Ministry press page, `moe.gov.my/kenyataan-media` | Haze titles; the statement PDF's text (`unpdf`) |
+| `doe-statements` | DOE WordPress API, posts of 30 days matching "jerebu" | The post text |
+| `news-statements` | Google News RSS, "jerebu" (ms) and "haze Malaysia" (en), 7 days | The headline only, and only one that announces something (`haze/statement-text.ts`) |
+
+- An item is read once, by URL, newest first, at most 20 per channel per cycle. Prompt
+  `agents/prompts/statement/v3.md` turns it into one flat object: issuer, kind (`rule`, `order`,
+  `lift`, `advice`), action, states (the 16 station state names), districts, the line and days
+  for a rule, start and end dates, an English summary and a verbatim quote. Every call is a row in
+  `llm_calls`.
+- The quote must be found word for word in the fetched text (case, spacing, punctuation and a
+  PDF's page numbers set aside). A statement whose quote is not found is stored and never shown.
+- A district's own state is dropped from `states` (`services/statements.ts`, `tidyAreas`).
+- `haze/statements.ts` decides what is in force, at read time:
+  - Reports of one decision are one statement: a rule by its issuer, action and line; an order by
+    its issuer, action and start day, with every report's areas joined. The ministry's own copy
+    is the link when there is one.
+  - A later rule of the same issuer, action and length replaces an earlier one (180 replaced 200).
+  - An order ends on its stated last day, on a later lift or reopening for its areas, or a week
+    after it began when nothing more is said (closures run "until further notice").
+- An order covers a station by its state, by a district of the station's name, or by a gazetteer
+  district within 40 km.
+- The thresholds alerts use stay hand-checked in `haze/guidelines.ts`. A fetched rule never
+  changes who is alerted; when one differs, update the file by hand.
+
+### 5.3 The rules
+
+`haze/alert-rules.ts` and `haze/closing.ts`, pure and tested. After every model run the job
+(`jobs/alerts.ts`) works out, for each station, the one alert worth raising, most impactful first:
 
 | Kind | Label | Holds when | Example message |
 | --- | --- | --- | --- |
-| `observed` | Now | The reading is above an official line. Only the highest such line. | "Seremban: API 182, above 180. Schools close under the Education Ministry rule." |
-| `arriving` | Forecast | Tomorrow has at least a 60% chance of passing a line the reading is not yet above. Only the highest such line. | "Klang: 73% chance of API above 150 tomorrow. Three days in a row above 150 closes schools." |
-| `clearing` | Clearing | The reading is above 100 and a later forecast day has at most a 40% chance of passing 100. | "Klang: likely to drop below 100 by Monday. Outdoor activities could resume then." |
+| `order` | Official | An order in force or about to be covers the station and closes schools, stops outdoor activity, declares an emergency or sends people home to work. | "Ministry of Education: All education institutions in Negeri Sembilan close from 9 October." |
+| `arriving` | Forecast | Tomorrow has a 60% chance of passing 180, or yesterday and today were above 150 and tomorrow has a 60% chance of being the third day (from 12 October 2026). | "Klang: schools may close tomorrow. 72% chance of API above 180, the Education Ministry's closing line." |
+| `clearing` | Clearing | The reading is above 100 and a later day has at most a 40% chance of passing 100. | "Klang: likely below 100 tomorrow. Outdoor activities can resume then." |
 
-Every message is one or two sentences: what happened, then what it means. English only.
+- A reading above a line is not an alert (`observed` is kept only for old rows): the map and the
+  card show it.
+- One open alert per station. When a higher one holds, the lower one closes.
+- An open forecast alert holds down to a 50% chance, so one hovering at 60% is said once.
+- A day counts as above 150 when its peak hour is. The message says "may close".
+- The card's headline (`haze/headline.ts`) reads the same numbers, so card and alert agree.
 
-One alert per event:
+### 5.4 Delivery
 
-- A condition that newly holds opens an alert. A unique database index makes a second identical
-  open alert impossible, so running the job twice says nothing twice.
-- While the condition holds, nothing more is said.
-- When it stops holding the alert is closed, and only then can it open again.
-- A reading hovering at a line does not flap: an open "Now" alert stays open until the reading is
-  5 points under its line.
-- A station moving up from above 150 to above 180 gets a new alert, because that is a new line.
-
-The forecast alert is the point of the feature, and also the one that can be wrong. The 60% bar
-keeps wrong ones rare. Do not lower it without looking at how often it would have fired.
-
-### 5.3 Delivery
-
-In-app only: the bar polls `/api/alerts?session=...` every minute. Browser push (alerts while the
-tab is closed) was cut from this version. The table already has a `push` column for a Web Push
-subscription and the contract has the type. To add it: a service worker in the frontend, VAPID
-keys in `config.ts`, and a send step in `jobs/alerts.ts` for each newly opened alert.
+- In the app: the island line, polled every minute.
+- On the device: Web Push. "Notify this device" registers `public/sw.js`, subscribes with the
+  server's VAPID public key (`GET /alerts/push-key`) and stores the subscription with every area
+  the session follows (`PUT /alerts/push`). After each alert pass the jobs process sends each newly
+  opened alert to the devices following that station (`sources/push.ts`, `web-push`). A
+  subscription the push service says is gone is cleared. Without `VAPID_PUBLIC_KEY` and
+  `VAPID_PRIVATE_KEY` alerts stay in the app.
 
 ## 6. Feature 3: the assistant
 
@@ -432,6 +469,7 @@ the model, a one-line preview for the page, and a `source` shown as a chip.
 | --- | --- | --- | --- |
 | `get_air_quality` | `place` | Reading now and the last 24 hour range, with the station it came from | DOE |
 | `get_forecast` | `place` | Each day's forecast peak, range and chance of passing 100, 150, 180, 200; a value every 6 hours | Haze model |
+| `get_statements` | `place` optional | Official statements with status, areas, quote and link; with a place, the orders covering it and the rules in force | Official statements |
 | `get_guidelines` | none | The official lines, and that there is none for events or flights | Ministry guidance |
 | `get_track_record` | none | Measured error at 24, 48, 72 hours beside "no change" | Haze model |
 | `get_fires` | `place` optional | Burning cells and fire power by region for three days; distance and direction of the strongest from the place | NASA FIRMS |
@@ -484,8 +522,9 @@ not meant to serve other users.
 
 Backend, on `127.0.0.1:8091`. The browser never calls it; it calls the Next routes under
 `/api/...`, which forward; the Simulation and Sources pages read it from the Next server. Contracts
-are zod schemas in `backend/src/contracts.haze.ts`, `contracts.alerts.ts` and `contracts.sources.ts`,
-mirrored by hand in `frontend/lib/api/haze-schemas.ts`, `alert-schemas.ts` and `source-schemas.ts`
+are zod schemas in `backend/src/contracts.haze.ts`, `contracts.alerts.ts`, `contracts.sources.ts`
+and `contracts.statements.ts`, mirrored by hand in `frontend/lib/api/haze-schemas.ts`,
+`alert-schemas.ts`, `source-schemas.ts` and `statement-schemas.ts`
 (the `CityAir` part of `contracts.haze.ts` in `city-schemas.ts`).
 Change both together.
 
@@ -500,6 +539,10 @@ Change both together.
 | GET | `/haze/cities/:key` | `CityAir`: a city (only `kl`) blended from its stations, hour by hour with API, PM2.5, estimated visibility and optical depth; 404 for an unknown city |
 | GET | `/sources` | `SourceReport`: each source from `sources/catalog.ts` with its newest good and failed fetch and the last 24 hours' tally, and the 60 newest fetches |
 | GET | `/alerts?session=&after=` | `AlertFeed`: newest first; with a session only followed stations |
+| GET | `/alerts/areas?session=` | `AreaList`: one card per followed station with headline, day outlooks, open alert and orders in force |
+| GET | `/alerts/push-key` | `PushKey`: the VAPID public key, or null when push is off |
+| PUT | `/alerts/push` | Body `{ sessionId, push }`, a browser push subscription or null. 204 |
+| GET | `/statements?status=current\|all&page=` | `StatementPage`: statements once each with status, five a page |
 | GET | `/alerts/subscriptions?session=` | `SubscriptionList` |
 | POST | `/alerts/subscriptions` | Body `{ sessionId, stationId }`. Following twice is following once. |
 | DELETE | `/alerts/subscriptions/:stationId?session=` | 204 |
@@ -590,17 +633,18 @@ Limits, in the order they matter:
 4. Fires under cloud are missed, and future fires are assumed to continue as they were.
 5. Stations are sparse in Sabah, Sarawak and the east coast. Away from stations the map is the
    model with little correction.
-6. Alerts only reach an open tab.
-7. The "150 for three days" rule is shown as the chance of passing 150 on each day; the app does
-   not yet count consecutive days.
+6. Statements from news headlines carry only the headline, and orders that are never lifted in
+   the news are assumed over a week after they began.
+7. The "150 for three days" rule counts a day by its peak hour; the ministry may count it
+   differently.
 8. No auth, no rate limiting. Loopback only.
 9. The 3D visibility is an optics estimate at a fixed 70% humidity, and has run long against
    reported haze visibility. Humidity from Open-Meteo and a METAR visibility source would fix both.
 
 Next, roughly in value order:
 
-- Web Push, so alerts arrive with the tab closed (section 5.3).
-- Count consecutive days above 150 and alert on the third.
+- Read NADMA, the Health Ministry and state government channels directly once they can be
+  fetched (the Health Ministry site refuses scripted requests today).
 - Store weather by fetch time so skill can be measured against the wind that was really forecast.
 - Beat persistence beyond a day: store weather by fetch time, test a faster ensemble wind (the
   stored wind runs 20% slow against radiosondes), slower decay of assumed fires. Judge only by

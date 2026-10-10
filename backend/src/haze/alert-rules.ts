@@ -81,13 +81,15 @@ function forecastCondition(state: StationState, stillOpen: (kind: AlertKind, thr
 }
 
 function clearingCondition(state: StationState): Condition | null {
-  const { clearingDay } = closingOutlook(state);
+  const { clearingDay, tomorrow } = closingOutlook(state);
   if (!clearingDay) return null;
+  // Said as the card says it, so the alert and the card never name the same day two ways.
+  const when = clearingDay === tomorrow ? "tomorrow" : `by ${weekday(clearingDay.day)}`;
   return {
     stationId: state.stationId,
     kind: "clearing",
     threshold: CLEAR_LINE,
-    message: `${state.name}: likely below ${CLEAR_LINE} by ${weekday(clearingDay.day)}. Outdoor activities can resume then.`,
+    message: `${state.name}: likely below ${CLEAR_LINE} ${when}. Outdoor activities can resume then.`,
     detail: { api: state.api, day: clearingDay.day, forecastPeak: clearingDay.forecastPeak },
   };
 }
