@@ -143,6 +143,8 @@ export const Verdict = z.object({
   baselines: z.array(z.object({ planId: z.string(), title: z.string(), score: ScoreSummary })),
   series: z.object({ baseline: z.array(z.number()), withPlan: z.array(z.number()) }),
   maps: VerdictMaps.nullable().default(null),
+  /** Where KL's coming smoke comes from, by area. Null on older runs. */
+  sources: z.array(z.object({ area: z.string(), share: z.number() })).nullable().default(null),
   /** What the plan costs Malaysia against the money set aside, ringgit. Null on runs made before budgets. */
   cost: z.object({ total: z.number(), budget: z.number(), lines: z.array(z.object({ label: z.string(), rm: z.number() })) }).nullable().default(null),
 });

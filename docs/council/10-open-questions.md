@@ -50,3 +50,11 @@
 - How the run is started in production: a button that starts a job in the api process, or a
   `pnpm council:run` script in the jobs process. The design says a button that enqueues; the run
   executes in the jobs process, which already owns long work.
+
+## Added after the build
+
+- **A check that the plan scorer matches the full engine.** The scorer adds up per-complex
+  contributions; the verdict's maps come from a full scaled run. A test that the two agree within a
+  tolerance on recorded data is not built yet.
+- **The scooper's water reach** is advisory, not enforced, until a river map is bundled
+  (`02-decision-model.md`).

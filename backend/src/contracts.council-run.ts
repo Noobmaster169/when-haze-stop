@@ -133,6 +133,8 @@ export const Verdict = z.object({
   /** The target's 24-hour PM2.5 each hour from the data's hour, central, mean over members: without and with the plan. */
   series: z.object({ baseline: z.array(z.number()), withPlan: z.array(z.number()) }),
   maps: VerdictMaps.nullable().default(null),
+  /** Where the target's coming smoke comes from, by area, as parts of the most that could be removed. Null on older runs. */
+  sources: z.array(z.object({ area: z.string(), share: z.number() })).nullable().default(null),
   /** What the plan costs Malaysia against the money set aside, ringgit. */
   cost: z.object({ total: z.number(), budget: z.number(), lines: z.array(z.object({ label: z.string(), rm: z.number() })) }).nullable().default(null),
 });

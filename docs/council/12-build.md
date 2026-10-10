@@ -48,11 +48,16 @@ The api serves `POST /council/runs`, `GET /council/runs`, `GET /council/runs/:id
 5. `wargame`: every shortlisted plan and baseline scored, as events.
 6. `crossExamine`: three critics a plan (Foreign Affairs and two opposed seats) plus the Red
    Cell's pre-mortem; a critic's variant is tabled if the engine scores it higher.
-7. `revision`: authors revise or hold, with the evidence. A second round runs on the top three
-   only if the leader changed and the budget (130 calls) allows.
+7. `revision`: authors revise or hold, with the evidence. Further rounds (up to three) run on the
+   top three while the leading plan keeps changing. There is no limit on model calls; the only
+   budget is the government's money, which every plan must fit (`suppression/costs.ts`).
 8. `comparison`: criterion owners rate the shortlist blind, in shuffled order.
-9. `decision`: the matrix picks the plan; the Chair writes the three tracks. Then the engine
-   draws the region without and with the plan at the hour the plan helps most.
+9. `decision`: the matrix picks the plan, except that a plan rated below 3 of 10 on feasibility or
+   diplomacy by the seats that own them cannot win while another clears both; the Chair writes the
+   three tracks in plain English; every member then says in one sentence whether it stands behind
+   the decision (`stages/closing.ts`). Then the engine draws the region without and with the plan
+   at the hour the plan helps most, and the verdict says where KL's coming smoke comes from by
+   area.
 
 Every step writes events (`agents/council/events.ts`) in sequence; a failed run writes
 `run_failed` and keeps its events.

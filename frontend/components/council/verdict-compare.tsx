@@ -22,8 +22,9 @@ interface Row {
 
 export function VerdictCompare({ verdict }: { verdict: Verdict }) {
   const rows: Row[] = [
-    { key: verdict.planId, title: "The committee's plan", chosen: true, score: verdict.score },
-    ...verdict.baselines.map((baseline) => ({ key: baseline.planId, title: baseline.title, chosen: false, score: baseline.score })),
+    { key: verdict.planId, title: verdict.baselines.some((baseline) => baseline.planId === verdict.planId) ? "The committee's plan (one worked out by computer)" : "The committee's plan", chosen: true, score: verdict.score },
+    // When the committee adopted a computer plan, that plan is the chosen row, not a second one.
+    ...verdict.baselines.filter((baseline) => baseline.planId !== verdict.planId).map((baseline) => ({ key: baseline.planId, title: baseline.title, chosen: false, score: baseline.score })),
   ];
   const span = Math.max(1e-9, ...rows.flatMap((row) => [row.score.optimistic, row.score.pessimistic, row.score.expected]));
   const at = (share: number) => `${Math.max(0, Math.min(100, (100 * share) / span))}%`;

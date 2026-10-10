@@ -23,7 +23,7 @@ the edge (`research/01`, rule 4) [E].
 | **Persistence**: days burning in the last 30 | `fire_cells` history (back to 1 July). Of the cells burning 7 to 9 October, about half had burned on 10 or more of the last 30 days | M |
 | **Smoulder signal**: share of detections at night | FIRMS `daynight`. Borneo 63% at night this week, Sumatra 50%, the peninsula 12%. Peat fires smoulder through the night and peak later in the day [E]; a high night share with many days of persistence flags deep peat | M |
 | **Peat**: share of the complex on peat | PEATMAP (Xu et al. 2018, University of Leeds, CC BY 4.0), resampled to a 0.1 degree peat fraction and bundled (`research/05`). No open map gives depth, so depth is inferred from persistence and the smoulder signal. Spot checks: the top Jambi complex 1.0, Central Kalimantan complexes 0.57 to 0.72, both Johor fires 0.0 | M |
-| **Access**: distance to staging, to scoopable water, Malaysian or Indonesian soil, consent | Gazetteer, land outline (`haze/land.ts`, read only), the consent table | M and A |
+| **Access**: distance to staging, to scoopable water, Malaysian or Indonesian soil, consent | Gazetteer, land outline (`haze/land.ts`, read only), the consent table. The scooper's 25 km water reach is shown to the seats but not enforced by the validator: the outline has no rivers, and the large rivers beside the Jambi fires (the Batang Hari) can be scooped from, so a hard rule would wrongly bar them. Air Operations judges it | M and A |
 
 ## 3. What can be done to a complex, and how fast
 

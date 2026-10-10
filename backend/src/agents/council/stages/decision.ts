@@ -4,6 +4,7 @@ import { loadPrompt } from "../../prompts/registry";
 import { SEATS, seat } from "../seats";
 import { runTurn } from "../turn";
 import { DecisionAnswer } from "./answers";
+import { closing } from "./closing";
 import { BAR, matrix } from "./comparison";
 import { say } from "./say";
 import { describePlan, type Session } from "./session";
@@ -53,6 +54,7 @@ export async function decision(session: Session): Promise<Verdict> {
     planId: chosen.id,
     seen,
   });
+  await closing(session, [value.headline, `Do now: ${value.actNow}`, `Ask Indonesia for: ${value.ask}`, `Tell Indonesia: ${value.share}`, value.reasoning].join("\n\n"));
   await session.deps.emit.emit("verdict", "chair", { planId: chosen.id });
   return buildVerdict(session, chosen, value);
 }

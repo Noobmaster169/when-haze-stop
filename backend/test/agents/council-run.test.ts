@@ -83,6 +83,9 @@ function script(request: LlmRequest): string {
       replanTrigger: "Rain.",
     });
   }
+  if (system.includes("whether they stand behind it")) {
+    return final({ headline: seatTitle === "Foreign Affairs" ? "I cannot back asking Jakarta for crews in Jambi." : "I stand behind it.", stance: seatTitle === "Foreign Affairs" ? "dissent" : "support", reason: "From my mandate." });
+  }
   throw new Error(`the script has no answer for: ${system.slice(0, 80)}`);
 }
 
@@ -131,6 +134,21 @@ describe("a council run", () => {
     const { events } = await run();
     const variants = events.filter((event) => event.kind === "candidate" && String((event.payload as { premise: string | null }).premise).startsWith("variant of"));
     for (const variant of variants) expect(events.some((event) => event.kind === "simulation" && (event.payload as { planId: string }).planId === (variant.payload as { planId: string }).planId)).toBe(true);
+  });
+
+  it("ends with every member saying whether they stand behind the decision", async () => {
+    const { events } = await run();
+    const verdictAt = events.findIndex((event) => event.kind === "verdict");
+    const closing = events.slice(0, verdictAt).filter((event) => event.kind === "message" && ["support", "dissent"].includes((event.payload as { act: string }).act) && (event.payload as { to: string[] }).to.includes("chair"));
+    expect(closing.some((event) => (event.payload as { act: string }).act === "dissent")).toBe(true);
+    expect(new Set(closing.map((event) => event.actor)).size).toBeGreaterThanOrEqual(10);
+  });
+
+  it("says where KL's coming smoke comes from, by area, adding up to the whole", async () => {
+    const { verdict } = await run();
+    const total = (verdict.sources ?? []).reduce((sum, item) => sum + item.share, 0);
+    expect(total).toBeCloseTo(1, 5);
+    expect(verdict.strikeList.map((line) => line.fromDay)).toEqual([...verdict.strikeList.map((line) => line.fromDay)].sort((a, b) => a - b));
   });
 
   it("flags a figure the seat was never shown", async () => {

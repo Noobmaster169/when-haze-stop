@@ -158,7 +158,7 @@ graph is SVG driven by `requestAnimationFrame`, with no new dependencies. Contra
 - An invalid structured answer gets the existing one corrective retry (`callStructured`).
 - The engine seam failing in stage 0 fails the run at once: nothing to argue over.
 - A run is never resumed; a failed run stays in the log with its events, and a new run starts.
-- Budget: 80 model calls and 25 minutes hard cap; the verdict says "budget-limited" if hit.
+- No cap on model calls (changed on the user's instruction, 10 October 2026): up to three rounds of critique while the leading plan keeps changing. The budget is money: each run is given RM 4, 8 or 12 million and no plan may cost more (`suppression/costs.ts`, `docs/council/13-real-runs.md`).
 - Errors are the project's `RetryableError`, `TerminalError`, `UpstreamError`; nothing swallowed.
 
 ## 7. Truthfulness rules

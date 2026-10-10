@@ -22,6 +22,30 @@ const TRACKS: { key: "actNow" | "ask" | "share"; label: string; hint: string }[]
   { key: "share", label: "Tell Indonesia", hint: "What we know that helps their own crews" },
 ];
 
+/** When the plan's benefit first reaches KL, in words. */
+function clears(hours: number | null): string {
+  if (hours === null) return "No benefit reaches KL within the two weeks.";
+  const days = Math.round(hours / 24);
+  return days < 1 ? "KL starts to feel it within a day." : `KL starts to feel it after about ${days} day${days > 1 ? "s" : ""}.`;
+}
+
+/** Where KL's coming smoke comes from, by area: the "memory" of the haze, worked out for this week's wind. */
+function Sources({ sources }: { sources: NonNullable<Verdict["sources"]> }) {
+  return (
+    <ul className="space-y-2">
+      {sources.map((item) => (
+        <li key={item.area} className="grid grid-cols-[150px_minmax(0,1fr)_48px] items-center gap-3 text-small">
+          <span className="text-ink">{item.area}</span>
+          <span className="h-2 overflow-hidden rounded-full bg-sunken">
+            <span className="block h-full rounded-full bg-accent" style={{ width: `${Math.max(1, 100 * item.share)}%` }} />
+          </span>
+          <span className="text-right text-ink-secondary tabular-nums">{Math.round(100 * item.share)}%</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function Fact({ label, value, note }: { label: string; value: string; note: string }) {
   return (
     <div className="rounded-lg border border-hairline bg-surface p-4">
@@ -40,7 +64,7 @@ function Facts({ verdict }: { verdict: Verdict }) {
       <Fact
         label="Cleaner air for KL"
         value={`${Math.round(100 * verdict.score.expected)}% of what is possible`}
-        note={`About ${verdict.score.meanRemoved.toFixed(1)} ug/m3 less PM2.5 on average over two weeks, if every fire out would give ${verdict.ceiling.toFixed(1)}.`}
+        note={`About ${verdict.score.meanRemoved.toFixed(1)} ug/m3 less PM2.5 on average over two weeks, if every fire out would give ${verdict.ceiling.toFixed(1)}. ${clears(verdict.score.arrivalHours)}`}
       />
       {verdict.cost ? (
         <Fact label="Cost" value={ringgit(verdict.cost.total)} note={`Of the ${ringgit(verdict.cost.budget)} the government set aside.`} />
@@ -102,6 +126,13 @@ export function VerdictView({ run, verdict, events, onReplay, onStart }: { run: 
               </div>
             ))}
           </dl>
+
+          {verdict.sources ? (
+            <Section title="Where KL's smoke is coming from">
+              <p className="mb-3 max-w-[68ch] text-small text-ink-secondary">Not always the nearest fires: it depends on this week&apos;s wind. This is the smoke still to come over the next two weeks, worked out by the smoke model.</p>
+              <Sources sources={verdict.sources} />
+            </Section>
+          ) : null}
 
           <Section title={verdict.maps ? "Before and after" : "Where the help goes"}>
             <VerdictMap verdict={verdict} />

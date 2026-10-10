@@ -57,3 +57,29 @@ export function shareOfCeiling(attribution: Attribution, complexId: string, memb
   for (let day = 1; day < byDay.length; day++) total += mean(byDay[day]);
   return total / ceiling;
 }
+
+const AREA_NAMES: Record<Complex["place"]["area"], string> = {
+  sumatra: "Sumatra",
+  kalimantan: "Kalimantan",
+  peninsula: "Peninsular Malaysia",
+  malaysian_borneo: "Sarawak and Sabah",
+  other: "Elsewhere",
+};
+
+/**
+ * Where the target's coming smoke comes from, by area: each area's part of the
+ * most that could be removed, averaged over the wind members. Fires too small
+ * or too far to have their own contribution are counted together as the rest.
+ */
+export function sharesByArea(attribution: Attribution): { area: string; share: number }[] {
+  const byArea = new Map<string, number>();
+  const complexes = new Map(attribution.complexes.map((complex) => [complex.id, complex]));
+  for (const id of attribution.contributions.keys()) {
+    const area = AREA_NAMES[complexes.get(id)?.place.area ?? "other"];
+    const share = attribution.members.reduce((sum, _, member) => sum + shareOfCeiling(attribution, id, member), 0) / Math.max(1, attribution.members.length);
+    byArea.set(area, (byArea.get(area) ?? 0) + share);
+  }
+  const named = [...byArea].map(([area, share]) => ({ area, share })).sort((a, b) => b.share - a.share);
+  const rest = 1 - named.reduce((sum, item) => sum + item.share, 0);
+  return rest > 0.005 ? [...named, { area: "Smaller or farther fires", share: rest }] : named;
+}

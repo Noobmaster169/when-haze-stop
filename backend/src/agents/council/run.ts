@@ -1,7 +1,7 @@
 import type { StageId, Verdict } from "../../contracts";
 import { childLogger } from "../../lib/logger";
 import type { SuppressionEngine } from "../../services/suppression-engine";
-import { mean } from "../../suppression/attribution";
+import { mean, sharesByArea } from "../../suppression/attribution";
 import { DEFAULT_BUDGET_RM, ringgit } from "../../suppression/costs";
 import { keepTable } from "../../suppression/score";
 import type { TargetArea } from "../../suppression/targets";
@@ -102,7 +102,7 @@ export async function runCouncil(deps: CouncilDeps, target: TargetArea, budgetRm
     to: ["chair"],
     act: "brief",
     headline: `${attribution.complexes.length} groups of fires are burning. Just ten of them make ${(100 * ranked.slice(0, 10).reduce((sum, value) => sum + value, 0)).toFixed(0)}% of the smoke heading for KL.`,
-    detail: `If every fire went out from day 1, KL's air would be about ${ceiling.toFixed(1)} ug/m3 of PM2.5 cleaner on average over the next ${attribution.days} days. That is the most any plan could do. The money available is ${ringgit(budgetRm)}.\n\n${session.facts}`,
+    detail: `Where the smoke heading for KL comes from: ${sharesByArea(attribution).map((item) => `${item.area} ${(100 * item.share).toFixed(0)}%`).join(", ")}.\n\nIf every fire went out from day 1, KL's air would be about ${ceiling.toFixed(1)} ug/m3 of PM2.5 cleaner on average over the next ${attribution.days} days. That is the most any plan could do. The money available is ${ringgit(budgetRm)}.\n\n${session.facts}`,
     seen: [session.facts],
   });
 

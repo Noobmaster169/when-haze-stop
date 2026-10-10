@@ -38,7 +38,8 @@ export function captionFor(event: CouncilEvent | null, agents: Agent[]): string 
         case "challenge":
           return `${from} challenges ${plan}.`;
         case "support":
-          return `${from} supports ${plan}.`;
+          // A support with no plan is a closing word on the decision, addressed to the Chair.
+          return message.planId ? `${from} supports ${plan}.` : `${from} stands behind the decision.`;
         case "concede":
           return `${from} concedes to ${to}.`;
         case "revise":
@@ -50,7 +51,7 @@ export function captionFor(event: CouncilEvent | null, agents: Agent[]): string 
         case "answer":
           return `${from} answers ${to}.`;
         case "dissent":
-          return `${from} dissents.`;
+          return `${from} does not stand behind the decision.`;
         default:
           return `${from} briefs ${to}.`;
       }

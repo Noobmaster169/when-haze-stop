@@ -57,9 +57,8 @@ It composes the engine's public pieces and edits none of them:
 
 When the teammate's new engine lands, only this file changes. If the new engine is no longer
 linear in emissions (for example chemistry, or a non-linear calibration), the matrix becomes an
-approximation, and the verdict run (3) is the check: the verdict page shows both the matrix's
-prediction and the full run's, and the test suite asserts they agree within a tolerance on the
-recorded fixture.
+approximation, and the verdict run (3) is the check. Not built yet: a test that the matrix's
+prediction and a full scaled run agree within a tolerance; it is in `10-open-questions.md`.
 
 ## What a suppressed complex does to emissions
 
@@ -101,4 +100,6 @@ falls after the window. Two answers, in order of preference:
    engine's input, not the engine. Needs the teammate's agreement because the loader is theirs.
 2. **Report within the window only.** Honest and simple; the benefit looks small.
 
-Until (1) is agreed the council runs on (2), and says so in the verdict.
+As built: (1), with four analogue windows (`suppression/analogue.ts`), each labelled on the page
+as a possible wind pattern. It changes only the engine's input. The engine's owner still has to
+agree to it (`10-open-questions.md`).

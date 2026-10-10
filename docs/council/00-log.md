@@ -35,3 +35,20 @@
   attribution, score, validate, baselines), `contracts.council.ts`, the PEATMAP grid
   (`sources/peat-data.ts`, `scripts/pack-peat.mjs`), Indonesian places
   (`sources/places-id-data.ts`, `scripts/pack-places-id.mjs`), `sources/place-namer.ts`; 29 tests.
+- Phase 2: the engine seam (`services/suppression-inputs.ts`, `suppression-engine.ts`), analogue
+  wind members, `pnpm council:situation`.
+- Phases 3 and 4: migration 007, the council repository, routes and worker; the council (12
+  agents, 11 tools, 5 skills, 7 prompts, 9 stages); a fake-model test of a whole run.
+- Run 1 on real data (`13-real-runs.md`): grounded and honest, but lost to a computer plan and
+  four turns failed. Fixes: enforced answers, computer plans on the shortlist, an archive of the
+  best plans in revision, a stricter fact check.
+- The page at `/council` (replay and verdict), built by a frontend agent and checked in a browser;
+  the nav's Simulation entry now opens it.
+- On the user's instructions: plain English everywhere a person reads, and the budget is money
+  (RM 4, 8 or 12 million per run, migration 008), not a cap on model calls.
+- Run 3: the committee adopted the computer's plan over two seats' low ratings; added the
+  feasibility and diplomacy bar.
+- A requirements audit against the original brief (`14-requirements-checklist.md`): 56 of 67 met.
+  Closed after it: the verdict now says where KL's smoke comes from by area, every member says
+  whether it stands behind the decision, the strike list is in order of attack, the verdict says
+  when KL starts to feel the plan, and the docs were brought up to date.

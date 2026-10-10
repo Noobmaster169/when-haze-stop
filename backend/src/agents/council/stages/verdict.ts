@@ -1,5 +1,5 @@
 import type { Assignment, StrikeLine, Verdict } from "../../../contracts";
-import { mean } from "../../../suppression/attribution";
+import { mean, sharesByArea } from "../../../suppression/attribution";
 import { planCost } from "../../../suppression/costs";
 import { removedSeries, scorePlan } from "../../../suppression/score";
 import { type BoardPlan, summarise } from "../context";
@@ -44,7 +44,8 @@ function strikeList(session: Session, plan: BoardPlan): StrikeLine[] {
         share: scorePlan({ assignments: lines }, ctx.attribution).expected,
       };
     })
-    .sort((a, b) => b.share - a.share)
+    // The order of attack: what starts first comes first, and among those the work that removes most smoke.
+    .sort((a, b) => a.fromDay - b.fromDay || b.share - a.share)
     .map((line, index) => ({ ...line, order: index + 1 }));
 }
 
@@ -81,6 +82,7 @@ export function buildVerdict(session: Session, plan: BoardPlan, words: DecisionA
     ceiling: ctx.attribution.ceiling.reduce((sum, member) => sum + mean(member), 0) / ctx.attribution.ceiling.length,
     baselines: ctx.plans().filter((entry) => entry.baseline).map((entry) => ({ planId: entry.id, title: entry.plan.title, score: summarise(entry.score) })),
     series: series(session, plan),
+    sources: sharesByArea(ctx.attribution),
     // Filled by the run from the engine once the plan is chosen: it costs two full engine runs per wind member.
     maps: null,
     cost: { ...planCost(plan.plan), budget: ctx.budgetRm },

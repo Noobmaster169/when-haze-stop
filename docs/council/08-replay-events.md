@@ -45,7 +45,7 @@ Every event has `seq`, `at`, `kind`, `actor`. The payload by kind:
 | `thinking` | `{ about, summary }` (summary is the agent's own one-line gist) | A soft pulse ring on the node; the gist in the side transcript |
 | `tool_call` | `{ callId, tool, args, preview }` | A small satellite node buds off the agent |
 | `tool_result` | `{ callId, ok, preview }` | The satellite flashes and is absorbed back |
-| `subagent` | `{ id, parent, task }` then `subagent_done` `{ id, finding }` | A small node spawns, orbits, returns its finding along a short edge |
+| `subagent` | not built | Decided against: a seat's lookups already appear as small nodes budding off it (tool calls), which is what the brief asks for; separate helper agents would add model calls and noise without new information. `agent_joined` keeps a `parent` field should they be added |
 | `message` | `{ id, to: [agentId], act, text, refs }` | A pulse travels along the edge from sender to each recipient |
 | `candidate` | `{ planId, by, title, targets: [complexId], rationale }` | A plan card appears in the plan tray |
 | `simulation` | `{ planId, scenario, measures }` | The engine node lights; the plan card gets its numbers |

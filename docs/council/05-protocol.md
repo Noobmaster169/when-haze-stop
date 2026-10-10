@@ -60,14 +60,20 @@ prototype's Chair wrote 1,500 words for one decision.
    an event on the page.
 6. **The rule decides, not the mood.** Stage 8 picks the validated plan with the best weighted
    score: engine benefit (central, with a penalty for its pessimistic spread) times the frozen
-   criteria. Foreign Affairs or Force Command can veto only by citing a hard constraint.
+   criteria. As built, the veto is made by ratings: a plan the owning seats rate below 3 of 10 on
+   feasibility or diplomacy cannot win while another clears both (added after run 3). After the
+   decision every member says whether it stands behind it, so agreement and dissent are on the
+   record.
 7. **Stop on stability, never on agreement.** After stage 6, stop when the top plan stays top across
    two scorings and its margin exceeds the wind-scenario spread, or when a round improves the best
-   score by under 2%, or at the budget (then the verdict says "budget-limited").
+   score by under 2%. As built: up to three rounds, stopping as soon as the leader holds; there is
+   no cap on model calls (the budget is money, rule 9).
 8. **Always beat the baselines.** Every run also scores, on the same engine: biggest fires first,
    nearest fires first, a greedy influence-per-effort plan (no agents), the best single draft
    without debate, and the ceiling. The verdict shows them. If the council does not beat the
    greedy plan and the no-debate draft, the page says so.
+9. **Money is the budget.** Every plan must fit the money the run was given (RM 4, 8 or 12
+   million); aircraft cost far more a day than people and do little to peat (rule R11).
 
 ## The plan format
 

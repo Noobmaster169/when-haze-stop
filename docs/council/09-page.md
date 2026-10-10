@@ -98,7 +98,7 @@ Reached at the end of the replay, or directly from "Verdict". Concise, in readin
    - Share: "Give BNPB this ranking: the Jambi belt complexes cause about half of KL's coming smoke."
    The example is spike 2's shape; the words are the Chair's.
 2. **Before and after.** The map of the target area at the moment the benefit peaks, without and
-   with the plan, side by side with a slider, using the map's own colours and index. The struck
+   with the plan, side by side (as built; no slider), using the map's own colours and index. The struck
    complexes are numbered in the order they are attacked.
 3. **The strike list.** One row per complex: order, place, peat share, what is sent, from when
    to when, whether it waits on a request, and the share of KL's coming smoke it removes.

@@ -46,8 +46,10 @@ Each seat's prompt names the skills it should load first; any seat may load any 
 | `aerial-firefighting` | `research/01`, `research/02` | CL-415 scoop-and-drop cycle and daily drops, helicopter buckets, water within reach, the 2015 Palembang precedent |
 | `transboundary-diplomacy` | `research/02` | The ASEAN haze agreement, how help is requested and coordinated through BNPB, Indonesia's sensitivities, what Malaysia has been cleared to do in 2026 |
 | `exposure-and-health` | `research/03`, guidelines | People times hours over a line, the school and outdoor lines, the vulnerable |
-| `writing-a-plan` | `05-protocol.md` | The plan format, what makes a plan distinct, feasible, acceptable, suitable and complete |
-| `cross-examination` | `research/04` | How to challenge: cite a fact or a score, label judgement as judgement, offer a variant instead of an argument, the pre-mortem question |
+
+As built, five skills exist. The plan format and how to cross-examine went into the stage prompts
+(`council-draft`, `council-critique`, `council-premortem`) instead of skills, because every seat
+needs them at that stage and none needs them elsewhere.
 
 Every skill states its sources at the foot, so the replay's "why does the scientist say that"
 can be traced to a paper.
