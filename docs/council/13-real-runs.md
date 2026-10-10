@@ -152,7 +152,15 @@ compose `council` worker, which proved that path. Stopped minutes later, before 
 finished, because the user simplified the council: Indonesia is assumed to allow everything, and
 only the most relevant seats remain (`04-council-roles.md`). Closed as failed with that reason.
 
-## Run 6
+## Run 6 (run id 23), stopped
 
-The first run of the simplified council (eight agents, no consent rules, no diplomacy), with
-every fix from the requirements audit and its independent check. Recorded here when read.
+Queued at 23:07 MYT on the eight-agent design and stopped before its first event, because the user
+asked for a faster meeting. The council was cut again: seven agents (Meteorology merged into Air
+Quality as Air and Weather), two critics a plan, at most two rounds, a shortlist of four plus the
+computer's plan, critics answering in one step, the Red Cell on the faster model, and eight calls in
+flight. Runs now execute only in the user's compose stack (`council` service), never in processes
+started by hand.
+
+## Run 7
+
+The first run of the seven-agent council. Recorded here when read.

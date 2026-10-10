@@ -4,7 +4,7 @@ Working folder for the feature that answers one question: with the limited help 
 send, which fire hotspots should be put out first to clear the haze over Kuala Lumpur and its
 surroundings, and what does the air look like afterwards.
 
-A council of eight agents who play Malaysian officials and experts argue the question from the same
+A council of seven agents who play Malaysian officials and experts argue the question from the same
 data, assuming Indonesia lets every Malaysian aircraft and crew work wherever needed. Their candidate plans go through the smoke model, and the plan that holds up best becomes
 the verdict. The page replays the whole meeting.
 

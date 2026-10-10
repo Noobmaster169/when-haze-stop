@@ -32,7 +32,7 @@ import { meanOf } from "./tools/format";
 
 const log = childLogger({ module: "council.run" });
 /** Rounds of critique and revision: more run only while the leading plan keeps changing. */
-const MAX_ROUNDS = 3;
+const MAX_ROUNDS = 2;
 
 const TITLES: Record<StageId, string> = {
   situation: "The situation",

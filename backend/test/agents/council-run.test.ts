@@ -142,8 +142,8 @@ describe("a council run", () => {
     const verdictAt = events.findIndex((event) => event.kind === "verdict");
     const closing = events.slice(0, verdictAt).filter((event) => event.kind === "message" && ["support", "dissent"].includes((event.payload as { act: string }).act) && (event.payload as { to: string[] }).to.includes("chair"));
     expect(closing.some((event) => (event.payload as { act: string }).act === "dissent")).toBe(true);
-    // Every member but the Chair: seven of them.
-    expect(new Set(closing.map((event) => event.actor)).size).toBe(7);
+    // Every member but the Chair: six of them.
+    expect(new Set(closing.map((event) => event.actor)).size).toBe(6);
   });
 
   it("says where KL's coming smoke comes from, by area, adding up to the whole", async () => {

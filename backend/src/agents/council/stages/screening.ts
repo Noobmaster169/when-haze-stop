@@ -11,7 +11,7 @@ import { councilPlans, type Session } from "./session";
  * plan; the better scored stays.
  */
 
-const SHORTLIST = 5;
+const SHORTLIST = 4;
 const SAME = 0.75;
 
 function lines(plan: BoardPlan): Set<string> {

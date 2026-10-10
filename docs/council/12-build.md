@@ -25,7 +25,7 @@ The api serves `POST /council/runs`, `GET /council/runs`, `GET /council/runs/:id
 | Bundled data | `backend/src/sources/peat-data.ts` (PEATMAP), `places-id-data.ts` (GeoNames Indonesia), `peat.ts`, `place-namer.ts`; packers in `backend/scripts/` | `research/05` |
 | Engine seam | `backend/src/services/suppression-inputs.ts` (load once), `suppression-engine.ts` (attribution, verdict maps), `fire-complexes.ts` | `06` |
 | Store and API | `backend/db/migrations/007_council.sql`, `repositories/council.repo.ts`, `routes/council.routes.ts` | `08` |
-| Council (8 agents since the simplification) | `backend/src/agents/council/`: `seats.ts`, `context.ts`, `situation.ts`, `turn.ts`, `fact-check.ts`, `events.ts`, `run.ts`, `stages/*.ts`, `tools/*.ts`, `skills/*/SKILL.md` | `04`, `05`, `07` |
+| Council (7 agents since the simplification) | `backend/src/agents/council/`: `seats.ts`, `context.ts`, `situation.ts`, `turn.ts`, `fact-check.ts`, `events.ts`, `run.ts`, `stages/*.ts`, `tools/*.ts`, `skills/*/SKILL.md` | `04`, `05`, `07` |
 | Prompts | `backend/src/agents/prompts/council-{mission,draft,critique,premortem,revise,rate,decide}/` (draft, revise and decide at v2) | `05`, `13` |
 | Worker | `backend/src/jobs/council-worker.ts`, `council-situation.ts` | |
 | Page | `frontend/app/(app)/council/page.tsx`; `frontend/components/council/` (pure: `timeline.ts` beats, `scene.ts` scene at time t, `tray.ts`, `caption.ts`, `layout.ts`; UI: `graph.tsx` and `paint.ts` for the animated SVG, `use-playback.ts`, `use-council-run.ts` live polling, `replay.tsx`, `rail.tsx`, `plan-tray.tsx`, `player.tsx`, `start-panel.tsx`, `verdict*.tsx`); `frontend/lib/api/council-*.ts`; route handlers under `frontend/app/api/council/` | `09` |

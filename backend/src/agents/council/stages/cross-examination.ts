@@ -12,21 +12,21 @@ import { describePlan, type Session } from "./session";
 
 /**
  * Stage 5: sparse, assigned critique (docs/council/05-protocol.md). Each plan
- * gets three seats whose mandates pull against it. A critic who thinks a change is better tables it as
+ * gets two seats whose mandates pull against it. A critic who thinks a change is better tables it as
  * a variant and the engine scores it on the spot. The Red Cell runs one
  * pre-mortem over the whole shortlist.
  */
 
 export const CRITIQUE_PROMPT = "v3";
 export const PREMORTEM_PROMPT = "v3";
-const POOL = ["peat_science", "meteorology", "fire_operations", "air_operations", "treasury", "air_quality"];
+const POOL = ["peat_science", "fire_operations", "air_operations", "treasury", "air_quality"];
 const MAX_SHORTLIST = 7;
 const log = childLogger({ module: "council.cross-examination" });
 
-/** Three critics a plan, never its author, rotating so every seat questions several plans. */
+/** Two critics a plan, never its author, rotating so every seat questions several plans. */
 function criticsFor(plan: BoardPlan, index: number): string[] {
   const pool = POOL.filter((id) => id !== plan.by);
-  return [0, 1, 2].map((k) => pool[(3 * index + k) % pool.length]);
+  return [0, 1].map((k) => pool[(2 * index + k) % pool.length]);
 }
 
 async function critique(session: Session, plan: BoardPlan, critic: string): Promise<void> {
@@ -35,7 +35,8 @@ async function critique(session: Session, plan: BoardPlan, critic: string): Prom
     prompt: loadPrompt("council-critique", CRITIQUE_PROMPT),
     input: { "Fact sheet": session.facts, "The plan before you (author hidden)": describePlan(plan) },
     answer: CritiqueAnswer,
-    toolSteps: 1,
+    // The plan and its scores are in front of the critic; a variant is scored when it is tabled. One call, for speed.
+    toolSteps: 0,
   });
   session.turns += 1;
   session.critiques.push({ planId: plan.id, by: critic, answer: value });
@@ -70,7 +71,7 @@ async function premortem(session: Session, plans: BoardPlan[]): Promise<void> {
     prompt: loadPrompt("council-premortem", PREMORTEM_PROMPT),
     input: { "Fact sheet": session.facts, "The shortlist": plans.map(describePlan).join("\n\n") },
     answer: PremortemAnswer,
-    toolSteps: 2,
+    toolSteps: 1,
   });
   session.turns += 1;
   session.premortem = value;

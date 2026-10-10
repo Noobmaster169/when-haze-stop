@@ -12,7 +12,7 @@ import { describePlan, type Session } from "./session";
 /**
  * Stage 2: every proposer drafts one plan under its premise, blind to the
  * others. A plan the validator refuses goes back to its author once with the
- * reasons. Four of six drafts are needed to go on.
+ * reasons. Four of five drafts are needed to go on.
  */
 
 export const DRAFT_PROMPT = "v4";

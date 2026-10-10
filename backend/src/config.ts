@@ -32,7 +32,7 @@ const Env = z.object({
   LLM_MAX_CONCURRENCY: z.coerce.number().int().positive().default(4),
   // The Suppression Council's own cap, in its worker process: its seats draft
   // and critique in parallel waves, and the proxy serves eight at once.
-  COUNCIL_MAX_CONCURRENCY: z.coerce.number().int().positive().default(6),
+  COUNCIL_MAX_CONCURRENCY: z.coerce.number().int().positive().default(8),
 
   // The NASA FIRMS archive key, read only by `pnpm haze:history`. Everything
   // else runs without it.
