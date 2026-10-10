@@ -1,7 +1,8 @@
+import { unstable_rethrow } from "next/navigation";
+
 import { FIRST_TEST } from "@/components/accuracy/first-test";
 import { GuidelineTable } from "@/components/accuracy/guideline-table";
 import { ScoreTable } from "@/components/accuracy/score-table";
-import { TopBar } from "@/components/shell/top-bar";
 import { getAccuracy, getGuidelines } from "@/lib/api-client";
 import type { Accuracy, GuidelineList } from "@/lib/api/haze-schemas";
 import { formatWhen } from "@/lib/when";
@@ -13,6 +14,8 @@ async function load(): Promise<{ accuracy: Accuracy; lines: GuidelineList } | nu
     const [accuracy, lines] = await Promise.all([getAccuracy(), getGuidelines()]);
     return { accuracy, lines };
   } catch (error) {
+    // Next signals "render this per request" by throwing; that is not a backend failure.
+    unstable_rethrow(error);
     console.error("[accuracy] the backend could not be read:", error);
     return null;
   }
@@ -41,7 +44,6 @@ export default async function AccuracyPage() {
 
   return (
     <main className="flex min-w-0 grow flex-col">
-      <TopBar crumbs={[{ label: "Track record" }]} />
       <div className="min-h-0 grow overflow-y-auto px-6 py-8 md:px-10">
         <h1 className="font-display text-display text-ink">Track record</h1>
         <p className={prose}>

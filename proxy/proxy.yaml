@@ -11,7 +11,7 @@ version: 1
 
 server:
   # Loopback on a laptop. In the compose stack the container binds its own
-  # interface, reachable only on the compose network, and compose.local.yaml publishes its
+  # interface, reachable only on the compose network, and compose.yaml publishes its
   # port to host loopback only.
   host: ${LLM_PROXY_HOST:-127.0.0.1}
   port: 4000

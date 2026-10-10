@@ -3,17 +3,17 @@
 A small HTTP gateway. It speaks the Anthropic Messages API and routes each
 request, by alias, to `claude -p` (the Claude subscription) or an offline echo.
 The backend is its only client. It has no auth, so it is reachable only on the
-compose network (and on host loopback 4001 in `backend/compose.local.yaml`).
+compose network (and on host loopback 4001, from the root `compose.yaml`).
 
 ## Run
 
-It runs as the `llm-proxy` container of the backend's compose stack, built from
+It runs as the `llm-proxy` container of the root `compose.yaml`, built from
 this directory with `Dockerfile`. The image carries the Claude Code CLI, pinned by
 `CLAUDE_CODE_VERSION`, and logs in with `CLAUDE_CODE_OAUTH_TOKEN` (make one with
-`claude setup-token`; compose reads it from `backend/.env`).
+`claude setup-token`; compose reads it from the root `.env`).
 
 ```sh
-cd ../backend && docker compose -f compose.local.yaml up -d --build llm-proxy   # :4001 on the host
+cd .. && docker compose up -d --build llm-proxy   # :4001 on the host
 ```
 
 To work on the proxy itself, it still runs outside a container:

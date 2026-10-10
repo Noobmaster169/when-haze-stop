@@ -6,7 +6,8 @@ proxy that puts the Claude subscription behind the Anthropic wire. Read this fil
 touching code. What each feature does and how is in `docs/FEATURES.md`. Where the work stands and
 what to do next is in `docs/HANDOVER.md`.
 
-Three independent packages. Run commands inside a package, never at the root.
+Three independent packages. Run commands inside a package, never at the root. The one exception
+is `compose.yaml` at the root, which runs the whole stack with `docker compose up -d --build`.
 
 - `frontend/` Next.js 16. Read `frontend/AGENTS.md` before writing Next code.
 - `backend/` Express + Postgres. Owns the chat agent, its tools and its skills.
@@ -18,9 +19,12 @@ Setup, ports and the API are in `README.md`.
 ## Commands
 
 ```bash
-# local infra, from backend/ (postgres :5433, llm-proxy :4001)
-docker compose -f compose.local.yaml up -d
-docker compose -f compose.local.yaml up -d --build llm-proxy   # after changing proxy/
+# everything, from the root: postgres, llm-proxy, migrate, api, jobs, frontend
+docker compose up -d --build
+
+# only the local infra for host development (postgres :5433, llm-proxy :4001)
+docker compose up -d postgres llm-proxy
+docker compose up -d --build llm-proxy   # after changing proxy/
 
 # backend, inside backend/
 pnpm install && pnpm db:migrate

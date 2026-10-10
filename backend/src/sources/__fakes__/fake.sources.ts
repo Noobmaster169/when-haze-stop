@@ -1,5 +1,6 @@
 import type { Detection } from "../../haze/fires";
 import type { WeatherGrid } from "../../haze/transport";
+import { RetryableError } from "../../lib/errors";
 import type { DoeClient, DoeReading, DoeStation } from "../doe";
 import type { FiresClient } from "../firms";
 import type { FoundPlace, Geocoder } from "../geocoder";
@@ -48,6 +49,13 @@ export class FakeWeatherClient implements WeatherClient {
 
   async grid(): Promise<WeatherGrid> {
     return this.weather;
+  }
+}
+
+/** A weather service that does not answer, failing the way fetchText does when a request times out. */
+export class SilentWeatherClient implements WeatherClient {
+  async grid(): Promise<WeatherGrid> {
+    throw new RetryableError("Open-Meteo forecast did not answer");
   }
 }
 

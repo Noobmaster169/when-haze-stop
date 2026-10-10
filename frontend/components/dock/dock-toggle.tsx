@@ -4,7 +4,7 @@ import { Icon } from "@/components/ui/icons";
 
 import { useDock } from "./dock-state";
 
-/** The one control on every top bar that opens the dock. Hidden while it is open: the dock has its own close. */
+/** The one control on the banner that opens the dock. Hidden while it is open: the dock has its own close. */
 export function DockToggle() {
   const dock = useDock();
   if (dock.open) return null;

@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import type { z } from "zod";
 
 /**
@@ -16,6 +17,10 @@ function baseUrl(): string {
 }
 
 export async function request(path: string, init: RequestInit & { timeoutMs?: number } = {}): Promise<Response> {
+  // Backend data is never part of a build. Without this, `next build` prerenders
+  // a page whose read throws (no BACKEND_URL at build time) and serves that
+  // failure as a static page forever.
+  await connection();
   const { timeoutMs = 15_000, headers, signal, ...rest } = init;
   return fetch(`${baseUrl()}${path}`, {
     ...rest,

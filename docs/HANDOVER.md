@@ -35,17 +35,16 @@ four things have never been run and are the first jobs:
 ## Do this first
 
 ```sh
-cd backend
-cp .env.example .env            # if not done; put the token from `claude setup-token` in it
-docker compose -f compose.local.yaml up -d
-pnpm install && pnpm db:migrate
-pnpm test                       # expect 63 passing
-pnpm dev                        # terminal 1
+cp .env.example .env            # at the root; put the token from `claude setup-token` in it
+docker compose up -d --build    # the whole stack: the jobs service runs once, backfill, then hourly
+docker compose logs -f jobs     # watch the first cycle
 
-pnpm haze:once                  # terminal 2. Watch the log.
+cd backend && pnpm install && pnpm test   # expect 63 passing, against the compose postgres
 ```
 
-What a good `haze:once` log looks like, in order: `readings stored` (days 7, added in the
+To run a step by hand from source instead, see "Host development" in the README.
+
+What a good first cycle looks like, in order: `readings stored` (days 7, added in the
 thousands), `fire cells stored`, `weather stored` (hours around 300), a forecast run, then
 `alerts evaluated`. A failed step logs `a step of the cycle failed` with `what` naming the source,
 and the rest still run.
@@ -58,14 +57,8 @@ If a source fails, start here:
 | FIRMS | `backend/src/sources/firms.ts` | Three files of 8 to 9 MB; a timeout. Raise the timeout |
 | Open-Meteo | `backend/src/sources/weather.ts` | Rate limit (15 requests, 1.5 s apart, raise the spacing), or a shape change, which fails with "a shape this client does not know" |
 
-Then:
-
-```sh
-pnpm haze:backfill              # once: fills the past week of the timeline and the track record
-pnpm haze:loop                  # leave running
-
-cd ../frontend && cp .env.example .env.local && pnpm install && pnpm dev
-```
+After the first cycle the jobs service backfills the stored week (the timeline's past and the track
+record) and then runs hourly. A source fix is picked up with `docker compose up -d --build jobs`.
 
 Open http://localhost:3000 and go through this list:
 
@@ -110,8 +103,8 @@ After that, the backlog is section 10 of `docs/FEATURES.md`: Web Push, counting 
   `frontend/node_modules/next/dist/docs/` before writing Next code. Files stay under 200 lines
   (lint enforces it).
 - **Contracts are mirrored by hand.** A change in `backend/src/contracts.haze.ts` or
-  `contracts.alerts.ts` needs the same change in `frontend/lib/api/haze-schemas.ts` or
-  `alert-schemas.ts`.
+  `contracts.alerts.ts` or `contracts.sources.ts` needs the same change in
+  `frontend/lib/api/haze-schemas.ts`, `alert-schemas.ts` or `source-schemas.ts`.
 - **The commit author** on the first commit was set to `Henson Zein <hello@upshot.cards>` because
   no git identity was configured where it was made. Amend before pushing if that is wrong.
 
