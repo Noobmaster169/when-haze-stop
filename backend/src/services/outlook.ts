@@ -1,13 +1,16 @@
 import { config, type ModelMode } from "../config";
 import type { ForecastSource, Station, StationOutlook } from "../contracts";
 import type { Queryable } from "../db";
+import { apiToPm25, pm25ToApi } from "../haze/api-index";
 import { firstHindcast, leadBucket } from "../haze/chance";
 import { addHours } from "../haze/grid";
 import { dayOutlooks, type ErrorsFor, type Hourly, type ModelDay } from "../haze/outlook";
+import { reshapeToLearned } from "../haze/reshape";
 import { forecasts, modelForecasts, nea, readings, scores, stations } from "../repositories";
 import type { ModelClient } from "../sources/model";
 import { neaRegionOf } from "../sources/nea";
 import { forecastSource, hourlySource, LEARNED_STALE_HOURS } from "./forecast-source";
+import { withWhy } from "./outlook-why";
 
 export { LEARNED_STALE_HOURS };
 
@@ -56,18 +59,33 @@ async function learnedDays(db: Queryable, stationId: string, asOf: Date): Promis
   return stored.days;
 }
 
+/**
+ * The hourly forecast in API, or, where the learned model has days for the
+ * station, the hourly line bent to the model's peaks at the simulation's
+ * timing. Without learned days the stored values pass through untouched, so
+ * shadow mode shows exactly what it did before the model.
+ */
+async function hourlyLine(db: Queryable, station: Station, context: OutlookContext, api: number[], modelDays: ReadonlyMap<string, ModelDay>): Promise<{ api: number[]; physics: number[] | null }> {
+  if (modelDays.size === 0) return { api, physics: null };
+  const physics = await forecasts.stationPhysics(db, context.runId, station.id);
+  const line = reshapeToLearned({ asOf: context.asOf, hourly: api.map(apiToPm25), physics, learned: modelDays });
+  return { api: line.map(pm25ToApi), physics };
+}
+
 export async function outlookFor(db: Queryable, station: Station, context: OutlookContext, forecastApi?: number[] | null): Promise<StationOutlook> {
   const { asOf, runId, errorsFor } = context;
   const stored = await readings.forStation(db, station.id, addHours(asOf, -24 * HISTORY_DAYS), asOf);
   const api = forecastApi === undefined ? await forecasts.stationForecast(db, runId, station.id) : forecastApi;
   const observed: Hourly[] = stored.map((reading) => ({ at: reading.observedAt, api: reading.api }));
-  const ahead: Hourly[] = (api ?? []).map((value, index) => ({ at: addHours(asOf, index + 1), api: value }));
   const modelDays = context.learned ? await learnedDays(db, station.id, asOf) : new Map<string, ModelDay>();
+  const line = await hourlyLine(db, station, context, api ?? [], modelDays);
+  const ahead: Hourly[] = line.api.map((value, index) => ({ at: addHours(asOf, index + 1), api: value }));
+  const days = dayOutlooks(asOf, observed, ahead, errorsFor, modelDays);
   return {
     station,
     readings: observed.map((reading) => ({ at: reading.at.toISOString(), api: reading.api })),
     forecast: ahead.map((value) => ({ at: value.at.toISOString(), api: Math.round(value.api) })),
-    days: dayOutlooks(asOf, observed, ahead, errorsFor, modelDays),
+    days: modelDays.size === 0 ? days : await withWhy(db, station, asOf, line.api, line.physics, days),
     pm25: await measuredPm25(db, station),
     source: context.source,
   };
