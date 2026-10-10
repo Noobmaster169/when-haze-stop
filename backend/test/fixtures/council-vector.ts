@@ -54,5 +54,6 @@ export function vectorAttribution(perDay: Record<string, number> = { C01: 0.1, C
     ceiling: [flat(ceiling)],
     contributions,
     complexes: VECTOR_COMPLEXES,
+    winds: [],
   };
 }

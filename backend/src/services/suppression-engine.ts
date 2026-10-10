@@ -1,7 +1,7 @@
 import type { Queryable } from "../db";
 import { ensembleMean } from "../haze/ensemble";
 import { emissionsFor } from "../haze/fires";
-import { addHours, cellsWithin, distanceKm, hoursBetween, WEATHER_POINTS } from "../haze/grid";
+import { addHours, cellsWithin, DOMAIN, distanceKm, hoursBetween, WEATHER, WEATHER_POINTS } from "../haze/grid";
 import { REACH_KM, smokeFrom } from "../haze/smoke";
 import type { Emission, Weather } from "../haze/transport";
 import { TerminalError } from "../lib/errors";
@@ -9,7 +9,7 @@ import { childLogger } from "../lib/logger";
 import { council, fires as fireCells, stations, weather } from "../repositories";
 import type { FiresClient } from "../sources";
 import { ANALOGUE_DAYS, analogueStarts, extendWeather } from "../suppression/analogue";
-import { type Attribution, mean, type WindMember } from "../suppression/attribution";
+import { type Attribution, mean, type WindMember, type WindSummary } from "../suppression/attribution";
 import type { Complex } from "../suppression/complexes";
 import { dayOneFor } from "../suppression/package";
 import type { TargetArea } from "../suppression/targets";
@@ -125,9 +125,38 @@ export function engineSuppression(deps: EngineDeps): SuppressionEngine {
         );
       }
       log.info({ candidates: chosen.length }, "day-by-day contributions made");
-      return { asOf: asOf.toISOString(), dayOne, hours: span, days: HORIZON_DAYS, members: members.map((item) => item.member), baseline, ceiling, contributions, complexes };
+      const winds = members.map(({ member, weather: wind }) => summariseWind(member.id, wind, now + 1, hours));
+      return { asOf: asOf.toISOString(), dayOne, hours: span, days: HORIZON_DAYS, members: members.map((item) => item.member), baseline, ceiling, contributions, complexes, winds };
     },
   };
+}
+
+/** Where MetMalaysia is asked about the wind: the source regions, the strait, and the target. */
+const WIND_PLACES = [
+  { name: "Riau", lat: 0, lon: 102 },
+  { name: "Jambi", lat: -2, lon: 104 },
+  { name: "South Sumatra", lat: -3, lon: 105 },
+  { name: "West Kalimantan", lat: -2, lon: 110 },
+  { name: "Central Kalimantan", lat: -3, lon: 113 },
+  { name: "Strait of Malacca", lat: 2, lon: 101 },
+  { name: "Kuala Lumpur", lat: 3, lon: 102 },
+];
+
+function summariseWind(member: string, wind: Weather, from: number, to: number): WindSummary {
+  const places = WIND_PLACES.map((place) => {
+    const point = (place.lat - DOMAIN.lat0) * WEATHER.nx + (place.lon - DOMAIN.lon0);
+    let u = 0;
+    let v = 0;
+    let rain = 0;
+    for (let hour = from; hour < to; hour++) {
+      u += wind.u[hour * WEATHER_POINTS + point];
+      v += wind.v[hour * WEATHER_POINTS + point];
+      rain += wind.rain[hour * WEATHER_POINTS + point];
+    }
+    const hours = Math.max(1, to - from);
+    return { ...place, u: u / hours, v: v / hours, rainMm: rain };
+  });
+  return { member, places };
 }
 
 function groupEmissions(emissions: Emission[], complexes: Complex[]): Map<string, Emission[]> {

@@ -8,6 +8,7 @@ import { childLogger } from "./lib/logger";
 import { aiRouter } from "./routes/ai.routes";
 import { alertsRouter } from "./routes/alerts.routes";
 import { chatRouter } from "./routes/chat.routes";
+import { councilRouter } from "./routes/council.routes";
 import { hazeRouter } from "./routes/haze.routes";
 import { requestLog } from "./routes/request-log";
 import { sourcesRouter } from "./routes/sources.routes";
@@ -46,6 +47,7 @@ export function createApp(deps: AppDeps): express.Express {
 
   app.use("/ai", aiRouter());
   app.use("/chat", chatRouter({ pool: deps.pool, llm: deps.llm, geocoder: deps.geocoder }));
+  app.use("/council", councilRouter({ pool: deps.pool }));
   app.use("/haze", hazeRouter({ pool: deps.pool, geocoder: deps.geocoder }));
   app.use("/alerts", alertsRouter({ pool: deps.pool }));
   app.use("/sources", sourcesRouter({ pool: deps.pool }));

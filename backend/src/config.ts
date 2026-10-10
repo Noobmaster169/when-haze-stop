@@ -30,6 +30,9 @@ const Env = z.object({
   // under what the proxy serves at once (max_concurrency in proxy/proxy.yaml):
   // more only wait inside the proxy with their request timeout already running.
   LLM_MAX_CONCURRENCY: z.coerce.number().int().positive().default(4),
+  // The Suppression Council's own cap, in its worker process: its seats draft
+  // and critique in parallel waves, and the proxy serves eight at once.
+  COUNCIL_MAX_CONCURRENCY: z.coerce.number().int().positive().default(6),
 
   // The NASA FIRMS archive key, read only by `pnpm haze:history`. Everything
   // else runs without it.

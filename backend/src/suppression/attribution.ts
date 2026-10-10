@@ -16,6 +16,12 @@ export interface WindMember {
   label: string;
 }
 
+/** Mean wind at smoke height and total rain over the horizon at a few places, in one wind member. */
+export interface WindSummary {
+  member: string;
+  places: { name: string; lat: number; lon: number; u: number; v: number; rainMm: number }[];
+}
+
 export interface Attribution {
   /** The hour of data the council reasons over. Series index i is the hour `asOf` + i + 1. */
   asOf: string;
@@ -32,6 +38,7 @@ export interface Attribution {
   /** Complex id, then member, then plan day: the complex's contribution to the target, ug/m3, hourly. */
   contributions: Map<string, Float32Array[][]>;
   complexes: Complex[];
+  winds: WindSummary[];
 }
 
 export function mean(series: Float32Array): number {
