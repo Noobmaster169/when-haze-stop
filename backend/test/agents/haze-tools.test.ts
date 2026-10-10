@@ -22,7 +22,7 @@ describe("the assistant's haze tools, over one recorded cycle", () => {
   }, 120_000);
 
   it("offers every haze tool by name", () => {
-    expect(TOOL_NAMES).toEqual(expect.arrayContaining(["get_air_quality", "get_forecast", "get_guidelines", "get_track_record", "get_fires", "get_wind", "create_alert"]));
+    expect(TOOL_NAMES).toEqual(expect.arrayContaining(["get_air_quality", "get_forecast", "get_guidelines", "get_statements", "get_track_record", "get_fires", "get_wind", "create_alert"]));
   });
 
   it("reads a station by its own name and says where the reading is from", async () => {
@@ -55,6 +55,16 @@ describe("the assistant's haze tools, over one recorded cycle", () => {
     expect(outcome.text).toContain("- Sun 11 Oct:");
     expect(outcome.text).toMatch(/Chance the peak passes 100: \d+%, 150: \d+%, 180: \d+%, 200: \d+%/);
     expect(outcome.text).toContain("only about as accurate beyond a day");
+  });
+
+  it("tells a place the orders that cover it and the rules in force, with the original wording", async () => {
+    const outcome = await callTool("get_statements", { place: "Seremban" }, context());
+    expect(outcome).toMatchObject({ ok: true, source: "Official statements" });
+    expect(outcome.text).toContain("Orders in force or upcoming that cover Seremban, Negeri Sembilan:");
+    expect(outcome.text).toContain('All education institutions in Negeri Sembilan close from 9 October. (Negeri Sembilan; from 2026-10-09). Quote: "Semua institusi pendidikan di Negeri Sembilan ditutup esok"');
+    expect(outcome.text).toContain("Education institutions close where the API passes 180, from 9 October.");
+    const nationally = await callTool("get_statements", {}, context());
+    expect(nationally.text).toMatch(/^Official statements about the haze, newest first \(\d+ in force or upcoming\):/);
   });
 
   it("lists the official lines and admits there is none for events or flights", async () => {
