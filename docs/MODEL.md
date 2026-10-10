@@ -29,8 +29,9 @@ measured in shadow (section 5.7), not assumed away.
 
 ## 2. What it is given
 
-About 110 columns in six groups (`model/src/hazemodel/features/`, one module per group). The first
-real build is 27,579 rows by 119 columns for 2025-06-07 to 2026-10-08, made in 190 seconds. The
+About 110 feature columns in six groups (`model/src/hazemodel/features/`, one module per group). The first
+real build is 27,579 rows by 119 columns for 2025-06-07 to 2026-10-08, made in 190 seconds; the 119 includes the two keys, the kind and weight columns, the two targets
+and their weights and censor flags. The
 ablation in section 5.6 decides which groups survive.
 
 **Group 1, state of the air** (`air.py`). The 24 hour mean PM2.5 at issue time; the same at 24, 48
@@ -109,7 +110,7 @@ Each builder writes its fit coefficients and every accept or drop decision into 
 ### 4.1 Rows and weights
 
 Each row's weight is its kind weight times a target weight that rises with the truth: a row whose
-target exceeds 55 ug/m3 (the start of DOE's 151 band) counts three times. Plain error on all days
+target exceeds about 55 ug/m3 (DOE's 151 band begins at 55.4) counts three times. Plain error on all days
 rewards "clean", which is right most days and useless.
 
 ### 4.2 Model and loss
@@ -149,8 +150,8 @@ or two. No GPU is needed.
 
 ## 5. How it is tested
 
-The package tests (`cd model && .venv/bin/pytest -q`, 49 of them) check the builders against
-fixtures recorded from the stored data. The tests below are the model's own, run by track D.
+The package has a test per module, run with `.venv/bin/pytest -q` inside `model/`, on fixtures
+recorded from the stored data. The tests below are the model's own, run by track D.
 
 ### 5.1 Walk-forward by month
 
