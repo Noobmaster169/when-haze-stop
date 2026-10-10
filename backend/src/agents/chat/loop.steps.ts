@@ -55,6 +55,7 @@ export function finish(call: Call, outcome: ToolOutcome, durationMs: number): Fi
     thought: call.thought,
     ok: outcome.ok,
     preview: outcome.preview,
+    source: outcome.source ?? null,
     durationMs,
     text: outcome.text,
     skill: outcome.skill ?? null,

@@ -5,6 +5,7 @@ import useSWR from "swr";
 import { z } from "zod";
 
 import { Composer } from "@/components/chat/composer";
+import { Starters } from "@/components/chat/starters";
 import { PendingTurn, Turn } from "@/components/chat/turn";
 import { useChat } from "@/components/chat/use-chat";
 import { ChatThread, type ChatTurn } from "@/lib/api/chat-schemas";
@@ -92,9 +93,7 @@ function DockThread({ initial, title }: { initial: ChatTurn[]; title: string | n
         <DockHistory onOpen={() => setView("thread")} />
       ) : (
         <div className="min-h-0 grow space-y-5 overflow-y-auto px-[18px] py-4">
-          {chat.turns.length === 0 && !chat.pending ? (
-            <p className="text-small leading-[19px] text-ink-tertiary">Ask anything. The assistant can call the tools and skills defined in the backend.</p>
-          ) : null}
+          {chat.turns.length === 0 && !chat.pending ? <Starters onAsk={chat.ask} /> : null}
           {chat.turns.map((turn, index) => (
             <Turn key={turn.id} turn={turn} exhausted={chat.exhausted && index === chat.turns.length - 1} />
           ))}
@@ -111,7 +110,7 @@ function DockThread({ initial, title }: { initial: ChatTurn[]; title: string | n
         }}
         onStop={chat.stop}
         pending={chat.pending}
-        placeholder="Ask a question"
+        placeholder="Ask about haze"
       />
     </>
   );

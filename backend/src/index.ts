@@ -6,6 +6,7 @@ import { config } from "./config";
 import { closePool, getPool } from "./db";
 import { checkHealth, realProbes } from "./health";
 import { childLogger } from "./lib/logger";
+import { openMeteoGeocoder } from "./sources";
 
 const log = childLogger({ module: "api" });
 
@@ -19,6 +20,7 @@ const probes = realProbes(pool);
 const app = createApp({
   pool,
   llm: proxyLlmClient({ maxConcurrency: config.LLM_MAX_CONCURRENCY }),
+  geocoder: openMeteoGeocoder(),
   health: () => checkHealth(probes),
 });
 

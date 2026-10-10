@@ -6,8 +6,11 @@ import type { HealthReport } from "./contracts";
 import { RetryableError, UpstreamError } from "./lib/errors";
 import { childLogger } from "./lib/logger";
 import { aiRouter } from "./routes/ai.routes";
+import { alertsRouter } from "./routes/alerts.routes";
 import { chatRouter } from "./routes/chat.routes";
+import { hazeRouter } from "./routes/haze.routes";
 import { requestLog } from "./routes/request-log";
+import type { Geocoder } from "./sources";
 
 const log = childLogger({ module: "api" });
 
@@ -16,6 +19,8 @@ export interface AppDeps {
   pool: Pool;
   /** How the chat reaches a model. */
   llm: LlmClient;
+  /** Place names to coordinates, for the search box and the assistant. */
+  geocoder: Geocoder;
   health: () => Promise<HealthReport>;
 }
 
@@ -38,7 +43,9 @@ export function createApp(deps: AppDeps): express.Express {
   });
 
   app.use("/ai", aiRouter());
-  app.use("/chat", chatRouter({ pool: deps.pool, llm: deps.llm }));
+  app.use("/chat", chatRouter({ pool: deps.pool, llm: deps.llm, geocoder: deps.geocoder }));
+  app.use("/haze", hazeRouter({ pool: deps.pool, geocoder: deps.geocoder }));
+  app.use("/alerts", alertsRouter({ pool: deps.pool }));
 
   app.use(
     // Four parameters are what make Express treat this as an error handler.

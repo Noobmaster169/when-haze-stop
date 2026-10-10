@@ -12,8 +12,8 @@ const inter = Inter({ variable: "--font-inter", subsets: ["latin"], weight: ["40
 const jetbrains = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["latin"], weight: ["400", "500"], display: "swap" });
 
 export const metadata: Metadata = {
-  title: "Haze",
-  description: "An AI application starter with a side chat.",
+  title: "When Haze Stop",
+  description: "Haze over Malaysia: readings now, a forecast three and a half days ahead, alerts, and an assistant that reads the same data.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

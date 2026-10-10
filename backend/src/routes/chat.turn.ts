@@ -5,6 +5,7 @@ import type { LlmClient } from "../agents/llm-client";
 import type { ChatAnswer, ChatConversation, ChatProgress, ChatToolCall, NewMessage } from "../contracts";
 import { childLogger } from "../lib/logger";
 import { chat } from "../repositories";
+import type { Geocoder } from "../sources";
 
 /**
  * One turn, end to end: load what the agent is given, run it, store what came
@@ -25,6 +26,7 @@ const HISTORY_TURNS = 20;
 export interface TurnDeps {
   pool: Pool;
   llm: LlmClient;
+  geocoder: Geocoder;
   /** Aborted when the person stops the turn. */
   signal: AbortSignal;
   /** Where the turn has got to, for a caller that is streaming it back. Absent, the turn does not stream. */
@@ -47,7 +49,7 @@ export async function answerTurn(deps: TurnDeps, conversation: ChatConversation,
       llm: deps.llm,
       pool: deps.pool,
       signal: deps.signal,
-      tools: { pool: deps.pool },
+      tools: { pool: deps.pool, geocoder: deps.geocoder, sessionId: message.sessionId },
       onStep: deps.onCalls,
       onProgress: deps.onProgress,
     },

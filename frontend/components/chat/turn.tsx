@@ -1,6 +1,7 @@
 import type { ChatProgress, ChatToolCall, ChatTurn } from "@/lib/api/chat-schemas";
 
 import { Markdown } from "./markdown";
+import { Sources } from "./sources";
 import { ToolsUsed } from "./tools-used";
 
 /**
@@ -26,6 +27,7 @@ export function Turn({ turn, exhausted = false }: { turn: ChatTurn; exhausted?: 
           The agent ran out of steps before it finished. What it looked at is below.
         </p>
       ) : null}
+      <Sources calls={turn.toolCalls} />
       <ToolsUsed calls={turn.toolCalls} />
     </div>
   );

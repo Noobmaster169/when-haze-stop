@@ -7,7 +7,9 @@ import { z } from "zod";
  * boundary naming the field.
  */
 
+export * from "./contracts.alerts";
 export * from "./contracts.chat";
+export * from "./contracts.haze";
 
 export const CheckStatus = z.enum(["up", "down"]);
 export type CheckStatus = z.infer<typeof CheckStatus>;

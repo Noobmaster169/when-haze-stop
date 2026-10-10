@@ -12,11 +12,11 @@ export function Rail({ open, onToggle, active }: { open: boolean; onToggle(): vo
     <nav aria-label="Primary" className={`flex shrink-0 flex-col border-r border-hairline bg-shell transition-[width] duration-150 ${open ? "w-[232px]" : "w-[58px]"}`}>
       <div className={`flex h-14 shrink-0 items-center ${open ? "gap-2.5 px-[18px]" : "justify-center"}`}>
         <span aria-hidden="true" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-ink font-display text-[14px] text-ink-inverse">
-          H
+          W
         </span>
         {open ? (
           <>
-            <span className="font-display text-[17px] tracking-[-0.01em]">Haze</span>
+            <span className="whitespace-nowrap font-display text-[17px] tracking-[-0.01em]">When Haze Stop</span>
             <span className="grow" />
             <CollapseButton open onClick={onToggle} />
           </>

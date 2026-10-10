@@ -12,6 +12,7 @@ export const ChatToolCall = z.object({
   thought: z.string(),
   ok: z.boolean(),
   preview: z.string(),
+  source: z.string().nullable().default(null),
   durationMs: z.number().int(),
 });
 export type ChatToolCall = z.infer<typeof ChatToolCall>;

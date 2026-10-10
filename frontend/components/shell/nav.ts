@@ -8,7 +8,11 @@ export interface Destination {
   icon: IconName;
 }
 
-export const DESTINATIONS: Destination[] = [{ key: "home", label: "Home", href: "/", icon: "home" }];
+export const DESTINATIONS: Destination[] = [
+  { key: "map", label: "Map", href: "/map", icon: "map" },
+  { key: "alerts", label: "Alerts", href: "/alerts", icon: "bell" },
+  { key: "accuracy", label: "Track record", href: "/accuracy", icon: "chart" },
+];
 
 /** The destination a pathname sits under: the longest href that prefixes it. */
 export function activeFor(pathname: string): string | null {

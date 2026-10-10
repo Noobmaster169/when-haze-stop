@@ -1,0 +1,25 @@
+import { getPool } from "../../src/db";
+import type { Detection } from "../../src/haze/fires";
+import { runCycle } from "../../src/jobs/cycle";
+import { FakeDoeClient, FakeFiresClient, FakeWeatherClient } from "../../src/sources/__fakes__/fake.sources";
+import { FIRE_CELLS, LAST_HOUR, READINGS, STATIONS } from "./recorded";
+import { steadyWind } from "./steady-wind";
+
+/** The recorded cell-days, as the single detections they would have come from. */
+const DETECTIONS: Detection[] = FIRE_CELLS.map((cell) => ({ satellite: "snpp", lat: cell.lat10 / 10 + 0.01, lon: cell.lon10 / 10 + 0.01, day: cell.day, frpMw: cell.frpMw }));
+const WEATHER_START = new Date("2026-10-06T00:00:00Z");
+
+/**
+ * One whole cycle over the recorded sample, twenty minutes after its last
+ * reading. Safe to run from more than one test file: everything it stores is
+ * keyed, so a second run changes nothing.
+ */
+export async function recordedCycle(): Promise<FakeDoeClient> {
+  const doe = new FakeDoeClient(STATIONS, READINGS);
+  await runCycle(
+    { pool: getPool(), doe, fires: new FakeFiresClient(DETECTIONS), weather: new FakeWeatherClient(steadyWind(WEATHER_START, 200, 3, 3)) },
+    new Date(LAST_HOUR.getTime() + 20 * 60_000),
+    { fires: true },
+  );
+  return doe;
+}

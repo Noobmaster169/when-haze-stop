@@ -1,8 +1,20 @@
-# Haze
+# When Haze Stop
 
-An AI application starter. A Next.js app with a chat dock on the right of every page, an
-Express backend that runs the agent with tools and skills, and an LLM proxy container that
-serves Claude through a Claude Code OAuth token instead of an API key.
+Haze over Malaysia: the official readings on a map, a forecast three and a half days ahead,
+alerts when an area crosses an official line, and an assistant that answers from the same data.
+
+Three features, described in full in [docs/FEATURES.md](docs/FEATURES.md):
+
+- **Map and forecast.** DOE readings, NASA fire detections and Open-Meteo wind drive a smoke
+  transport model. The map replays the past week and shows the forecast.
+- **Alerts.** Follow an area and be told once when a line is crossed, when haze is forecast to
+  arrive, and when it is forecast to clear.
+- **Assistant.** A chat dock with tools over the data. It recommends, names its sources and
+  refuses anything that is not about haze.
+
+Built on an AI application starter: a Next.js app with a chat dock on every page, an Express
+backend that runs the agent with tools and skills, and an LLM proxy container that serves Claude
+through a Claude Code OAuth token instead of an API key.
 
 ```
 frontend/   Next.js 16, React 19, Tailwind 4          :3000
@@ -28,14 +40,20 @@ pnpm install
 pnpm db:migrate
 pnpm dev                    # http://127.0.0.1:8091
 
-# 4. the frontend, in another terminal
+# 4. the data, in another terminal (no keys needed)
+cd backend
+pnpm haze:once              # fetch readings, fires and wind, run the model, raise alerts
+pnpm haze:backfill          # once: replay the stored week for the timeline and the track record
+pnpm haze:loop              # keep running: refreshes every hour
+
+# 5. the frontend, in another terminal
 cd ../frontend
 cp .env.example .env.local
 pnpm install
 pnpm dev                    # http://localhost:3000
 ```
 
-Open http://localhost:3000 and ask the dock something. `curl 127.0.0.1:8091/health` says
+Open http://localhost:3000. The map is the home page; ask the dock something about haze. `curl 127.0.0.1:8091/health` says
 whether Postgres and the proxy are up.
 
 Without Docker, the proxy also runs on the host with your own `claude` login:
@@ -79,8 +97,16 @@ Without Docker, the proxy also runs on the host with your own `claude` login:
 | POST | `/chat/conversations` | Open a conversation. |
 | GET | `/chat/conversations` | List them, most recently used first. |
 | GET | `/chat/:id` | One conversation with its turns. |
-| POST | `/chat/:id/messages` | Ask. `{ content }`. JSON by default, SSE with `Accept: text/event-stream`. |
+| POST | `/chat/:id/messages` | Ask. `{ content, sessionId? }`. JSON by default, SSE with `Accept: text/event-stream`. |
 | DELETE | `/chat/:id` | Delete a conversation and its turns. |
+| GET | `/haze/map` | Everything the map draws: frames, stations, fires, wind. |
+| GET | `/haze/stations/:id` | One station: readings, forecast, day-by-day outlook. |
+| GET | `/haze/accuracy` | Forecast error by lead time, beside "no change". |
+| GET | `/haze/guidelines` | The official API thresholds. |
+| GET | `/haze/places?q=` | Place search, each result with its nearest station. |
+| GET | `/alerts?session=&after=` | Alerts, newest first. |
+| GET, POST | `/alerts/subscriptions` | The stations a browser follows; follow one. |
+| DELETE | `/alerts/subscriptions/:stationId?session=` | Stop following. |
 
 Smoke test the proxy without spending anything, using its offline `test` alias:
 

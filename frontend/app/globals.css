@@ -52,6 +52,25 @@
   --accent-tint: #eff4ff;
   --accent-line: #bbd2f5;
 
+  /* the map: a pale chart under the colours that carry the reading */
+  --map-sea: #e8eef5;
+  --map-land: #f8f7f3;
+  --map-coast: #aab4c1;
+  --map-border: #8d98a7;
+  --map-label: #374151;
+  --map-wind: #1f2937;
+  --map-fire: #d92d20;
+  --map-fire-core: #fff1d6;
+
+  /* the index ramp, at API 0, 50, 100, 150, 200, 300 and 400. The legend, the field and the stations all read these. */
+  --api-0: #2f9e54;
+  --api-50: #d6cf3a;
+  --api-100: #f5a623;
+  --api-150: #ee5a24;
+  --api-200: #c81e4a;
+  --api-300: #7b1fa2;
+  --api-400: #3a0d4f;
+
   /* the one shadow in the product, and the focus ring */
   --shadow-overlay: 0 8px 24px -8px rgb(17 24 39 / 0.18), 0 1px 2px rgb(17 24 39 / 0.06);
   --focus-ring: 0 0 0 2px var(--canvas), 0 0 0 4px var(--accent);
@@ -101,6 +120,15 @@
   --color-accent: var(--accent);
   --color-accent-tint: var(--accent-tint);
   --color-accent-line: var(--accent-line);
+
+  --color-map-sea: var(--map-sea);
+  --color-api-0: var(--api-0);
+  --color-api-50: var(--api-50);
+  --color-api-100: var(--api-100);
+  --color-api-150: var(--api-150);
+  --color-api-200: var(--api-200);
+  --color-api-300: var(--api-300);
+  --color-api-400: var(--api-400);
 
   --font-display: var(--font-newsreader), Georgia, serif;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;

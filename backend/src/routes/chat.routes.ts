@@ -7,6 +7,7 @@ import type { ChatConversationList, ChatThread } from "../contracts";
 import { NewMessage } from "../contracts";
 import { childLogger } from "../lib/logger";
 import { chat } from "../repositories";
+import type { Geocoder } from "../sources";
 import { answerTurn } from "./chat.turn";
 import { eventStream, wantsStream } from "./sse";
 
@@ -28,6 +29,7 @@ const log = childLogger({ module: "chat.routes" });
 export interface ChatRouteDeps {
   pool: Pool;
   llm: LlmClient;
+  geocoder: Geocoder;
 }
 
 const IdParam = z.uuid();

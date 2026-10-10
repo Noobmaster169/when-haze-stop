@@ -1,6 +1,7 @@
 import type { z } from "zod";
 
 import type { Queryable } from "../../../db";
+import type { Geocoder } from "../../../sources";
 
 /**
  * What every tool is: a name, a sentence the prompt shows the model, a zod
@@ -13,7 +14,11 @@ import type { Queryable } from "../../../db";
 export interface ToolContext {
   /** The database. Hand a tool a read-only pool here if it runs anything a model wrote. */
   pool: Queryable;
+  /** Place names to coordinates. */
+  geocoder: Geocoder;
   conversationId: string;
+  /** The browser the question came from, where it said. Alerts are followed under it. */
+  sessionId?: string;
   /** Set when the person may stop the turn. A slow tool should pass it on to whatever it awaits. */
   signal?: AbortSignal;
 }
@@ -31,6 +36,8 @@ export interface ToolOutcome {
   text: string;
   /** One line for the collapsed "Tools used" block. */
   preview: string;
+  /** Where the facts came from, shown as a chip under the answer. */
+  source?: string;
   /** Set by `load_skill`: the skill now in front of the agent, which stays there for the conversation. */
   skill?: string;
 }
