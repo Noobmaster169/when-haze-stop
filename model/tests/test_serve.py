@@ -1,0 +1,84 @@
+import datetime as dt
+
+import lightgbm as lgb
+import numpy as np
+import pandas as pd
+import pytest
+from fastapi.testclient import TestClient
+
+from hazemodel.artifacts import Artifact, save_artifact, set_live
+from hazemodel.features.build import build_rows
+from hazemodel.predict import predict_rows
+from hazemodel.region import region_from_env
+from hazemodel.serve import create_app
+from hazemodel.store import SourceData
+
+ISSUE = pd.Timestamp("2026-10-08T00:00:00Z")
+
+
+def fit_on_fixture(data: SourceData) -> Artifact:
+    frame, _ = build_rows(
+        data, region_from_env(), pd.DatetimeIndex([ISSUE - pd.Timedelta(days=1), ISSUE]), with_targets=True
+    )
+    features = [
+        c
+        for c in frame.columns
+        if c not in {"kind", "reference_weight"}
+        and not c.startswith(("peak_", "weight_", "censored_"))
+        and not c.startswith("fire_s")
+    ]
+    boosters = {}
+    for d in (1, 2):
+        rows = frame.dropna(subset=[f"peak_d{d}"])
+        x, y = rows[features].to_numpy(dtype=float), rows[f"peak_d{d}"].to_numpy()
+        for q in (10, 50, 90):
+            params = {"objective": "quantile", "alpha": q / 100, "verbose": -1, "min_data_in_leaf": 2, "num_leaves": 4}
+            boosters[f"d{d}_q{q}"] = lgb.train(params, lgb.Dataset(x, y), 10)
+    return Artifact(
+        version="2026-10-10-fixture1",
+        trained_at=dt.datetime(2026, 10, 10, tzinfo=dt.timezone.utc),
+        features=features,
+        boosters=boosters,
+    )
+
+
+def test_predict_rows_gives_three_days_with_sorted_quantiles(data):
+    artifact = fit_on_fixture(data)
+    frame, _ = build_rows(data, region_from_env(), pd.DatetimeIndex([ISSUE]), with_targets=False)
+    out = predict_rows(artifact, frame)
+    assert set(out.columns) == {"instrument_id", "day", "p10", "p50", "p90"}
+    assert sorted(out["day"].unique()) == [dt.date(2026, 10, 9), dt.date(2026, 10, 10), dt.date(2026, 10, 11)]
+    assert (out["p10"] <= out["p50"]).all() and (out["p50"] <= out["p90"]).all()
+    assert len(out) == 3 * frame.index.get_level_values("instrument_id").nunique()
+
+
+@pytest.fixture
+def app_env(tmp_path, monkeypatch, data):
+    monkeypatch.setenv("MODEL_ARTIFACTS", str(tmp_path))
+    monkeypatch.setenv("MODEL_SOURCE_CSV", str(__import__("pathlib").Path(__file__).parent / "fixtures"))
+    return tmp_path
+
+
+def test_predict_without_artifact_is_503(app_env):
+    client = TestClient(create_app())
+    assert client.get("/health").json() == {"status": "ok", "modelVersion": None, "trainedAt": None}
+    answer = client.post("/predict", json={"asOf": ISSUE.isoformat()})
+    assert answer.status_code == 503
+    assert answer.json() == {"error": "no live model"}
+
+
+def test_predict_with_live_artifact(app_env, data):
+    artifact = fit_on_fixture(data)
+    save_artifact(app_env, artifact)
+    set_live(app_env, artifact.version)
+    client = TestClient(create_app())
+    health = client.get("/health").json()
+    assert health["modelVersion"] == artifact.version
+    answer = client.post("/predict", json={"asOf": ISSUE.isoformat()})
+    assert answer.status_code == 200
+    body = answer.json()
+    assert body["modelVersion"] == artifact.version
+    first = body["forecasts"][0]
+    assert set(first) == {"instrumentId", "day", "p10", "p50", "p90"}
+    assert first["day"] == "2026-10-09"
+    assert np.isfinite(first["p50"])
