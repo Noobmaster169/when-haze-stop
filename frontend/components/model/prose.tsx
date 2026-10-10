@@ -1,10 +1,6 @@
 import type { ReactNode } from "react";
 
-/** The Model page's running text at the Simulation page's sizes: paragraphs, sub-headings, inline code, formula blocks and bullet lists. */
-
-export function P({ children }: { children: ReactNode }) {
-  return <p className="mt-3 max-w-[72ch] text-body text-ink-secondary first:mt-0">{children}</p>;
-}
+/** The Model page's text at the Simulation page's sizes: sub-headings, inline code, formula blocks and bullet lists. */
 
 export function H3({ children }: { children: ReactNode }) {
   return <h3 className="mt-7 mb-2 text-small font-medium text-ink">{children}</h3>;

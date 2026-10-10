@@ -1,7 +1,7 @@
-/** What each of the three series looks like, shared by every station chart and named in the same words as the tooltips. */
+/** What each of the station panels' marks means, named in the same words as their tooltips. */
 export function SeriesLegend() {
   return (
-    <div className="flex flex-wrap gap-4 text-caption text-ink-secondary">
+    <div className="flex flex-wrap gap-x-4 gap-y-1 text-caption text-ink-secondary">
       <span className="flex items-center gap-1.5">
         <span className="inline-block h-0.5 w-5 bg-series-real" />
         Real next-day peak
@@ -16,6 +16,10 @@ export function SeriesLegend() {
       <span className="flex items-center gap-1.5">
         <span className="inline-block w-5 border-t-2 border-dashed border-series-same" />
         No change
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="inline-block w-5 border-t-2 border-dotted border-ink-tertiary" />
+        API 150
       </span>
     </div>
   );

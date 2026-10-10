@@ -4,71 +4,66 @@ import { z } from "zod";
  * The shape of lib/data/model-performance.json, the learned model's published
  * scores. The file is written by the model's report step, not by hand, so it
  * is parsed here: a renamed field fails the build and the test naming it,
- * instead of reaching a chart as undefined.
+ * instead of reaching a chart as undefined. Strict objects, so a stale file
+ * of the earlier shape fails loudly rather than parsing to half a page.
  */
 
-const Trio = z.object({ model: z.number(), v2: z.number(), noChange: z.number() });
-const Pair = z.object({ model: z.number(), v2: z.number() });
+const Share = z.number().min(0).max(1);
+const Day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
-const Crossing = z.object({ events: z.number().int(), hit: Trio, falseAlarm: Trio });
-
-const SeriesRow = z.object({
-  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  real: z.number(),
-  model: z.number(),
-  low: z.number(),
-  high: z.number(),
-  noChange: z.number(),
-  v2: z.number().nullable(),
+/** A share that has no meaning on an instrument with no events of that kind (no crossing, no big move) is null. */
+const Score = z.strictObject({
+  days: z.number().int().positive(),
+  mae: z.number(),
+  maeNoChange: z.number(),
+  within20: Share,
+  events150: z.number().int(),
+  hit150: Share.nullable(),
+  falseAlarm150: Share.nullable(),
+  hitNoChange: Share.nullable(),
+  bigMoves: z.number().int(),
+  directionRight: Share.nullable(),
+  maxReal: z.number(),
 });
 
-export const ModelPerformanceSchema = z.object({
+const OverallScore = Score.extend({ hit150: Share, falseAlarm150: Share, hitNoChange: Share, directionRight: Share });
+
+export const KINDS = ["doe", "nea", "openaq"] as const;
+const Kind = z.enum(KINDS);
+
+const Tally = z.strictObject({ caught: z.number().int(), missed: z.number().int(), falseAlarm: z.number().int(), quietRight: z.number().int() });
+
+const Row = z.strictObject({ day: Day, real: z.number(), model: z.number(), low: z.number(), high: z.number(), noChange: z.number() });
+
+export const ModelPerformanceSchema = z.strictObject({
   version: z.string(),
-  parquet: z.string(),
   testSpan: z.string(),
-  stationDays: z.number().int(),
-  nextDay: z.object({
-    within10: Trio,
-    within20: Trio,
-    corr: Trio,
-    changeCorr: Trio,
-    bigMoves: z.object({ cases: z.number().int(), realSize: z.number(), directionRight: Pair, sizePredicted: Pair }),
-    cross150: Crossing,
-  }),
-  twoDays: z.object({ within20: Trio, cross150: Crossing }),
-  doeOnly: z.object({ within20: z.number(), hit150: z.number(), falseAlarm150: z.number(), changeCorr: z.number() }),
-  neaOnly: z.object({ within20: z.number(), hit150: z.number(), falseAlarm150: z.number() }),
-  bandCoverageHazy: z.number(),
-  backtest: z.object({
-    months: z.number().int(),
-    hazyMaeDay1: Trio,
-    hazyMaeDay2: Trio,
-    monthsWon: z.string(),
-    ablation: z.array(z.tuple([z.string(), z.number()])).min(1),
-    leaks: z.object({ shift: z.boolean(), shuffle: z.boolean() }),
-  }),
-  example: z.object({
-    station: z.string(),
-    issued: z.string(),
-    inputs: z.object({
-      level: z.number(),
-      lag24: z.number(),
-      near50: z.number(),
-      fireTotal3d: z.number(),
-      heaviestBearing: z.number(),
-      fireS3R2: z.number(),
-      fireS3R1: z.number(),
-      alongFire24: z.number(),
-      rain48: z.number(),
-      smokeNow: z.number(),
-      smoke48h: z.number(),
-    }),
-    outputs: z.array(z.object({ day: z.string(), low: z.number(), p50: z.number(), high: z.number(), real: z.number().nullable() })).min(2),
-  }),
-  series: z.array(z.object({ id: z.string(), name: z.string(), rows: z.array(SeriesRow).min(2) })).min(1),
-  scatter: z.array(z.object({ real: z.number(), model: z.number() })).min(1),
+  stationDays: z.number().int().positive(),
+  instruments: z.number().int().positive(),
+  overall: z.strictObject({ doe: OverallScore, nea: OverallScore, openaq: OverallScore, all: OverallScore }),
+  twoDay: z.strictObject({ days: z.number().int(), within20: Share, within20NoChange: Share, mae: z.number(), maeNoChange: z.number() }),
+  cross150: z.strictObject({ model: Tally, noChange: Tally, v2: Tally }),
+  errorHistogram: z.array(z.strictObject({ low: z.number(), model: z.number().int(), noChange: z.number().int() })).min(2),
+  bandCoverage: z.strictObject({ doe: Share, nea: Share, openaq: Share }),
+  scatter: z.array(z.strictObject({ real: z.number(), model: z.number(), kind: Kind })).min(1),
+  stations: z
+    .array(
+      z.strictObject({
+        id: z.string(),
+        name: z.string(),
+        kind: Kind,
+        state: z.string().nullable(),
+        score: Score,
+        rows: z.array(Row).min(1),
+      }),
+    )
+    .min(1),
 });
 
 export type ModelPerformance = z.infer<typeof ModelPerformanceSchema>;
-export type StationSeries = ModelPerformance["series"][number];
-export type SeriesPoint = StationSeries["rows"][number];
+export type Kind = z.infer<typeof Kind>;
+export type Station = ModelPerformance["stations"][number];
+export type StationScore = Station["score"];
+export type StationRow = Station["rows"][number];
+export type HistogramBin = ModelPerformance["errorHistogram"][number];
+export type CrossTally = z.infer<typeof Tally>;
