@@ -49,7 +49,7 @@ export function chanceAbove(forecast: number, line: number, quantiles: Quantiles
   return Math.round(Math.min(0.99, Math.max(0.01, chance)) * 100) / 100;
 }
 
-/** A forecast's own 10th, 50th and 90th percentile, in API points, lowest first. */
+/** A forecast's own 10th, 50th and 90th percentile, in ug/m3, lowest first. */
 export type Band = [number, number, number];
 
 const BAND_LEVELS = [0.1, 0.5, 0.9];
@@ -62,7 +62,7 @@ function bandShare(value: number, band: Band): number {
   return BAND_LEVELS[k] + ((value - band[k]) / span) * (BAND_LEVELS[k + 1] - BAND_LEVELS[k]);
 }
 
-/** The chance a forecast with this band passes `line`. Never 0 or 1: three quantiles cannot rule anything out. */
+/** The chance a forecast with this band passes `line`; both are in ug/m3. Never 0 or 1: three quantiles cannot rule anything out. */
 export function chanceAboveBand(line: number, band: Band): number {
   const chance = 1 - bandShare(line, band);
   return Math.round(Math.min(0.99, Math.max(0.01, chance)) * 100) / 100;

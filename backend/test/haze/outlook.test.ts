@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { pm25ToApi } from "../../src/haze/api-index";
+import { apiToPm25, pm25ToApi } from "../../src/haze/api-index";
 import { chanceAboveBand, firstHindcast } from "../../src/haze/chance";
 import { addHours } from "../../src/haze/grid";
 import { dayOutlooks, type Hourly, type ModelDay } from "../../src/haze/outlook";
@@ -41,9 +41,15 @@ describe("the day outlook with a learned forecast", () => {
     expect(tomorrow.low).toBe(Math.round(pm25ToApi(40)));
     expect(tomorrow.high).toBe(Math.round(pm25ToApi(80)));
     expect(tomorrow.forecastPeak).toBe(116);
-    expect(tomorrow.chance["150"]).toBe(chanceAboveBand(150, [pm25ToApi(40), pm25ToApi(52), pm25ToApi(80)]));
-    expect(tomorrow.chance["150"]).toBeCloseTo(0.21, 2);
-    expect(tomorrow.chance["100"]).toBeGreaterThan(0.6);
+    expect(tomorrow.chance["150"]).toBe(chanceAboveBand(apiToPm25(150), [40, 52, 80]));
+    // Line 150 is 55.4 ug/m3. Between p50 = 52 and p90 = 80 the level goes from 0.5 to 0.9,
+    // so the cumulative is 0.5 + 0.4 * (55.4 - 52) / 28 = 0.5486 and the chance above is 0.45.
+    expect(tomorrow.chance["150"]).toBeCloseTo(1 - (0.5 + (0.4 * (apiToPm25(150) - 52)) / 28), 2);
+    expect(tomorrow.chance["150"]).toBeCloseTo(0.45, 2);
+    // Line 200 is 150.4 ug/m3, far above p90 = 80: extrapolated past 1, then clamped.
+    expect(tomorrow.chance["200"]).toBe(0.01);
+    // Line 100 is 50.4 ug/m3, between p10 = 40 and p50 = 52: cumulative 0.1 + 0.4 * 10.4 / 12 = 0.447.
+    expect(tomorrow.chance["100"]).toBeCloseTo(0.55, 2);
   });
 
   it("leaves today to the readings, however high the learned forecast for it", () => {

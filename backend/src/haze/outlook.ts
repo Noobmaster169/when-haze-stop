@@ -1,5 +1,5 @@
 import type { DayOutlook } from "../contracts";
-import { pm25ToApi } from "./api-index";
+import { apiToPm25, pm25ToApi } from "./api-index";
 import { type Band, chanceAbove, chanceAboveBand, type Quantiles } from "./chance";
 import { addHours } from "./grid";
 import { LINES } from "./guidelines";
@@ -52,8 +52,9 @@ function fromHourly(forecastPeak: number, errors: Quantiles): Expected {
 }
 
 function fromLearned(day: ModelDay): Expected {
-  const band: Band = [pm25ToApi(day.p10), pm25ToApi(day.p50), pm25ToApi(day.p90)];
-  return { peak: band[1], low: Math.max(0, band[0]), high: band[2], chanceAbove: (line) => chanceAboveBand(line, band) };
+  // The chance is read in ug/m3, where the model's quantiles live, because the index bands are very unequal in width; only the displayed numbers are converted.
+  const band: Band = [day.p10, day.p50, day.p90];
+  return { peak: pm25ToApi(day.p50), low: Math.max(0, pm25ToApi(day.p10)), high: pm25ToApi(day.p90), chanceAbove: (line) => chanceAboveBand(apiToPm25(line), band) };
 }
 
 /**
