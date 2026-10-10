@@ -48,13 +48,17 @@ def _targets(series: pd.DataFrame, frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_rows(
-    data: SourceData, region: Region, issue_times: pd.DatetimeIndex, with_targets: bool
+    data: SourceData,
+    region: Region,
+    issue_times: pd.DatetimeIndex,
+    with_targets: bool,
+    from_forecast: int = 0,
 ) -> tuple[pd.DataFrame, dict]:
     table = instruments(data)
     series, decisions = assemble_truth(data, table)
     air = air_features(series, table, issue_times)
     fires = fire_features(data, table, issue_times)
-    weather = weather_features(data, table, region, fires, issue_times)
+    weather = weather_features(data, table, region, fires, issue_times, from_forecast)
     physics = physics_features(data, issue_times)
     frame = air.join(fires, how="inner").join(weather, how="left").join(physics, how="left")
     frame["has_physics"] = pd.to_numeric(frame["has_physics"]).fillna(0).astype(int)

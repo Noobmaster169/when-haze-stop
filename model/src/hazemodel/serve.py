@@ -16,24 +16,27 @@ from hazemodel.region import region_from_env
 from hazemodel.store import connect, load_source_data, load_source_data_from_csv
 
 LOOKBACK_DAYS = HISTORY_DAYS
-LOOKAHEAD_HOURS = 48
+# The store keeps valid_at < end, and the weather features read the hour at issue + 48 h, so the window
+# runs through issue + 3 days as the CLI's does; a 48 h end would lose that last hour on every on-the-hour ask.
+LOOKAHEAD_DAYS = 3
 
 
 class PredictBody(BaseModel):
     asOf: str
 
 
+def serve_window(as_of: pd.Timestamp) -> tuple[pd.Timestamp, pd.Timestamp]:
+    """The [start, end) span the service loads for one ask."""
+    return as_of - pd.Timedelta(days=LOOKBACK_DAYS), as_of + pd.Timedelta(days=LOOKAHEAD_DAYS)
+
+
 def _source(as_of: pd.Timestamp):
     csv = os.environ.get("MODEL_SOURCE_CSV")
     if csv:
         return load_source_data_from_csv(pathlib.Path(csv))
+    start, end = serve_window(as_of)
     with connect() as conn:
-        return load_source_data(
-            conn,
-            as_of - pd.Timedelta(days=LOOKBACK_DAYS),
-            as_of + pd.Timedelta(hours=LOOKAHEAD_HOURS),
-            os.environ.get("HINDCAST_MODEL", "v2-analysis"),
-        )
+        return load_source_data(conn, start, end, os.environ.get("HINDCAST_MODEL", "v2-analysis"))
 
 
 def create_app() -> FastAPI:
@@ -66,7 +69,8 @@ def create_app() -> FastAPI:
         artifact = live()
         if artifact is None:
             return JSONResponse(status_code=503, content={"error": "no live model"})
-        frame, _ = build_rows(_source(as_of), region, pd.DatetimeIndex([as_of]), with_targets=False)
+        # The hours ahead of the ask are the newest fetch's forecast, never the analysis training mostly saw.
+        frame, _ = build_rows(_source(as_of), region, pd.DatetimeIndex([as_of]), with_targets=False, from_forecast=1)
         out = predict_rows(artifact, frame)
         forecasts = [
             {

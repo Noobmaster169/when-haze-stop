@@ -26,7 +26,7 @@ def features_command(args) -> pathlib.Path:
             end + pd.Timedelta(days=TARGET_LOOKAHEAD_DAYS),
             args.hindcast_model,
         )
-    frame, decisions = build_rows(data, region_from_env(), issues, with_targets=True)
+    frame, decisions = build_rows(data, region_from_env(), issues, with_targets=True, from_forecast=0)
     path = write_parquet(frame, pathlib.Path(args.out), args.start, args.end)
     for name in ("sensors", "airports"):
         target = path.with_name(f"{path.stem}-{name}.csv")

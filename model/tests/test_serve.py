@@ -11,7 +11,7 @@ from hazemodel.artifacts import Artifact, save_artifact, set_live
 from hazemodel.features.build import build_rows
 from hazemodel.predict import predict_rows
 from hazemodel.region import region_from_env
-from hazemodel.serve import create_app
+from hazemodel.serve import create_app, serve_window
 from hazemodel.store import SourceData
 
 ISSUE = pd.Timestamp("2026-10-08T00:00:00Z")
@@ -110,3 +110,19 @@ def test_blank_live_file_is_no_live_model(app_env):
     client = TestClient(create_app())
     assert client.get("/health").json()["modelVersion"] is None
     assert client.post("/predict", json={"asOf": ISSUE.isoformat()}).status_code == 503
+
+
+def _within(frame: pd.DataFrame, column: str, start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame:
+    # The store's SQL keeps start <= t < end; the CSV source is cut the same way here.
+    return frame[(frame[column] >= start) & (frame[column] < end)]
+
+
+def test_the_serve_window_keeps_all_48_weather_hours(data):
+    start, end = serve_window(ISSUE)
+    windowed = type(data)(**{**data.__dict__, "weather_hours": _within(data.weather_hours, "valid_at", start, end)})
+    frame, _ = build_rows(windowed, region_from_env(), pd.DatetimeIndex([ISSUE]), with_targets=False)
+    assert (frame["hours_present"] == 48).all()
+    short = _within(data.weather_hours, "valid_at", start, ISSUE + pd.Timedelta(hours=48))
+    cut = type(data)(**{**data.__dict__, "weather_hours": short})
+    frame_short, _ = build_rows(cut, region_from_env(), pd.DatetimeIndex([ISSUE]), with_targets=False)
+    assert (frame_short["hours_present"] == 47).all()

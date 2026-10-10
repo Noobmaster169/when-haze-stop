@@ -1,8 +1,9 @@
 """Group 4: the wind and rain over the next 48 hours at the instrument's grid point, as stored.
 
-weather_hours holds the newest fetch: the analysis for past hours. A training row built from it
-knows the real wind, which a live row never does; the from_forecast flag records which it was,
-and track B's weather_forecasts table is what makes from_forecast = 1 rows possible later.
+weather_hours holds the newest fetch: the analysis for past hours and the forecast for the hours
+ahead. A training row built from it knows the real wind, which a live row never does; the
+from_forecast flag records which it was (the CLI builds 0, the service 1), and track B's
+weather_forecasts table is what makes from_forecast = 1 training rows possible later.
 """
 
 import numpy as np
@@ -38,7 +39,12 @@ def _along(bearing: float, u24: float, v24: float) -> float:
 
 
 def weather_features(
-    data, table: pd.DataFrame, region: Region, fires: pd.DataFrame, issue_times: pd.DatetimeIndex
+    data,
+    table: pd.DataFrame,
+    region: Region,
+    fires: pd.DataFrame,
+    issue_times: pd.DatetimeIndex,
+    from_forecast: int = 0,
 ) -> pd.DataFrame:
     weather = data.weather_hours.sort_values("valid_at")
     rows = {}
@@ -46,7 +52,7 @@ def weather_features(
         windows = {h: _window(weather, issue, h) for h in HORIZONS}
         for _, instrument in table.iterrows():
             index = grid_index(region, instrument["lat"], instrument["lon"])
-            row = {"hours_present": len(windows[48]), "from_forecast": 0}
+            row = {"hours_present": len(windows[48]), "from_forecast": from_forecast}
             for h in HORIZONS:
                 u, v, steady, rain = _stats(windows[h], index)
                 row.update({f"u{h}": u, f"v{h}": v, f"steady{h}": steady, f"rain{h}": rain})

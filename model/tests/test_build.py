@@ -120,3 +120,9 @@ def test_parquet_keeps_the_index_as_columns(tmp_path, data):
     frame, _ = build_rows(data, region_from_env(), ISSUES, with_targets=False)
     back = pd.read_parquet(write_parquet(frame, tmp_path, "a", "b"))
     assert {"instrument_id", "issue_at"} <= set(back.columns)
+
+
+def test_from_forecast_reaches_the_column(data):
+    for flag in (0, 1):
+        frame, _ = build_rows(data, region_from_env(), ISSUES, with_targets=False, from_forecast=flag)
+        assert (frame["from_forecast"] == flag).all()
