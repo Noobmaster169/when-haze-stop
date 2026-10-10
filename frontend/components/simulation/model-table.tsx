@@ -36,9 +36,9 @@ export function ModelTable({ model }: { model: ModelSkill }) {
                 <td className="py-2 text-ink-secondary">
                   {NETWORK_NAME[lead.network]}, {lead.leadDays}
                 </td>
-                <td className={cell(lead.model, lead.model === lowest)}>{lead.model ?? "none yet"}</td>
-                <td className={cell(lead.v2, lead.v2 === lowest)}>{lead.v2 ?? "none yet"}</td>
-                <td className={cell(lead.persistence, lead.persistence === lowest)}>{lead.persistence ?? "none yet"}</td>
+                <td className={cell(lead.model, lead.model === lowest)}>{lead.model === null ? "none yet" : lead.model.toFixed(1)}</td>
+                <td className={cell(lead.v2, lead.v2 === lowest)}>{lead.v2 === null ? "none yet" : lead.v2.toFixed(1)}</td>
+                <td className={cell(lead.persistence, lead.persistence === lowest)}>{lead.persistence === null ? "none yet" : lead.persistence.toFixed(1)}</td>
                 <td className="py-2 text-right font-mono text-mono text-ink-secondary">{lead.cases.toLocaleString("en-GB")}</td>
               </tr>
             );

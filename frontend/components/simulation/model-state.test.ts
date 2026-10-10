@@ -26,7 +26,7 @@ describe("what the page says about the learned model", () => {
   });
 
   it("counts the shadow days still to go and the gain so far", () => {
-    expect(shadowSummary(BASE)).toBe("In shadow: 9 of 14 days scored, 14% better than the hourly forecast a day ahead at DOE stations. Needs 10%. Nothing a person sees comes from it yet.");
+    expect(shadowSummary(BASE)).toBe("In shadow: 9 of 14 days scored, 14% better than the hourly forecast a day ahead at DOE stations. Needs 5 more days of shadow data. Nothing a person sees comes from it yet.");
   });
 
   it("says when the rule has passed and when the model is live", () => {
@@ -35,6 +35,18 @@ describe("what the page says about the learned model", () => {
   });
 
   it("does not claim a gain it cannot measure", () => {
-    expect(shadowSummary({ ...BASE, gain: null, shadowDays: 2 })).toBe("In shadow: 2 of 14 days scored, not yet comparable with the hourly forecast. Needs 10%. Nothing a person sees comes from it yet.");
+    expect(shadowSummary({ ...BASE, gain: null, shadowDays: 2 })).toBe("In shadow: 2 of 14 days scored, not yet comparable with the hourly forecast. Needs 12 more days of shadow data. Nothing a person sees comes from it yet.");
+  });
+
+  it("names the gain as the missing condition once the days are in", () => {
+    expect(shadowSummary({ ...BASE, shadowDays: 14, gain: 0.04 })).toBe("In shadow: 14 of 14 days scored, 4% better than the hourly forecast a day ahead at DOE stations. Needs 10% better. Nothing a person sees comes from it yet.");
+  });
+
+  it("says worse when the gain is negative", () => {
+    expect(shadowSummary({ ...BASE, gain: -0.05 })).toBe("In shadow: 9 of 14 days scored, 5% worse than the hourly forecast a day ahead at DOE stations. Needs 5 more days of shadow data. Nothing a person sees comes from it yet.");
+  });
+
+  it("uses the singular for the last day", () => {
+    expect(shadowSummary({ ...BASE, shadowDays: 13 })).toContain("Needs 1 more day of shadow data.");
   });
 });
