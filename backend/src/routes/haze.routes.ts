@@ -77,7 +77,7 @@ export function hazeRouter(deps: HazeRouteDeps): Router {
   });
 
   router.get("/simulation", async (_req, res) => {
-    res.json(await simulation(deps.pool));
+    res.json(await simulation(deps.pool, config.MODEL_MODE));
   });
 
   router.get("/guidelines", (_req, res) => {

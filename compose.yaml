@@ -49,6 +49,29 @@ services:
       - "127.0.0.1:4001:4000"
     restart: unless-stopped
 
+  # The learned forecast (model/): reads the stored history, serves a forecast
+  # of each instrument's peak PM2.5 for the next three days. Without a
+  # promoted artifact it answers 503 and the cycle logs it and goes on.
+  model:
+    build: ./model
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: postgres
+      PG_USER: postgres
+      PG_PASSWORD: localdev
+      MODEL_ARTIFACTS: /app/artifacts
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    # 4002 on the host; 4000 and 4001 are the proxies'.
+    ports:
+      - "127.0.0.1:4002:4002"
+    volumes:
+      - model-artifacts:/app/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
   migrate:
     build: ./backend
     environment: &backend-env
@@ -59,6 +82,11 @@ services:
       PG_PASSWORD: localdev
       LLM_PROXY_URL: http://llm-proxy:4000
       LLM_MODEL_CHAT: ${LLM_MODEL_CHAT:-}
+      MODEL_URL: http://model:4002
+      # off, shadow or live. shadow asks the model each cycle and scores it on
+      # the Simulation page; live makes its forecast the outlook's. Set live by
+      # hand once the shadow rule on that page has passed.
+      MODEL_MODE: ${MODEL_MODE:-shadow}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       # Web Push, so alerts reach a device with the tab closed. Empty: in-app only.
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
@@ -125,6 +153,8 @@ services:
         condition: service_completed_successfully
       llm-proxy:
         condition: service_started
+      model:
+        condition: service_started
     restart: unless-stopped
 
   frontend:
@@ -138,5 +168,32 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Retraining on request: features, train with backtest, promote by rule. It
+  # takes 15 to 40 minutes, so it sits behind the `train` profile and `up`
+  # never starts it; run it as
+  #   docker compose --profile train run --rm --user "$(id -u):$(id -g)" model-train
+  # (the user, so the reports land in the bind mount owned by you). It skips
+  # when a report is under a week old; append `--force` to retrain anyway.
+  # Shares the artifacts volume with the model service, which re-reads `live`
+  # on every /predict, so a promotion needs no restart.
+  model-train:
+    build: ./model
+    profiles: ["train"]
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: postgres
+      PG_USER: postgres
+      PG_PASSWORD: localdev
+      MODEL_ARTIFACTS: /app/artifacts
+    volumes:
+      - model-artifacts:/app/artifacts
+      - ./model/reports:/app/reports
+    entrypoint: ["hazemodel", "retrain", "--from", "2025-06-07"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   pgdata:
+  model-artifacts:

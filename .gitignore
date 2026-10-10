@@ -29,3 +29,7 @@ __pycache__/
 # setuptools writes these on every `pip install -e proxy`.
 *.egg-info/
 proxy/uv.lock
+
+# python (model/): training data and artifacts are rebuilt, reports are committed
+model/data/
+model/artifacts/

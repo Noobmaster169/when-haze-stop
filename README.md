@@ -20,6 +20,7 @@ through a Claude Code OAuth token instead of an API key.
 frontend/   Next.js 16, React 19, Tailwind 4          :3000
 backend/    Express 5, TypeScript, Postgres, zod      :8091
 proxy/      Python gateway to `claude -p` (container) :4001 on the host
+model/      Python learned forecast, `/predict` service (container) :4002 on the host
 ```
 
 ## Run it
@@ -34,12 +35,13 @@ docker compose up -d --build
 
 Open http://localhost:3000. The map is the home page; ask the dock something about haze.
 
-`compose.yaml` starts six services:
+`compose.yaml` starts seven services:
 
 | Service | What it does | Host port |
 | --- | --- | --- |
 | `postgres` | The database | 5433 |
 | `llm-proxy` | `claude -p` behind the Anthropic wire | 4001 |
+| `model` | The learned forecast's `/predict` service, described in `docs/MODEL.md` | 4002 |
 | `migrate` | Applies the migrations, then exits | |
 | `api` | The Express api | 8091 |
 | `jobs` | One data cycle, a backfill of the stored week, then every hour | |
@@ -141,6 +143,10 @@ This needs Node 24 and pnpm 11. Without Docker, the proxy also runs on the host 
   `loop.ts`.
 - **The model.** Set `LLM_MODEL_CHAT` in `backend/.env` to `sonnet`, `opus` or `haiku`. The
   aliases are in `proxy/proxy.yaml`.
+- **The learned model.** `MODEL_URL` in `backend/.env` is the `model` service (the learned
+  forecast, port 4002). `MODEL_MODE` is `off`, `shadow` or `live`: `off` by default for a host
+  process, `shadow` in compose, where it is scored on the Simulation page without being shown;
+  `live` makes its forecast the outlook's, set by hand once the shadow rule has passed.
 - **A page.** Add it under `frontend/app/(app)/` and a line in `frontend/components/shell/nav.ts`.
 - **An endpoint.** Schema in `backend/src/contracts.ts`, SQL in `backend/src/repositories/`,
   router in `backend/src/routes/`, then mirror the schema in `frontend/lib/api/`.

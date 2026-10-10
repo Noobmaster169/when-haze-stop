@@ -56,7 +56,7 @@ export async function recordedCycle(): Promise<FakeDoeClient> {
       statements: { channels, llm: statementReader() },
     },
     new Date(LAST_HOUR.getTime() + 20 * 60_000),
-    { fires: true },
+    { fires: true, model: false },
   );
   return doe;
 }

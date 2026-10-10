@@ -9,6 +9,7 @@ import {
   firmsClient,
   metarArchiveClient,
   metarClient,
+  modelClient,
   moeStatementsClient,
   neaClient,
   newsStatementsClient,
@@ -22,6 +23,7 @@ import { backfill, runCycle } from "./cycle";
 import { writeDataset } from "./dataset";
 import { evaluate, formatScores } from "./evaluate";
 import { type HistoryPart, HISTORY_PARTS, isHistoryPart, runHistory } from "./history";
+import { formatHindcast, runHindcast } from "./hindcast";
 import type { IngestDeps } from "./ingest";
 
 /**
@@ -38,6 +40,9 @@ import type { IngestDeps } from "./ingest";
  *   pnpm haze:dataset    the history as flat tables for training, into ./dataset or the folder named
  *   pnpm haze:evaluate   replay the stored week and score it against no change; writes nothing
  *                        (optional: hours between runs, default 6; an ISO instant to score from)
+ *   pnpm haze:hindcast   replay the smoke model at 00:00 UTC of every stored day, for the learned model's
+ *                        training set; writes smoke_hindcasts and skips days that already have every instrument
+ *                        (optional: first day, last day, as YYYY-MM-DD; default HISTORY_FROM to yesterday)
  */
 
 const log = childLogger({ module: "jobs" });
@@ -74,7 +79,7 @@ async function loop(deps: IngestDeps): Promise<void> {
     });
   }
   for (let turn = 0; !stopping; turn++) {
-    await runCycle(deps, new Date(), { fires: turn % FIRES_EVERY_HOURS === 0 });
+    await runCycle(deps, new Date(), { fires: turn % FIRES_EVERY_HOURS === 0, model: config.MODEL_MODE !== "off" });
     // After a start the stored week may have hours no run covers. Backfill skips the ones that have a run, so this is cheap after the first time.
     if (turn === 0 && !stopping) await backfill(deps);
     if (turn > 0 && turn % HISTORY_EVERY_HOURS === 0 && !stopping) {
@@ -119,9 +124,10 @@ async function main(): Promise<void> {
     openaq: config.OPENAQ_API_KEY ? openAqClient(config.OPENAQ_API_KEY) : null,
     statements: { channels: [moeStatementsClient(), doeStatementsClient(), newsStatementsClient()], llm: proxyLlmClient({ maxConcurrency: config.LLM_MAX_CONCURRENCY }) },
     push: pushSender(),
+    model: config.MODEL_MODE === "off" ? null : modelClient(config.MODEL_URL),
   };
   try {
-    if (command === "once") await runCycle(deps, new Date(), { fires: true });
+    if (command === "once") await runCycle(deps, new Date(), { fires: true, model: config.MODEL_MODE !== "off" });
     else if (command === "backfill") await backfill(deps);
     else if (command === "loop") await loop(deps);
     else if (command === "history") {
@@ -136,7 +142,12 @@ async function main(): Promise<void> {
       const from = process.argv[4] ? new Date(process.argv[4]) : undefined;
       const rows = await evaluate(deps.pool, { everyHours: Number(process.argv[3] ?? 6), from });
       process.stdout.write(`${formatScores(rows)}\n`);
-    } else throw new Error(`unknown command "${command}". Use once, backfill, loop, history, coverage, dataset or evaluate.`);
+    } else if (command === "hindcast") {
+      const now = new Date();
+      const yesterday = new Date(now.getTime() - 24 * 3_600_000).toISOString().slice(0, 10);
+      const summary = await runHindcast(deps.pool, { from: process.argv[3] ?? config.HISTORY_FROM, to: process.argv[4] ?? yesterday, now });
+      process.stdout.write(`${formatHindcast(summary)}\n`);
+    } else throw new Error(`unknown command "${command}". Use once, backfill, loop, history, coverage, dataset, evaluate or hindcast.`);
   } finally {
     await closePool();
   }

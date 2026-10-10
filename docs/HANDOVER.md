@@ -80,6 +80,55 @@ Open http://localhost:3000 and go through this list:
 4. Run `pnpm build` in `frontend/`.
 5. Push `haze-product` and merge.
 
+The learned forecast (11 October 2026, track D). The package is `model/`; its document is
+`docs/MODEL.md`, whose section 6 holds the first results. Inside `model/`, with the compose
+database's `PG_*` variables set:
+
+```sh
+.venv/bin/hazemodel features --from 2025-06-07 --to <yesterday> --hindcast-model v2-analysis
+.venv/bin/hazemodel backtest data/features-<span>-<hash>.parquet --freq M --min-train-blocks 1 --ablation
+.venv/bin/hazemodel train data/features-<span>-<hash>.parquet --with-backtest
+.venv/bin/hazemodel promote <version>   # moves `live` only if not worse than the live score
+```
+
+Under compose, retraining runs on request, never from `up`, because it takes 15 to 40 minutes. From
+the repository root:
+
+```sh
+docker compose --profile train run --rm --user "$(id -u):$(id -g)" model-train           # skips if a report is under a week old
+docker compose --profile train run --rm --user "$(id -u):$(id -g)" model-train --force   # retrains anyway
+```
+
+The `model-artifacts` volume starts empty, so `/predict` has no live model under compose until a
+model is in it. Copy the host's published version and its `live` file in once, before any retrain:
+
+```sh
+docker compose --profile train run --rm --no-deps -v "$PWD/model/artifacts:/seed:ro" \
+  --entrypoint sh model-train -c 'cp -R /seed/. /app/artifacts/'
+```
+
+Without that step the first retrain becomes live unconditionally, because there is no live score to
+compare against. Hyperparameters: c88cac5a was trained with the then-committed defaults (31 leaves,
+learning rate 0.05, 100 rows per leaf, feature fraction 0.8, 600 rounds). `params.json` now holds
+the searched values (28 leaves, learning rate 0.0298, 125 rows per leaf, feature fraction 0.604, 299
+rounds), chosen with the all-day fallback criterion and never backtested; the draws table of that
+search was not kept. The next retrain evaluates them under the promotion rule. Day +2: the rule
+chose recursive (21.18 against 21.48, on the reference rows including DOE's week), but c88cac5a
+serves direct because the choice was not wired when it was saved; later artifacts carry it.
+
+The `model-train` compose job retrains on request, as above. The live version is
+`2026-10-11-c88cac5a` (reference hazy-day MAE 15.48 at day +1), promoted into the local
+`model/artifacts/`, which is not committed. It missed the 24 hour target (15% below persistence's
+17.53) and its band is too narrow. The shadow rule stands: the model forecasts every cycle and
+nothing shows it; `MODEL_MODE=live` only after 14 days with a 24 hour score at least 10% better
+than v2 on DOE stations. Next, in order:
+
+1. Run the smoke hindcast of the live issue day before any promotion to live. Every training row
+   carries the physics group, so a live row without `smoke_hindcasts` for its day is a row the
+   model has never seen.
+2. After 14 days of shadow data, read the model block of the Simulation page before considering
+   `MODEL_MODE=live`.
+
 After that, the backlog is section 10 of `docs/FEATURES.md`: Web Push, counting three days above
 150, storing weather by fetch time, trying to beat persistence.
 
@@ -113,6 +162,9 @@ training on it. What that leaves to do:
 The seed was exported again with the history in it: the stations carry their network, the fires
 go back to 1 January 2025, and OpenAQ's sensors and hours are two new files. Export it weekly as
 before.
+4. Export the seed again (`pnpm db:export-seed`) once the stations file carries `network`: today a
+   Singapore region loaded from the seed would arrive as a DOE station until the first cycle.
+5. Run `pnpm haze:hindcast` once over the stored history (about an hour or two: one ensemble run per day from `HISTORY_FROM`, 2025-01-01, where the days before the stored wind count as without enough wind). It resumes where it stopped. The learned model's phase 2 training reads the result.
 
 ## Things that will surprise you
 
@@ -164,6 +216,10 @@ before.
   proxy (up to 20 per channel per cycle). Without the Claude token no statement is read and
   alerts fall back to the forecast. Push needs `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` in
   `.env` (see `.env.example`).
+- **The model service is checked every cycle in compose and asked once a day, for the 00:00 UTC issue.** `MODEL_MODE` defaults to `shadow` there and `off` for a host process. In shadow the cycle logs "a step of the cycle failed" with `what: model` until `model/` (plan A) is built and an artifact promoted; everything else runs. The Simulation page's last chapter shows the shadow rule's state. Set `MODEL_MODE=live` only when it says the rule has passed.
+- **Three tables are append-only by contract**: `weather_forecasts`, `smoke_hindcasts`, `model_forecasts`. A method change is a new version string, never an update.
+- **Promoting a new model version restarts the shadow-day count**: the Simulation page scores the newest version alone, so it needs its own 14 days.
+- **`weather_forecasts` grows about 13 MB a day**, append-only by contract, so watch the disk the compose volume sits on.
 - **The commit author** on the first commit was set to `Henson Zein <hello@upshot.cards>` because
   no git identity was configured where it was made. Amend before pushing if that is wrong.
 
@@ -179,6 +235,7 @@ before.
 | A data source | `backend/src/sources/` |
 | Which hotspots count as fires | `backend/src/haze/fire-screen.ts`, `backend/src/haze/fixed-sources.ts` |
 | The one-off history fetch | `backend/src/jobs/history.ts` |
+| The model seam | `backend/src/sources/model.ts`, the step `backend/src/jobs/model-forecast.ts`, the score `backend/src/services/model-skill.ts` |
 | An assistant tool | `backend/src/agents/chat/tools/`, registered in `index.ts` |
 | How the assistant decides | `backend/src/agents/chat/skills/haze-decision/SKILL.md` |
 | The map | `frontend/components/map/haze-map.tsx` is the entry |

@@ -235,6 +235,9 @@ Migrations `backend/db/migrations/002_haze.sql` and `003_source_fetches.sql`. Ne
 | `openaq_sensors`, `openaq_hours` | A PM2.5 sensor OpenAQ gathers; its mean over one hour | Migration `007_openaq.sql`. Insert only. `reference` is OpenAQ's word for a regulatory-grade monitor; the rest are low-cost sensors. An hour is stamped with its end, like `readings`. Hours over 2,000 ug/m3 are stored and left out of what is read (`PM25_CEILING`). |
 | `cams_hours` | Empty | Made by migration `005` for a composition forecast that was then dropped from the product. Nothing writes it. |
 | `statements` | One fetched item about the haze, as the model read it | Migration `006_statements.sql`. Insert only, one row per URL, never read twice. Only rows with `is_statement` and `verified` are shown. |
+| `weather_forecasts` | A forecast hour of one fetch, by fetch time | Append-only: the leak-free record of what the wind forecast said. |
+| `smoke_hindcasts` | The transport model's smoke near an instrument as of an issue time | Written by `pnpm haze:hindcast`. |
+| `model_forecasts` | The learned model's band for an instrument-day | Append-only, one issue a day at 00:00 UTC, scored on the Simulation page. The shadow rule: 14 days of DOE forecasts and a day-ahead error 10% below the hourly forecast's, computed over the DOE day-ahead cases both have. |
 
 Note on `weather_hours`: this is the one table where a later fetch overwrites an earlier value. An
 hour first arrives as a forecast and is later replaced by the weather model's analysis of what
@@ -255,6 +258,7 @@ writes nothing. Check it before training on a span.
 | Wind and rain | Input | `weather_hours` | `valid_at`, the hour. Arrays of 375 values, row-major from the south-west corner (`haze/grid.ts`). | 1 degree grid, 96 to 120 E, 6 S to 8 N |
 | Airport visibility | Ground truth | `metar_obs` with `airports` | `(icao, observed_at)`, the report's own time, mostly every 30 or 60 minutes | 29 airports: 19 in Malaysia, Changi, Brunei, 8 in Sumatra and Kalimantan |
 | PM2.5 | Ground truth | `openaq_hours` with `openaq_sensors`; `nea_hours`; `readings` with `stations` | `observed_at`, the end of the hour measured | OpenAQ's sensors, Singapore's 5 regions, DOE's 68 stations |
+| Modelled smoke | Input (feature group 3) | `smoke_hindcasts` | `(as_of, instrument_id, model)`, the issue time 00:00 UTC. `smoke_now`, `smoke_24h`, `smoke_48h` are the ensemble-mean smoke within 50 km as a trailing day mean, uncalibrated, in the model's units. `model` names the method and the wind: `v2-analysis` is the stored analysis wind, the known leak. | Every instrument of `services/instruments.ts` |
 
 What to know before fitting anything to it:
 
@@ -280,6 +284,14 @@ What to know before fitting anything to it:
   and NOAA-21 its live feed, screened by the same rules and the same list of fixed sources. A
   cell-day is the largest satellite's sum either way.
 - **Nothing here is interpolated or filled.** A day with no row had no data from that source.
+- **The smoke hindcast is uncalibrated and on the analysis wind.** It is the physics' own view of where smoke was and would be, in its own units; the learned model fits the gain. A hindcast on the forecast wind needs `weather_forecasts` to have filled first, and will carry a different `model` name.
+
+### 3.5 The learned forecast
+
+A LightGBM model trained on the history of 3.4 predicts each instrument's peak 24 hour PM2.5 for
+the next two days. Its method, tests and results are in `docs/MODEL.md`; its code is `model/`;
+it reaches the app through `backend/src/sources/model.ts` and the `model_forecasts` table, and
+shows nothing to a person until the shadow rule in `docs/MODEL.md` is met.
 
 `pnpm haze:dataset [folder]` (`jobs/dataset.ts`) writes the history as five gzipped CSV tables,
 into `backend/dataset/` unless a folder is named, for training outside this codebase. It reads
@@ -453,6 +465,7 @@ of that spread that would lift the forecast over the line, clamped to 1% to 99%.
 For each local day (UTC+8) the outlook gives: the peak read so far, the forecast peak, a low and
 high (10th and 90th percentile, so the range covers 8 in 10 past errors), and the chance for each
 line. A day that has already passed a line in the readings has chance 1 for that line.
+With `MODEL_MODE=live` the day peaks and bands for days +1 to +3 come from the learned model while its newest issue is under 30 hours old; the hourly curve stays v2.
 
 Until the database holds 300 checked forecasts for a bucket, the percentiles of the v2 forecast
 replayed on every hour of 3 to 10 October 2026 (hard-coded in `chance.ts`) are used. After that the app's own are used
@@ -774,7 +787,7 @@ Change both together.
 | GET | `/haze/days/:day` | `HazeDay`: one past day for the map: strongest 1500 fire cells, wind every 3 hours, the airports' reports, every PM2.5 instrument's 24 hours, and the frames of that day (empty before the first readings) |
 | GET | `/haze/stations/:id` | `StationOutlook`: station, a week of readings, 84 hours of forecast, the day outlooks |
 | GET | `/haze/accuracy` | `Accuracy`: error by lead for model and persistence, current method's runs |
-| GET | `/haze/simulation` | `Simulation`: newest run's inputs, readings histogram, the readings-only backtest by lead and by day, replayed haze arrivals |
+| GET | `/haze/simulation` | `Simulation`: newest run's inputs, readings histogram, the readings-only backtest by lead and by day, replayed haze arrivals, and `model`, the learned model's DOE record beside no change and the hourly forecast with the shadow rule's state |
 | GET | `/haze/guidelines` | `GuidelineList` |
 | GET | `/haze/places?q=` | `PlaceList`: stations by name first, then geocoded places, each with its nearest station |
 | GET | `/haze/cities/:key` | `CityAir`: a city (only `kl`) blended from its stations, hour by hour with API, PM2.5, estimated visibility and optical depth; 404 for an unknown city |
@@ -937,7 +950,7 @@ Next, roughly in value order:
 
 - Read NADMA, the Health Ministry and state government channels directly once they can be
   fetched (the Health Ministry site refuses scripted requests today).
-- Store weather by fetch time so skill can be measured against the wind that was really forecast.
+- Stored by fetch time in `weather_forecasts` since migration 008; the backtest still reads the analysis until the hindcast job and the model package read it (plans C and D).
 - Beat persistence beyond a day: store weather by fetch time, test a faster ensemble wind (the
   stored wind runs 20% slow against radiosondes), slower decay of assumed fires. Judge only by
   `pnpm haze:evaluate` and the Simulation page. See `docs/FORECAST.md` section 9.
