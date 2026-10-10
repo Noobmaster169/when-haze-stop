@@ -1,5 +1,6 @@
 import { summarise } from "../context";
 import type { CouncilContext } from "../context";
+import { planCost, ringgit } from "../../../suppression/costs";
 import { asPlan, PlanInput } from "./plan-input";
 import { type CouncilTool, pct, type ToolResult, ug } from "./types";
 
@@ -16,6 +17,7 @@ export const simulatePlan: CouncilTool<PlanInput> = {
       `"${input.title}": expected ${pct(summary.expected)} of the ceiling (central, mean of wind members); worst member ${pct(summary.worstWind)}; pessimistic ${pct(summary.pessimistic)}; optimistic ${pct(summary.optimistic)}.`,
       `Central by member: ${central.map((item) => `${item.windMember} ${ug(item.meanRemoved)} mean, ${ug(item.peakRemoved)} peak, ${item.hoursOver100Avoided} h above API 100 avoided`).join("; ")}.`,
       summary.arrivalHours === null ? "No benefit reaches KL within the horizon." : `The benefit first reaches KL ${summary.arrivalHours} h after the data's hour.`,
+      `Cost: ${ringgit(planCost(input).total)} of the ${ringgit(ctx.budgetRm)} set aside.`,
       violations.length ? `Not feasible as written: ${violations.map((item) => item.message).join("; ")}.` : "Feasible as written.",
     ];
     return { ok: true, text: lines.join("\n"), preview: `expected ${pct(summary.expected)}, worst wind ${pct(summary.worstWind)}` };

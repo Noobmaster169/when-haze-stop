@@ -18,8 +18,8 @@ import { describePlan, type Session } from "./session";
  * pre-mortem over the whole shortlist.
  */
 
-export const CRITIQUE_PROMPT = "v1";
-export const PREMORTEM_PROMPT = "v1";
+export const CRITIQUE_PROMPT = "v2";
+export const PREMORTEM_PROMPT = "v2";
 const POOL = ["peat_science", "meteorology", "force_command", "air_operations", "treasury", "health", "domestic_fire", "sarawak", "air_quality"];
 const MAX_SHORTLIST = 7;
 const log = childLogger({ module: "council.cross-examination" });

@@ -66,7 +66,7 @@ export type PlanMeasures = z.infer<typeof PlanMeasures>;
 
 export const Violation = z.object({
   assignment: z.number().int().nullable(),
-  rule: z.enum(["capacity", "mandate", "consent", "reach", "days", "unknown_complex", "asset_place"]),
+  rule: z.enum(["capacity", "mandate", "consent", "reach", "days", "unknown_complex", "asset_place", "budget"]),
   message: z.string(),
 });
 export type Violation = z.infer<typeof Violation>;

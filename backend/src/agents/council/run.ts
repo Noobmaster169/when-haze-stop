@@ -2,6 +2,7 @@ import type { StageId, Verdict } from "../../contracts";
 import { childLogger } from "../../lib/logger";
 import type { SuppressionEngine } from "../../services/suppression-engine";
 import { mean } from "../../suppression/attribution";
+import { DEFAULT_BUDGET_RM, ringgit } from "../../suppression/costs";
 import { keepTable } from "../../suppression/score";
 import type { TargetArea } from "../../suppression/targets";
 import type { LlmClient } from "../llm-client";
@@ -30,9 +31,8 @@ import { meanOf } from "./tools/format";
  */
 
 const log = childLogger({ module: "council.run" });
-/** Model calls allowed. A second round of critique runs only if it fits. */
-export const BUDGET_CALLS = 130;
-const SECOND_ROUND_COST = 20;
+/** Rounds of critique and revision: more run only while the leading plan keeps changing. */
+const MAX_ROUNDS = 3;
 
 const TITLES: Record<StageId, string> = {
   situation: "The situation",
@@ -66,11 +66,11 @@ async function verdictMaps(engine: SuppressionEngine, session: Session, verdict:
   return engine.simulate({ keep: keepTable(chosen.plan, session.deps.ctx.attribution, "central"), hour: Math.max(0, hour) });
 }
 
-export async function runCouncil(deps: CouncilDeps, target: TargetArea): Promise<Verdict> {
+export async function runCouncil(deps: CouncilDeps, target: TargetArea, budgetRm: number = DEFAULT_BUDGET_RM): Promise<Verdict> {
   const started = Date.now();
   const attribution = await deps.engine.attribute({ target });
   await deps.onAsOf?.(new Date(attribution.asOf));
-  const ctx = councilContext(attribution, target);
+  const ctx = councilContext(attribution, target, budgetRm);
   let calls = 0;
   const llm: LlmClient = {
     complete(request, signal) {
@@ -92,7 +92,7 @@ export async function runCouncil(deps: CouncilDeps, target: TargetArea): Promise
   };
   const stage = (id: StageId) => deps.emit.emit("stage", "system", { stage: id, title: TITLES[id], index: ORDER.indexOf(id) + 1, of: ORDER.length });
 
-  await deps.emit.emit("run_started", "system", { target: target.id, targetName: target.name, asOf: attribution.asOf, dayOne: attribution.dayOne, daysInTheatre: attribution.days });
+  await deps.emit.emit("run_started", "system", { target: target.id, targetName: target.name, asOf: attribution.asOf, dayOne: attribution.dayOne, daysInTheatre: attribution.days, budgetRm });
   await stage("situation");
   await join(session, ["engine"]);
   const ranked = [...attribution.contributions.keys()].map((id) => meanOf(ctx.shares(id) ?? [0])).sort((a, b) => b - a);
@@ -101,8 +101,8 @@ export async function runCouncil(deps: CouncilDeps, target: TargetArea): Promise
     from: "engine",
     to: ["chair"],
     act: "brief",
-    headline: `${attribution.complexes.length} fire complexes burning; the ten most influential cause ${(100 * ranked.slice(0, 10).reduce((sum, value) => sum + value, 0)).toFixed(0)}% of KL's coming smoke.`,
-    detail: `Putting out every fire from day 1 could remove ${ceiling.toFixed(2)} ug/m3 of KL's mean PM2.5 over ${attribution.days} days, averaged over ${attribution.members.length} wind members.\n\n${session.facts}`,
+    headline: `${attribution.complexes.length} groups of fires are burning. Just ten of them make ${(100 * ranked.slice(0, 10).reduce((sum, value) => sum + value, 0)).toFixed(0)}% of the smoke heading for KL.`,
+    detail: `If every fire went out from day 1, KL's air would be about ${ceiling.toFixed(1)} ug/m3 of PM2.5 cleaner on average over the next ${attribution.days} days. That is the most any plan could do. The money available is ${ringgit(budgetRm)}.\n\n${session.facts}`,
     seen: [session.facts],
   });
 
@@ -116,8 +116,7 @@ export async function runCouncil(deps: CouncilDeps, target: TargetArea): Promise
   await stage("wargame");
   await wargame(session, ctx.plans().filter((plan) => plan.baseline || session.shortlist.includes(plan.id)));
 
-  let budgetLimited = false;
-  for (let round = 1; round <= 2; round++) {
+  for (let round = 1; round <= MAX_ROUNDS; round++) {
     const before = topByEngine(session);
     await stage("cross_examination");
     await crossExamine(session);
@@ -125,18 +124,14 @@ export async function runCouncil(deps: CouncilDeps, target: TargetArea): Promise
     await revision(session);
     const stable = topByEngine(session) === before;
     if (stable) break;
-    if (calls + SECOND_ROUND_COST > BUDGET_CALLS) {
-      budgetLimited = round === 1;
-      break;
-    }
-    // A second round looks only at the contenders.
+    // A further round looks only at the contenders.
     session.shortlist = [...session.shortlist].sort((a, b) => ctx.plan(b)!.score.expected - ctx.plan(a)!.score.expected).slice(0, 3);
   }
 
   await stage("comparison");
   await comparison(session);
   await stage("decision");
-  const verdict = await decision(session, budgetLimited);
+  const verdict = await decision(session);
   verdict.maps = await verdictMaps(deps.engine, session, verdict);
   const seconds = Math.round((Date.now() - started) / 1000);
   await deps.emit.emit("run_finished", "system", { seconds, calls });

@@ -1,5 +1,6 @@
 import type { Assignment, StrikeLine, Verdict } from "../../../contracts";
 import { mean } from "../../../suppression/attribution";
+import { planCost } from "../../../suppression/costs";
 import { removedSeries, scorePlan } from "../../../suppression/score";
 import { type BoardPlan, summarise } from "../context";
 import type { DecisionAnswer } from "./answers";
@@ -63,7 +64,7 @@ function series(session: Session, plan: BoardPlan): Verdict["series"] {
   return { baseline: round(baseline), withPlan: round(withPlan) };
 }
 
-export function buildVerdict(session: Session, plan: BoardPlan, words: DecisionAnswer, budgetLimited: boolean): Verdict {
+export function buildVerdict(session: Session, plan: BoardPlan, words: DecisionAnswer): Verdict {
   const { ctx } = session.deps;
   return {
     planId: plan.id,
@@ -82,6 +83,6 @@ export function buildVerdict(session: Session, plan: BoardPlan, words: DecisionA
     series: series(session, plan),
     // Filled by the run from the engine once the plan is chosen: it costs two full engine runs per wind member.
     maps: null,
-    budgetLimited,
+    cost: { ...planCost(plan.plan), budget: ctx.budgetRm },
   };
 }

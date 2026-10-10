@@ -69,11 +69,11 @@ export type RatingAnswer = z.infer<typeof RatingAnswer>;
 
 export const DecisionAnswer = z.object({
   headline: Headline,
-  actNow: z.string().max(320).describe("At most 40 words: what Malaysia does today with what it controls."),
-  ask: z.string().max(320).describe("At most 40 words: what to request of Indonesia, or that nothing is worth asking."),
-  share: z.string().max(320).describe("At most 40 words: what Malaysia hands Indonesia's agency."),
-  reasoning: z.string().max(1100).describe("At most 150 words."),
-  minorityReport: z.string().max(600),
-  replanTrigger: z.string().max(600),
+  actNow: z.string().max(280).describe("At most 30 plain words: what Malaysia does today with what it controls."),
+  ask: z.string().max(280).describe("At most 30 plain words: what to ask Indonesia for, or that nothing is worth asking."),
+  share: z.string().max(280).describe("At most 30 plain words: what Malaysia tells Indonesia's disaster agency."),
+  reasoning: z.string().max(800).describe("At most 100 plain words."),
+  minorityReport: z.string().max(400),
+  replanTrigger: z.string().max(400),
 });
 export type DecisionAnswer = z.infer<typeof DecisionAnswer>;

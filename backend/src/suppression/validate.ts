@@ -1,5 +1,6 @@
 import type { Assignment, Consent, Plan, Violation } from "../contracts.council";
 import type { Complex } from "./complexes";
+import { planCost, ringgit } from "./costs";
 import { assetLine, PACKAGE } from "./package";
 
 /**
@@ -35,7 +36,14 @@ export function normalise(plan: Plan, complexes: Complex[]): Plan {
 /** Distance from each complex to open water, km; a complex missing from it is not checked for reach. */
 export type CoastDistance = Map<string, number>;
 
-export function validate(plan: Plan, complexes: Complex[], coastKm: CoastDistance = new Map()): Violation[] {
+export interface Limits {
+  coastKm?: CoastDistance;
+  /** The money the government has set aside for the operation, ringgit; unchecked where absent. */
+  budgetRm?: number;
+}
+
+export function validate(plan: Plan, complexes: Complex[], limits: Limits = {}): Violation[] {
+  const coastKm = limits.coastKm ?? new Map<string, number>();
   const byId = new Map(complexes.map((complex) => [complex.id, complex]));
   const violations: Violation[] = [];
   const flag = (assignment: number | null, rule: Violation["rule"], message: string) => violations.push({ assignment, rule, message });
@@ -71,6 +79,8 @@ export function validate(plan: Plan, complexes: Complex[], coastKm: CoastDistanc
     }
     if (daysWorked > line.maxDays) flag(null, "capacity", `${line.label}: ${daysWorked} days worked, at most ${line.maxDays}`);
   }
+  const cost = planCost(plan).total;
+  if (limits.budgetRm !== undefined && cost > limits.budgetRm) flag(null, "budget", `the plan costs ${ringgit(cost)}, over the budget of ${ringgit(limits.budgetRm)}`);
   // One capacity message per kind and day is enough to act on; repeats would bury the rest.
   return violations.filter((item, index, all) => all.findIndex((other) => other.message === item.message) === index);
 }

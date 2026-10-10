@@ -2,6 +2,7 @@ import type { Assignment, AssetKind, Plan } from "../contracts.council";
 import { distanceKm } from "../haze/grid";
 import type { Attribution } from "./attribution";
 import type { Complex } from "./complexes";
+import { DAILY_RM, planCost } from "./costs";
 import { assetLine, PACKAGE } from "./package";
 import { scorePlan } from "./score";
 import { normalise, validate } from "./validate";
@@ -30,15 +31,26 @@ function wholePackageOn(complex: Complex): Assignment[] {
 
 const inKalimantan = (complexes: Complex[]) => complexes.filter((complex) => complex.place.area === "kalimantan");
 
-export function biggestFirst(complexes: Complex[]): Draft | null {
-  const target = [...inKalimantan(complexes)].sort((a, b) => b.firePowerMw - a.firePowerMw)[0];
-  return target ? { title: `Biggest fire first: everything on ${target.id}`, assignments: wholePackageOn(target) } : null;
+/** Trims a plan to the budget: the costliest line loses a day at a time, and goes when it has none left. */
+export function fitBudget(assignments: Assignment[], budgetRm: number | undefined): Assignment[] {
+  let lines = assignments.map((line) => ({ ...line }));
+  while (budgetRm !== undefined && lines.length > 0 && planCost({ assignments: lines }).total > budgetRm) {
+    const costliest = [...lines].sort((a, b) => DAILY_RM[b.asset] * b.units - DAILY_RM[a.asset] * a.units)[0];
+    if (DAILY_RM[costliest.asset] === 0 || costliest.toDay <= costliest.fromDay) lines = lines.filter((line) => line !== costliest);
+    else costliest.toDay -= 1;
+  }
+  return lines;
 }
 
-export function nearestFirst(complexes: Complex[], target: { lat: number; lon: number }): Draft | null {
+export function biggestFirst(complexes: Complex[], budgetRm?: number): Draft | null {
+  const target = [...inKalimantan(complexes)].sort((a, b) => b.firePowerMw - a.firePowerMw)[0];
+  return target ? { title: `Biggest fire first: everything on ${target.id}`, assignments: fitBudget(wholePackageOn(target), budgetRm) } : null;
+}
+
+export function nearestFirst(complexes: Complex[], target: { lat: number; lon: number }, budgetRm?: number): Draft | null {
   const km = (complex: Complex) => distanceKm(target.lat, target.lon, complex.lat, complex.lon);
   const nearest = [...inKalimantan(complexes)].sort((a, b) => km(a) - km(b))[0];
-  return nearest ? { title: `Nearest fire first: everything on ${nearest.id}`, assignments: wholePackageOn(nearest) } : null;
+  return nearest ? { title: `Nearest fire first: everything on ${nearest.id}`, assignments: fitBudget(wholePackageOn(nearest), budgetRm) } : null;
 }
 
 /** The package cut into the pieces the greedy search places one at a time. */
@@ -59,7 +71,7 @@ function pieces(withRequests: boolean): { asset: AssetKind; units: number; fromD
  * keeps to what Indonesia has accepted; with them it may use Sumatra and a
  * ground task force, as a request would.
  */
-export function greedy(attribution: Attribution, withRequests: boolean): Draft {
+export function greedy(attribution: Attribution, withRequests: boolean, budgetRm?: number): Draft {
   const complexes = attribution.complexes.filter((complex) => attribution.contributions.has(complex.id));
   const allowed = (complex: Complex) => withRequests || complex.place.area !== "sumatra";
   let plan: Plan = { title: "", assignments: [], requests: [], share: null, rationale: "", assumptions: [], confidence: 0, dependsOn: "" };
@@ -70,7 +82,7 @@ export function greedy(attribution: Attribution, withRequests: boolean): Draft {
       const toDay = Math.min(PACKAGE.daysInTheatre, piece.fromDay + assetLine(piece.asset).maxDays - 1);
       const merged = mergeInto(plan.assignments, { complexId: complex.id, asset: piece.asset, units: piece.units, fromDay: piece.fromDay, toDay, needsConsent: null });
       const candidate = normalise({ ...plan, assignments: merged }, complexes);
-      if (validate(candidate, complexes).length > 0) continue;
+      if (validate(candidate, complexes, { budgetRm }).length > 0) continue;
       const score = scorePlan(candidate, attribution).expected;
       if (score > (chosen?.score ?? best)) chosen = { plan: candidate, score };
     }

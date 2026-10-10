@@ -12,7 +12,7 @@ import { describePlan, type Session } from "./session";
  * the scores. The matrix and its weights decide; the mood of the room does not.
  */
 
-export const RATE_PROMPT = "v1";
+export const RATE_PROMPT = "v2";
 const log = childLogger({ module: "council.comparison" });
 
 export const RATERS: Record<Exclude<keyof Weights, "klBenefit" | "robustness">, string[]> = {

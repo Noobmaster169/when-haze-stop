@@ -31,7 +31,12 @@ const asks = (plan: BoardPlan) => plan.plan.assignments.some((line) => line.need
 
 export async function tableBaselines(session: Session): Promise<void> {
   const { ctx } = session.deps;
-  const made = [biggestFirst(ctx.attribution.complexes), nearestFirst(ctx.attribution.complexes, ctx.target.centre), greedy(ctx.attribution, false), greedy(ctx.attribution, true)];
+  const made = [
+    biggestFirst(ctx.attribution.complexes, ctx.budgetRm),
+    nearestFirst(ctx.attribution.complexes, ctx.target.centre, ctx.budgetRm),
+    greedy(ctx.attribution, false, ctx.budgetRm),
+    greedy(ctx.attribution, true, ctx.budgetRm),
+  ];
   for (const draft of made) {
     if (!draft) continue;
     const entry = ctx.table({ by: "engine", premise: null, baseline: true, plan: { ...draft, requests: [], share: null, rationale: "", assumptions: [], confidence: 0, dependsOn: "" } });
@@ -72,10 +77,10 @@ export async function screen(session: Session): Promise<void> {
     from: "engine",
     to: ["chair"],
     act: "brief",
-    headline: `Shortlist: ${session.shortlist.join(", ")} go forward; ${dropped.length} set aside as infeasible or near-duplicates.`,
+    headline: `${session.shortlist.length} plans go forward to be questioned, ${greedy.length} of them worked out by computer. ${dropped.length} set aside.`,
     detail: [
-      ...top.map((plan) => `${plan.id} ${plan.plan.title}: expected ${(100 * plan.score.expected).toFixed(2)}% of the ceiling.`),
-      ...dropped.map((plan) => `${plan.id} set aside: ${plan.violations.length ? "not feasible" : "same assets on mostly the same complexes as a better plan"}.`),
+      ...[...top, ...greedy].map((plan) => `${plan.plan.title} (${plan.id}): would remove about ${(100 * plan.score.expected).toFixed(0)}% of the smoke any plan could remove.`),
+      ...dropped.map((plan) => `${plan.plan.title} (${plan.id}) set aside: ${plan.violations.length ? plan.violations[0].message : "it sends the same help to mostly the same fires as a better plan"}.`),
     ].join("\n"),
     seen: [],
   });

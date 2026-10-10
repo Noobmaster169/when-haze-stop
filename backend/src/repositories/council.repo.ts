@@ -38,6 +38,7 @@ export async function daysBurning(db: Queryable, fromDay: string, toDay: string)
 interface RunRow {
   id: string;
   target: string;
+  budget_rm: string | null;
   status: RunStatus;
   as_of: Date | null;
   created_at: Date;
@@ -50,6 +51,7 @@ interface RunRow {
 export interface StoredRun {
   id: number;
   target: string;
+  budgetRm: number | null;
   status: RunStatus;
   asOf: string | null;
   createdAt: string;
@@ -60,11 +62,12 @@ export interface StoredRun {
   error: string | null;
 }
 
-const RUN_COLUMNS = "id, target, status, as_of, created_at, started_at, finished_at, verdict, error";
+const RUN_COLUMNS = "id, target, budget_rm, status, as_of, created_at, started_at, finished_at, verdict, error";
 const iso = (at: Date | null) => (at ? at.toISOString() : null);
 const toRun = (row: RunRow): StoredRun => ({
   id: Number(row.id),
   target: row.target,
+  budgetRm: row.budget_rm === null ? null : Number(row.budget_rm),
   status: row.status,
   asOf: iso(row.as_of),
   createdAt: row.created_at.toISOString(),
@@ -75,10 +78,10 @@ const toRun = (row: RunRow): StoredRun => ({
 });
 
 /** Queues a run; null where one is already queued or running (the unique index says no). */
-export async function queue(db: Queryable, target: string): Promise<StoredRun | null> {
+export async function queue(db: Queryable, target: string, budgetRm: number): Promise<StoredRun | null> {
   const { rows } = await db.query<RunRow>(
-    `insert into council_runs (target, status) values ($1, 'queued') on conflict do nothing returning ${RUN_COLUMNS}`,
-    [target],
+    `insert into council_runs (target, budget_rm, status) values ($1, $2, 'queued') on conflict do nothing returning ${RUN_COLUMNS}`,
+    [target, budgetRm],
   );
   return rows[0] ? toRun(rows[0]) : null;
 }

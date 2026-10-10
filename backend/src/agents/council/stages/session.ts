@@ -1,3 +1,4 @@
+import { planCost, ringgit } from "../../../suppression/costs";
 import type { BoardPlan } from "../context";
 import type { TurnDeps } from "../turn";
 import type { CritiqueAnswer, MissionAnswer, PremortemAnswer, RatingAnswer } from "./answers";
@@ -28,6 +29,7 @@ export function describePlan(plan: BoardPlan): string {
   return [
     `${plan.id}${plan.baseline ? " (baseline, made by code)" : ""}: ${plan.plan.title}`,
     `  lines: ${lines.join("; ") || "none"}`,
+    `  cost: ${ringgit(planCost(plan.plan).total)}`,
     `  engine: expected ${(100 * score.expected).toFixed(2)}% of the ceiling, worst wind ${(100 * score.worstWind).toFixed(2)}%, pessimistic ${(100 * score.pessimistic).toFixed(2)}%, optimistic ${(100 * score.optimistic).toFixed(2)}%`,
     plan.plan.requests.length ? `  requests: ${plan.plan.requests.join(" | ")}` : "",
     plan.plan.share ? `  share: ${plan.plan.share}` : "",

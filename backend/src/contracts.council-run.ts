@@ -39,7 +39,7 @@ const event = <K extends string, P extends z.ZodTypeAny>(kind: K, payload: P) =>
   z.object({ seq: z.number().int(), at: z.string(), actor: z.string(), kind: z.literal(kind), payload });
 
 export const CouncilEvent = z.discriminatedUnion("kind", [
-  event("run_started", z.object({ target: z.string(), targetName: z.string(), asOf: z.string(), dayOne: z.string(), daysInTheatre: z.number().int() })),
+  event("run_started", z.object({ target: z.string(), targetName: z.string(), asOf: z.string(), dayOne: z.string(), daysInTheatre: z.number().int(), budgetRm: z.number().optional() })),
   event("stage", z.object({ stage: StageId, title: z.string(), index: z.number().int(), of: z.number().int() })),
   event("agent_joined", z.object({ agent: z.string(), kind: AgentKind, title: z.string(), institution: z.string(), parent: z.string().nullable() })),
   event("thinking", z.object({ agent: z.string(), gist: z.string() })),
@@ -133,7 +133,8 @@ export const Verdict = z.object({
   /** The target's 24-hour PM2.5 each hour from the data's hour, central, mean over members: without and with the plan. */
   series: z.object({ baseline: z.array(z.number()), withPlan: z.array(z.number()) }),
   maps: VerdictMaps.nullable().default(null),
-  budgetLimited: z.boolean(),
+  /** What the plan costs Malaysia against the money set aside, ringgit. */
+  cost: z.object({ total: z.number(), budget: z.number(), lines: z.array(z.object({ label: z.string(), rm: z.number() })) }).nullable().default(null),
 });
 export type Verdict = z.infer<typeof Verdict>;
 
@@ -143,6 +144,8 @@ export type RunStatus = z.infer<typeof RunStatus>;
 export const CouncilRun = z.object({
   id: z.number().int(),
   target: z.string(),
+  /** The money the run was given, ringgit; null on runs made before budgets. */
+  budgetRm: z.number().nullable(),
   status: RunStatus,
   asOf: z.string().nullable(),
   createdAt: z.string(),
@@ -153,7 +156,8 @@ export const CouncilRun = z.object({
 });
 export type CouncilRun = z.infer<typeof CouncilRun>;
 
-export const StartCouncilRequest = z.object({ target: z.literal("klang-valley") });
+export const BudgetChoice = z.union([z.literal(4_000_000), z.literal(8_000_000), z.literal(12_000_000)]);
+export const StartCouncilRequest = z.object({ target: z.literal("klang-valley"), budgetRm: BudgetChoice.default(8_000_000) });
 export type StartCouncilRequest = z.infer<typeof StartCouncilRequest>;
 
 export const CouncilRunList = z.object({ runs: z.array(CouncilRun.omit({ verdict: true })) });

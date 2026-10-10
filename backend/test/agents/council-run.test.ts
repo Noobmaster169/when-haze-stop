@@ -104,6 +104,9 @@ describe("a council run", () => {
     expect(Verdict.safeParse(verdict).success).toBe(true);
     expect(verdict.strikeList.length).toBeGreaterThan(0);
     expect(verdict.baselines.map((item) => item.title)).toContain("Biggest fire first: everything on C01");
+    // The chosen plan fits the money set aside (8 million by default), and says what it costs.
+    expect(verdict.cost?.budget).toBe(8_000_000);
+    expect(verdict.cost!.total).toBeLessThanOrEqual(verdict.cost!.budget);
   });
 
   it("writes only events the page can parse, numbered without gaps", async () => {

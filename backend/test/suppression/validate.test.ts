@@ -44,8 +44,15 @@ describe("validating a plan", () => {
   });
 
   it("refuses the scooper where no open water is in reach", () => {
-    const rules = validate(plan([line("C01", "cl415", 1)]), VECTOR_COMPLEXES, new Map([["C01", 60]])).map((item) => item.rule);
+    const rules = validate(plan([line("C01", "cl415", 1)]), VECTOR_COMPLEXES, { coastKm: new Map([["C01", 60]]) }).map((item) => item.rule);
     expect(rules).toEqual(["reach"]);
+  });
+
+  it("refuses a plan that costs more than the budget", () => {
+    // Ten days of the scooper alone is RM 4.5 million, plus RM 1.7 million to deploy.
+    const rules = validate(plan([line("C01", "cl415", 1, 1, 10)]), VECTOR_COMPLEXES, { budgetRm: 4_000_000 }).map((item) => item.rule);
+    expect(rules).toEqual(["budget"]);
+    expect(validate(plan([line("C02", "bomba_domestic", 100, 1, 14)]), VECTOR_COMPLEXES, { budgetRm: 4_000_000 })).toEqual([]);
   });
 
   it("names a complex that is not on the fact sheet", () => {

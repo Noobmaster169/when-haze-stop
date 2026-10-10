@@ -27,10 +27,10 @@ export function councilRouter(deps: { pool: Pool }): Router {
   router.post("/runs", async (req, res) => {
     const body = StartCouncilRequest.safeParse(req.body);
     if (!body.success) {
-      res.status(400).json({ error: "target must be klang-valley, the only area the council can be asked about yet" });
+      res.status(400).json({ error: "target must be klang-valley, the only area the council can be asked about yet, and budgetRm one of 4000000, 8000000, 12000000" });
       return;
     }
-    const run = await council.queue(deps.pool, body.data.target);
+    const run = await council.queue(deps.pool, body.data.target, body.data.budgetRm);
     if (!run) {
       res.status(409).json({ error: "a council run is already queued or running; wait for it to finish" });
       return;

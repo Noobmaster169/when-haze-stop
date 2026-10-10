@@ -13,7 +13,7 @@ import type { Session } from "./session";
  * premises must differ: a duplicate falls back to the seat's default.
  */
 
-export const MISSION_PROMPT = "v1";
+export const MISSION_PROMPT = "v2";
 const DEFAULT_WEIGHTS: Weights = { klBenefit: 0.45, robustness: 0.2, feasibility: 0.15, diplomacy: 0.1, cost: 0.05, sideBenefits: 0.05 };
 
 function normalised(weights: Weights): Weights {

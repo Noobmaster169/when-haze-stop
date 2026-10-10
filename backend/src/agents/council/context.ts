@@ -44,6 +44,8 @@ export interface BoardPlan {
 export interface CouncilContext {
   attribution: Attribution;
   target: TargetArea;
+  /** The money set aside for the operation, ringgit. */
+  budgetRm: number;
   complex(id: string): Complex | undefined;
   /** Share of the ceiling per wind member, for a complex with a contribution; null otherwise. */
   shares(id: string): number[] | null;
@@ -72,7 +74,7 @@ export function summarise(score: PlanScore): ScoreSummary {
   };
 }
 
-export function councilContext(attribution: Attribution, target: TargetArea): CouncilContext {
+export function councilContext(attribution: Attribution, target: TargetArea, budgetRm: number): CouncilContext {
   const byId = new Map(attribution.complexes.map((complex) => [complex.id, complex]));
   const logistics = new Map<string, Logistics>();
   for (const complex of attribution.complexes) {
@@ -91,11 +93,12 @@ export function councilContext(attribution: Attribution, target: TargetArea): Co
   const board: BoardPlan[] = [];
   const tryPlan = (plan: Plan) => {
     const normalised = normalise(plan, attribution.complexes);
-    return { plan: normalised, violations: validate(normalised, attribution.complexes), score: scorePlan(normalised, attribution) };
+    return { plan: normalised, violations: validate(normalised, attribution.complexes, { budgetRm }), score: scorePlan(normalised, attribution) };
   };
   return {
     attribution,
     target,
+    budgetRm,
     complex: (id) => byId.get(id),
     shares: (id) => (attribution.contributions.has(id) ? attribution.members.map((_, member) => shareOfCeiling(attribution, id, member)) : null),
     logistics: (id) => logistics.get(id),

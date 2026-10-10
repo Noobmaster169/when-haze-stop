@@ -1,4 +1,5 @@
 import { mean } from "../../suppression/attribution";
+import { DAILY_RM, DEPLOYMENT_RM, ringgit, TASK_FORCE_AIRLIFT_RM } from "../../suppression/costs";
 import { PACKAGE } from "../../suppression/package";
 import type { CouncilContext } from "./context";
 import { complexLine, meanOf } from "./tools/format";
@@ -21,6 +22,7 @@ export const RULES = [
   "R8 Value suppression only until the rains; rain ended the haze in 1997, 2015 and 2019.",
   "R9 Influence holds only for its wind; prefer plans that hold up across the wind members.",
   "R10 A plan needing new Indonesian consent is a request with a lag, not an assignment.",
+  "R11 The money is limited. A plan must fit the budget, so spend each ringgit where it removes the most smoke: aircraft cost far more a day than people, and do little to peat.",
 ];
 
 const TOP = 18;
@@ -44,7 +46,8 @@ export function factSheet(ctx: CouncilContext): string {
     "The package (units: aircraft, teams, or people for the Bomba lines):",
     ...assets,
     `Domestic Bomba works only on Malaysian soil. Everything else is deployed to Indonesia, accepted for Kalimantan only.`,
-    "What the research says (cite as R1 to R10):",
+    `The money: the government has set aside ${ringgit(ctx.budgetRm)} for this operation, and no plan may cost more. Costs (assumptions from published rates): CL-415 ${ringgit(DAILY_RM.cl415)} a working day; each helicopter ${ringgit(DAILY_RM.helicopters)} a day; the lance teams come with the deployed crews; Bomba at home ${ringgit(DAILY_RM.bomba_domestic)} a person a day; the ground task force ${ringgit(DAILY_RM.ground_task_force)} a person a day plus ${ringgit(TASK_FORCE_AIRLIFT_RM)} to fly it in; sending anything abroad at all costs ${ringgit(DEPLOYMENT_RM)} (crews and airlift). simulate_plan and check_feasibility give a plan's cost.`,
+    "What the research says (cite as R1 to R11):",
     ...RULES,
   ].join("\n");
 }

@@ -8,6 +8,7 @@ import { council } from "../repositories";
 import type { StoredRun } from "../repositories/council.repo";
 import { engineSuppression } from "../services/suppression-engine";
 import { firmsClient } from "../sources";
+import { DEFAULT_BUDGET_RM } from "../suppression/costs";
 import { target } from "../suppression/targets";
 
 /**
@@ -40,6 +41,7 @@ async function execute(run: StoredRun): Promise<void> {
         onAsOf: (asOf) => council.setAsOf(pool, run.id, asOf),
       },
       area,
+      run.budgetRm ?? DEFAULT_BUDGET_RM,
     );
     await council.finish(pool, run.id, verdict);
   } catch (error) {
@@ -62,7 +64,7 @@ async function loop(): Promise<void> {
 
 async function once(): Promise<void> {
   const pool = getPool();
-  const queued = await council.queue(pool, "klang-valley");
+  const queued = await council.queue(pool, "klang-valley", DEFAULT_BUDGET_RM);
   if (!queued) log.info("a run was already queued or running; executing the queued one if any");
   const run = await council.claimNext(pool);
   if (run) await execute(run);

@@ -15,7 +15,7 @@ import { describePlan, type Session } from "./session";
  * the shortlist and is scored again.
  */
 
-export const REVISE_PROMPT = "v2";
+export const REVISE_PROMPT = "v3";
 const ARCHIVE = 3;
 const log = childLogger({ module: "council.revision" });
 

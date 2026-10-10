@@ -16,9 +16,9 @@ import { buildVerdict } from "./verdict";
  * report and what would make the Committee meet again.
  */
 
-export const DECIDE_PROMPT = "v2";
+export const DECIDE_PROMPT = "v3";
 
-export async function decision(session: Session, budgetLimited: boolean): Promise<Verdict> {
+export async function decision(session: Session): Promise<Verdict> {
   const rows = matrix(session);
   const chosen = rows[0] ? session.deps.ctx.plan(rows[0].planId) : undefined;
   if (!chosen) throw new TerminalError("no feasible plan reached the decision");
@@ -53,5 +53,5 @@ export async function decision(session: Session, budgetLimited: boolean): Promis
     seen,
   });
   await session.deps.emit.emit("verdict", "chair", { planId: chosen.id });
-  return buildVerdict(session, chosen, value, budgetLimited);
+  return buildVerdict(session, chosen, value);
 }

@@ -15,7 +15,7 @@ import { describePlan, type Session } from "./session";
  * reasons. Six of eight drafts are needed to go on.
  */
 
-export const DRAFT_PROMPT = "v2";
+export const DRAFT_PROMPT = "v3";
 const QUORUM = 6;
 const log = childLogger({ module: "council.drafts" });
 
@@ -57,7 +57,7 @@ async function draftOne(session: Session, proposer: Seat): Promise<BoardPlan> {
     from: "engine",
     to: [proposer.id],
     act: "challenge",
-    headline: `${entry.id} cannot be carried out as written: ${entry.violations.length} problem${entry.violations.length > 1 ? "s" : ""}.`,
+    headline: `This plan cannot be carried out as written: ${entry.violations[0].message}.`,
     detail: entry.violations.map((item) => item.message).join("\n"),
     planId: entry.id,
     seen: [],

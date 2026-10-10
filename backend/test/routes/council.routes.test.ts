@@ -30,7 +30,7 @@ describe("the council routes", () => {
 
   it("lists runs and serves a run's events after a sequence number", async () => {
     const pool = getPool();
-    const run = (await council.queue(pool, "klang-valley"))!;
+    const run = (await council.queue(pool, "klang-valley", 8_000_000))!;
     await council.appendEvent(pool, run.id, { seq: 0, kind: "stage", actor: "system", payload: { stage: "situation", title: "The situation", index: 1, of: 9 } });
     await council.appendEvent(pool, run.id, { seq: 1, kind: "thinking", actor: "chair", payload: { agent: "chair", gist: "reading the fact sheet" } });
     await council.appendEvent(pool, run.id, { seq: 2, kind: "not_a_kind", actor: "chair", payload: {} });
