@@ -231,6 +231,9 @@ Migrations `backend/db/migrations/002_haze.sql` and `003_source_fetches.sql`. Ne
 | `openaq_sensors`, `openaq_hours` | A PM2.5 sensor OpenAQ gathers; its mean over one hour | Migration `007_openaq.sql`. Insert only. `reference` is OpenAQ's word for a regulatory-grade monitor; the rest are low-cost sensors. An hour is stamped with its end, like `readings`. Hours over 2,000 ug/m3 are stored and left out of what is read (`PM25_CEILING`). |
 | `cams_hours` | Empty | Made by migration `005` for a composition forecast that was then dropped from the product. Nothing writes it. |
 | `statements` | One fetched item about the haze, as the model read it | Migration `006_statements.sql`. Insert only, one row per URL, never read twice. Only rows with `is_statement` and `verified` are shown. |
+| `weather_forecasts` | A forecast hour of one fetch, by fetch time | Append-only: the leak-free record of what the wind forecast said. |
+| `smoke_hindcasts` | The transport model's smoke near an instrument as of an issue time | Written by `pnpm haze:hindcast`. |
+| `model_forecasts` | The learned model's band for an instrument-day | Append-only, scored on the Simulation page. |
 
 Note on `weather_hours`: this is the one table where a later fetch overwrites an earlier value. An
 hour first arrives as a forecast and is later replaced by the weather model's analysis of what
@@ -879,7 +882,7 @@ Next, roughly in value order:
 
 - Read NADMA, the Health Ministry and state government channels directly once they can be
   fetched (the Health Ministry site refuses scripted requests today).
-- Store weather by fetch time so skill can be measured against the wind that was really forecast.
+- Stored by fetch time in `weather_forecasts` since migration 008; the backtest still reads the analysis until the hindcast job and the model package read it (plans C and D).
 - Beat persistence beyond a day: store weather by fetch time, test a faster ensemble wind (the
   stored wind runs 20% slow against radiosondes), slower decay of assumed fires. Judge only by
   `pnpm haze:evaluate` and the Simulation page. See `docs/FORECAST.md` section 9.
