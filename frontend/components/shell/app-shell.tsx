@@ -18,7 +18,8 @@ import { Banner } from "./banner";
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <DockProvider>
-      <div className="flex h-dvh flex-col overflow-hidden bg-canvas text-ink">
+      {/* Relative so an absolutely placed child (an sr-only label, say) is clipped here instead of stretching the document past the viewport. */}
+      <div className="relative flex h-dvh flex-col overflow-hidden bg-canvas text-ink">
         <Banner />
         <AlertBar />
         <div className="flex min-h-0 grow">

@@ -58,7 +58,7 @@ export default async function SourcesPage({ searchParams }: PageProps<"/sources"
 
   return (
     <main className="flex min-w-0 grow flex-col">
-      <div id={SCROLL_ID} className="min-h-0 grow overflow-y-auto px-6 pb-8 motion-safe:scroll-smooth md:px-10">
+      <div id={SCROLL_ID} className="relative min-h-0 grow overflow-y-auto px-6 pb-8 motion-safe:scroll-smooth md:px-10">
         <div className="flex max-w-[1180px] gap-12">
           {report ? (
             <aside className="hidden w-52 shrink-0 lg:block">
