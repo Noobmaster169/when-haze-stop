@@ -9,6 +9,7 @@ import { scores } from "../repositories";
 import { hazeDay, hazeDays } from "../services/history";
 import { cityAir } from "../services/city";
 import { hazeMap } from "../services/map";
+import { modelLive } from "../services/model-live";
 import { stationOutlook } from "../services/outlook";
 import { findPlaces } from "../services/places";
 import { simulation } from "../services/simulation";
@@ -81,6 +82,12 @@ export function hazeRouter(deps: HazeRouteDeps): Router {
 
   router.get("/simulation", async (_req, res) => {
     res.json(await simulation(deps.pool, config.MODEL_MODE));
+  });
+
+  router.get("/model", async (req, res) => {
+    // The browser's followed stations; an id that is not one is dropped, since the page is still worth showing.
+    const follow = typeof req.query.follow === "string" ? req.query.follow.split(",").filter((id) => StationId.safeParse(id).success) : [];
+    res.json(await modelLive(deps.pool, config.MODEL_MODE, deps.model, follow));
   });
 
   router.get("/guidelines", (_req, res) => {

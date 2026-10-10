@@ -94,3 +94,20 @@ export async function scorable(db: Queryable, modelVersion: string, runModel: st
     v2: row.v2,
   }));
 }
+
+/**
+ * The earliest stored day of a version that `scorable` cannot score yet: the
+ * newest reading's Malaysian day or a later one. Null before any reading or
+ * once every stored day has passed. Its end, 16:00 UTC, is when the next
+ * check lands.
+ */
+export async function pendingDay(db: Queryable, modelVersion: string): Promise<string | null> {
+  const { rows } = await db.query<{ day: string | null }>(
+    `with newest as (select max(observed_at) as at from readings)
+     select to_char(min(m.day), 'YYYY-MM-DD') as day
+       from model_forecasts m cross join newest n
+      where m.model_version = $1 and m.day >= ((n.at at time zone 'UTC') + interval '8 hours')::date`,
+    [modelVersion],
+  );
+  return rows[0]?.day ?? null;
+}
