@@ -1,13 +1,22 @@
+import { createHash } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
 
+import { pm25ToApi } from "../../src/haze/api-index";
 import { FIRST_FIT } from "../../src/haze/calibrate";
 import { chanceAbove, firstHindcast } from "../../src/haze/chance";
 import { emissionsFor, type FireCellDay } from "../../src/haze/fires";
-import { addHours, FIELD, FIELD_CELLS, hoursBetween } from "../../src/haze/grid";
-import { runModel, type RunStation } from "../../src/haze/run";
+import { addHours, DOMAIN, FIELD, FIELD_CELLS, hoursBetween } from "../../src/haze/grid";
+import { type LearnedInstrument, shaped } from "../../src/haze/learned-frames";
+import { localDay, type ModelDay } from "../../src/haze/outlook";
+import { runModel, type RunInput, type RunStation } from "../../src/haze/run";
 import { spearman } from "../../src/haze/stats";
 import { CENTRAL, simulate } from "../../src/haze/transport";
+import { parseMetars } from "../../src/sources/metar";
+import { NEA_STATIONS } from "../../src/sources/nea";
 import { FIRE_CELLS, FIRST_HOUR, LAST_HOUR, READINGS, STATIONS } from "../fixtures/recorded";
+import { METAR_JSON } from "../fixtures/recorded-context";
+import { ISSUE_VERSION, RECORDED_ISSUE } from "../fixtures/recorded-model-issue";
 import { steadyWind } from "../fixtures/steady-wind";
 
 const START = new Date("2026-10-06T00:00:00Z");
@@ -65,15 +74,17 @@ describe("the transport model", () => {
   });
 });
 
+const HOURS = hoursBetween(START, LAST_HOUR) + 85;
+const RUN_STATIONS: RunStation[] = STATIONS.map((station) => {
+  const readings = new Float32Array(HOURS).fill(NaN);
+  for (const reading of READINGS.filter((item) => item.stationId === station.id)) readings[hoursBetween(START, reading.observedAt)] = reading.api;
+  return { id: station.id, lat: station.lat, lon: station.lon, readings };
+});
+// A south-westerly, which is what carries Sumatran smoke to the peninsula.
+const RUN_INPUT: RunInput = { asOf: LAST_HOUR, start: START, weather: steadyWind(START, HOURS, 3, 3), fires: FIRE_CELLS, stations: RUN_STATIONS };
+
 describe("a model run", () => {
-  const hours = hoursBetween(START, LAST_HOUR) + 85;
-  const stations: RunStation[] = STATIONS.map((station) => {
-    const readings = new Float32Array(hours).fill(NaN);
-    for (const reading of READINGS.filter((item) => item.stationId === station.id)) readings[hoursBetween(START, reading.observedAt)] = reading.api;
-    return { id: station.id, lat: station.lat, lon: station.lon, readings };
-  });
-  // A south-westerly, which is what carries Sumatran smoke to the peninsula.
-  const output = runModel({ asOf: LAST_HOUR, start: START, weather: steadyWind(START, hours, 3, 3), fires: FIRE_CELLS, stations });
+  const output = runModel(RUN_INPUT);
 
   it("forecasts every station that has a recent reading, starting from that reading", () => {
     expect(output.forecasts.map((forecast) => forecast.stationId).sort()).toEqual(STATIONS.map((station) => station.id).sort());
@@ -102,6 +113,82 @@ describe("a model run", () => {
     for (let cell = 0; cell < now.length; cell++) moved += Math.abs(now[cell] - next[cell]) * 2;
     // One byte is two API points; the first forecast frame is at most three hours on.
     expect(moved / now.length).toBeLessThan(3);
+  });
+
+  it("gives every forecast station its calibrated smoke, hour by hour, on the same indices as the forecast", () => {
+    const seremban = output.forecasts.find((forecast) => forecast.stationId === "CA24N");
+    expect(seremban?.physics).toHaveLength(84);
+    // Nothing less than the fit's intercept, which is the air with no modelled smoke; the series is Float32.
+    expect(seremban?.physics.every((value) => value >= FIRST_FIT.intercept - 0.001)).toBe(true);
+    expect(output.learnedVersion).toBeNull();
+  });
+
+  it("is what it was before the learned correction existed, byte for byte, when no instrument is given", () => {
+    // Checksums of the frames and the station forecasts this input gave at commit 39078e9. A change to the
+    // model is meant to move them; the learned correction must not, because nothing learned was handed in.
+    const frames = createHash("sha256");
+    for (const frame of output.frames) frames.update(frame.field);
+    expect(frames.digest("hex")).toBe("871ea3d7b3cd337f53e39704f1d4d73ea3c481bddd1060451404f463d581ae96");
+    const forecasts = createHash("sha256");
+    for (const forecast of output.forecasts) forecasts.update(forecast.stationId).update(Buffer.from(forecast.api.buffer));
+    expect(forecasts.digest("hex")).toBe("e052de2419f4b29a3a2b0f7cf81c1d6449b2431bf64d059bdff516dfb0013f12");
+  });
+});
+
+describe("a run on the learned forecast", () => {
+  // The recorded issue's instruments the fixtures can place: two DOE stations, Singapore Central and KLIA.
+  // The OpenAQ sensor has no recorded position, so it is left out, as the job leaves out an instrument nothing stored.
+  const klia = parseMetars(METAR_JSON).find((report) => report.icao === "WMKK");
+  const central = NEA_STATIONS.find((station) => station.id === "SGCENTRAL");
+  const positions = new Map<string, { lat: number; lon: number }>([
+    ...STATIONS.map((station) => [station.id, { lat: station.lat, lon: station.lon }] as const),
+    ["SGCENTRAL", { lat: central?.lat ?? NaN, lon: central?.lon ?? NaN }],
+    ["WMKK", { lat: klia?.lat ?? NaN, lon: klia?.lon ?? NaN }],
+  ]);
+  const instruments: LearnedInstrument[] = [...positions].flatMap(([id, at]) => {
+    const days = new Map<string, ModelDay>(RECORDED_ISSUE.filter((row) => row.instrumentId === id).map((row) => [row.day, { p10: row.p10, p50: row.p50, p90: row.p90 }]));
+    return days.size === 0 ? [] : [{ id, ...at, days }];
+  });
+  const plain = runModel(RUN_INPUT);
+  const learned = runModel({ ...RUN_INPUT, instruments, learnedVersion: ISSUE_VERSION });
+  const seremban = STATIONS.find((station) => station.id === "CA24N");
+  if (!seremban) throw new Error("the recorded sample has no Seremban");
+  const cell = Math.floor((seremban.lat - DOMAIN.lat0) / FIELD.step) * FIELD.nx + Math.floor((seremban.lon - DOMAIN.lon0) / FIELD.step);
+  const apiAt = (frame: Uint8Array): number => frame[cell] * 2;
+
+  it("covers the four placed instruments and names the issue", () => {
+    expect(instruments.map((instrument) => instrument.id).sort()).toEqual(["CA19B", "CA24N", "SGCENTRAL", "WMKK"]);
+    expect(learned.learnedVersion).toBe(ISSUE_VERSION);
+  });
+
+  it("shows rule 2 at Seremban in a frame on the next Malaysian day, to the frame's resolution", () => {
+    const at = new Date("2026-10-11T06:00:00Z");
+    const frame = learned.frames.find((item) => item.validAt.getTime() === at.getTime());
+    const physics = learned.forecasts.find((forecast) => forecast.stationId === "CA24N")?.physics;
+    const row = instruments.find((instrument) => instrument.id === "CA24N")?.days.get("2026-10-11");
+    if (!frame || !physics || !row) throw new Error("the run has no frame, physics or row for 11 October");
+    // The physics series starts the hour after the run; the day's hours are those of 11 October Malaysian time.
+    const index = (hour: Date): number => hoursBetween(LAST_HOUR, hour) - 1;
+    const series: number[] = [];
+    for (let hour = addHours(LAST_HOUR, 1); index(hour) < physics.length; hour = addHours(hour, 1)) {
+      if (localDay(hour) === "2026-10-11") series.push(physics[index(hour)]);
+    }
+    expect(series).toHaveLength(24);
+    const expected = pm25ToApi(shaped(row, series, physics[index(at)]));
+    expect(Math.abs(apiAt(frame.field) - expected)).toBeLessThanOrEqual(2);
+    // The hourly forecast carried Seremban's 182 on; the learned median for the day is well below that.
+    expect(apiAt(frame.field)).toBeLessThan(apiAt(plain.frames[learned.frames.indexOf(frame)].field) - 5);
+  });
+
+  it("leaves every frame of today and before exactly as the hourly run drew it", () => {
+    const today = localDay(LAST_HOUR);
+    for (const [at, frame] of learned.frames.entries()) {
+      const same = localDay(frame.validAt) <= today;
+      expect(frame.validAt).toEqual(plain.frames[at].validAt);
+      if (same) expect(frame.field).toEqual(plain.frames[at].field);
+    }
+    expect(learned.frames.some((frame) => localDay(frame.validAt) > today)).toBe(true);
+    expect(learned.forecasts.map((forecast) => forecast.api)).toEqual(plain.forecasts.map((forecast) => forecast.api));
   });
 });
 

@@ -1,9 +1,10 @@
 import { apiToPm25 } from "./api-index";
 import { calibrate, type Pair, toPm25 } from "./calibrate";
 import { ensembleMean } from "./ensemble";
-import { type Anchor, forecastFrame, modelled, observedFrame, spreadErrors, stationWeight } from "./field";
+import { type Anchor, encode, forecastPm25, modelled, observedFrame, spreadErrors, stationWeight } from "./field";
 import { emissionsFor, type FireCellDay } from "./fires";
 import { addHours, cellsWithin, hoursBetween } from "./grid";
+import { learnedCorrector, type LearnedInstrument } from "./learned-frames";
 import { REACH_KM, smokeFrom } from "./smoke";
 import { carried, forecastStation, windowSlope } from "./station-forecast";
 import type { Weather } from "./transport";
@@ -29,6 +30,10 @@ export interface RunInput {
   weather: Weather;
   fires: FireCellDay[];
   stations: RunStation[];
+  /** Every instrument with a learned forecast. Without them the map's future is the hourly forecast alone. */
+  instruments?: LearnedInstrument[];
+  /** The learned model the instruments' rows came from. */
+  learnedVersion?: string;
 }
 
 export interface RunFrame {
@@ -41,7 +46,9 @@ export interface RunOutput {
   calibration: ReturnType<typeof calibrate>;
   frames: RunFrame[];
   /** Hourly from `asOf` + 1 hour. Absent for a station outside the region or with no recent reading. */
-  forecasts: { stationId: string; api: Float32Array }[];
+  forecasts: { stationId: string; api: Float32Array; physics: Float32Array }[];
+  /** The learned model the future frames were corrected to, null where none was given. */
+  learnedVersion: string | null;
 }
 
 /** Names the method, so runs made by different methods are never scored or drawn together. */
@@ -87,9 +94,10 @@ export function runModel(input: RunInput): RunOutput {
     return hour === null ? [] : [{ station, cells, hour }];
   });
 
-  const forecasts: RunOutput["forecasts"] = anchored.map(({ station, hour }) => ({
+  const forecasts: RunOutput["forecasts"] = anchored.map(({ station, cells, hour }) => ({
     stationId: station.id,
     api: forecastStation({ readings: station.readings, anchorHour: hour, now, end }),
+    physics: Float32Array.from({ length: end - now }, (_, ahead) => modelAt(cells, now + 1 + ahead)),
   }));
 
   const errorsAt = (hour: number): Anchor[] =>
@@ -101,6 +109,15 @@ export function runModel(input: RunInput): RunOutput {
   const slopes = spreadErrors(anchored.map(({ station, hour }) => ({ lat: station.lat, lon: station.lon, error: windowSlope(station.readings, hour) })));
   const modelNow = modelled(calibration, smoke.everywhere(now));
   const weight = stationWeight(anchored.map(({ station }) => station));
+  const instruments = (input.instruments ?? []).map((instrument) => ({ instrument, cells: cellsWithin(instrument.lat, instrument.lon, REACH_KM) })).filter((item) => item.cells.length > 0);
+  const cellsAt = new Map(instruments.map(({ instrument, cells }) => [`${instrument.lat},${instrument.lon}`, cells]));
+  const correct = learnedCorrector({
+    start,
+    asOf: input.asOf,
+    end,
+    instruments: instruments.map(({ instrument }) => instrument),
+    physicsAt: (lat, lon, hour) => modelAt(cellsAt.get(`${lat},${lon}`) ?? [], hour),
+  });
 
   const frames: RunFrame[] = [];
   // Frames sit on fixed three-hour marks so every run's frames line up into one history, plus one at `asOf` itself.
@@ -114,9 +131,10 @@ export function runModel(input: RunInput): RunOutput {
     else {
       const built = carried(hour - now);
       const trend = slopes.map((slope) => slope * built);
-      field = forecastFrame({ model: modelled(calibration, smoke.everywhere(hour)), modelAtAsOf: modelNow, errorsAtAsOf: errorsNow, trend, weight });
+      const hourly = forecastPm25({ model: modelled(calibration, smoke.everywhere(hour)), modelAtAsOf: modelNow, errorsAtAsOf: errorsNow, trend, weight });
+      field = encode(instruments.length > 0 ? correct(hour, hourly) : hourly);
     }
     frames.push({ validAt: addHours(start, hour), observed: hour <= now, field });
   }
-  return { calibration, frames, forecasts };
+  return { calibration, frames, forecasts, learnedVersion: instruments.length > 0 ? (input.learnedVersion ?? null) : null };
 }
