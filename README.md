@@ -146,7 +146,10 @@ This needs Node 24 and pnpm 11. Without Docker, the proxy also runs on the host 
 - **The learned model.** `MODEL_URL` in `backend/.env` is the `model` service (the learned
   forecast, port 4002). `MODEL_MODE` is `off`, `shadow` or `live`: `off` by default for a host
   process, `shadow` in compose, where it is scored on the Simulation page without being shown;
-  `live` makes its forecast the outlook's, set by hand once the shadow rule has passed.
+  `live` makes its forecast the one a person sees for the days ahead: the panel's day rows and
+  line, the map's future frames, the alerts and the assistant, every number labelled with its
+  source and "trial" until the shadow rule passes. The service also answers `GET /report`, the
+  live version's backtest figures, which the api states beside each forecast.
 - **A page.** Add it under `frontend/app/(app)/` and a line in `frontend/components/shell/nav.ts`.
 - **An endpoint.** Schema in `backend/src/contracts.ts`, SQL in `backend/src/repositories/`,
   router in `backend/src/routes/`, then mirror the schema in `frontend/lib/api/`.
@@ -169,6 +172,7 @@ This needs Node 24 and pnpm 11. Without Docker, the proxy also runs on the host 
 | GET | `/haze/days/:day` | One past day for the map: fires, wind, and the haze field where readings exist. |
 | GET | `/haze/stations/:id` | One station: readings, forecast, day-by-day outlook. |
 | GET | `/haze/accuracy` | Forecast error by lead time, beside "no change". |
+| GET | `/haze/model?follow=` | The learned model's live record: whose forecast is showing, its score, the stations to watch, the ledger. |
 | GET | `/haze/guidelines` | The official API thresholds. |
 | GET | `/haze/places?q=` | Place search, each result with its nearest station. |
 | GET | `/sources` | Every data source, its newest good and failed fetch, and the recent fetch log. |

@@ -411,6 +411,37 @@ figure comes from `GET /haze/simulation`, worked out from the database on each v
 (`services/simulation.ts`, `haze/backtest.ts`). `/accuracy`, the old Track record, redirects there.
 The method and every test behind it are in `docs/FORECAST.md`.
 
+### 4.1.1 One forecast
+
+Past today, every number a person sees comes from the learned model (`docs/MODEL.md`), and the
+smoke simulation is its hourly timing and its explanation, not a second forecast. The rule, from
+`docs/specs/2026-10-11-one-forecast-design.md` section 3, applies while `MODEL_MODE` is `live`
+and the newest learned issue is under 30 hours old:
+
+- A day's peak on the station panel's line is the learned median (`haze/reshape.ts`). Inside the
+  day the line follows the calibrated smoke at the station, scaled so its dip never passes the
+  model's p10; a flat simulation gives a flat day at the median. Today keeps the hourly forecast,
+  which is proven to 12 hours, with a ramp of up to 3 hours into the first learned day.
+- The map's future frames are pulled to the same values at every instrument with a learned row
+  (`haze/learned-frames.ts`, `field.ts` `correctToPoints`), spread as station errors are. The
+  run records the version it used in `forecast_runs.learned_version` and stores the smoke series
+  per station in `station_forecasts.physics`.
+- Every `DayOutlook` carries `source` (`learned` or `hourly`) and, for a learned day, `why`: the
+  simulation's peak hour and the wind direction, or that little simulated smoke reaches the
+  station (`haze/why.ts`). `StationOutlook` and the map carry a `ForecastSource` with the model
+  version, the issue time, whether it is still on trial, and its record: days checked, live gain,
+  and the backtest's hazy-day MAE read from the model service's `GET /report`.
+- The map shows chips for Now, Tonight, Tomorrow and Day after, and a caption under a future
+  moment naming the source and its record. The panel's footer names the source and links to the
+  Model page, whose first chapter is the live record (`GET /haze/model`): the backtest, the live
+  score, the rule's state, the six stations the model puts highest tomorrow, and the ledger of
+  every scored forecast.
+- In `shadow` or `off` nothing above applies and every forecast is labelled `hourly`.
+
+A day the issue does not cover (the fourth day after midnight Malaysian time, until the 08:00
+issue) keeps the hourly value and is labelled so. Hourly issue of the learned model, which removes
+that gap, is the next phase.
+
 ### 4.2 The model
 
 A Lagrangian particle model: it releases particles where fires burn and moves them with the wind.
@@ -929,8 +960,10 @@ rows and never delete, so they can be run repeatedly.
 
 Limits, in the order they matter:
 
-1. The forecast beats "no change" up to about 12 hours and ties with it beyond a day. The smoke
-   model adds the picture (where smoke is, where it is heading), not a better number past a day.
+1. The hourly forecast beats "no change" up to about 12 hours and ties with it beyond a day, so
+   it is used for today only. Past today the learned model is the forecast (section 4.1.1), 12%
+   closer than "no change" on hazy days in its backtest and on trial live; the smoke model adds
+   the picture and the timing, not a number of its own.
 2. The live source clients were verified against real responses for shape, and their parsers are
    tested on recorded real answers, but the first full run from a developer machine is the first
    time all three are fetched from Node end to end. Watch the first `pnpm haze:once`.

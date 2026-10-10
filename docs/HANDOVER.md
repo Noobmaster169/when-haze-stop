@@ -4,6 +4,43 @@ Written 10 October 2026, at commit "Add the haze map, forecast, alerts and assis
 branch `haze-product`. This is the state of the work and what to do next. For what each feature
 is and how it works, read `docs/FEATURES.md`. For the code rules, read `CLAUDE.md`.
 
+## One forecast (11 October 2026, later)
+
+The learned model is now the forecast a person sees past today, with the smoke simulation as its
+hourly shape and its reason; the design is `docs/specs/2026-10-11-one-forecast-design.md`, the
+plan `docs/specs/plans/2026-10-11-one-forecast.md`, the feature `docs/FEATURES.md` 4.1.1. Built
+in four tracks on top of foundation commit ad3b58c: the outlook reshaped to the learned peaks
+with a why line (A), the run's future frames corrected to the learned values at every instrument
+(B), the map's jump chips, caption and panel labels (C), and the live record at `/haze/model` as
+the first chapter of the Model page (D). Migration `009_learned_frames.sql`. The model service
+answers `GET /report` from the committed `model/reports`, mounted read-only in compose.
+
+Checked on the compose stack with `MODEL_MODE=live` after `docker compose up -d --build`:
+
+| Check | Result |
+| --- | --- |
+| Backend `pnpm test`, frontend `pnpm test`, model `pytest` | 265, 115 and 138 pass; type-checks, lint and `pnpm build` clean |
+| Jerantut panel, line against rows | Mon 12 Oct line peak 92 = row 92; Tue 13 Oct 103 = 103; today and Thu labelled hourly |
+| Why line under a learned day | "Little simulated smoke reaches here", because the run on screen predates migration 009 and stored no `physics`; the next run stores it and the sentence can name the peak hour and wind |
+| Map source, caption | learned, version 2026-10-11-c88cac5a, trial, backtest 15.48 against 17.53 |
+| Map frames corrected (`learnedFrom`) | Not yet at the time of writing: the newest complete DOE hour already had a run from before the rebuild, and runs are never remade. The first cycle that makes a new live run writes `learned_version` and the caption switches from "hourly forecast" to the model past midnight Malaysian time. Confirm with `select id, as_of, learned_version from forecast_runs order by id desc limit 1` |
+| `/haze/model` | source learned, 0 days checked, next check 2026-10-11T16:00Z, six watched DOE stations, empty ledger |
+| `/model` page | Renders the live record first, then the published figures |
+
+So `MODEL_MODE=live` works end to end on the compose stack for the panel, the alerts, the
+assistant and the Model page; the map's future frames follow at the next new run. The chat was
+not exercised against a real model call here; prompt `v5.md` and `haze-decision` version 5 are
+what it reads.
+
+Decisions to revisit: today's line stays the hourly forecast even when the issue's day +1 is
+today (between midnight and 08:00 Malaysian time the freshest learned day is unused); and the
+model is live on trial rather than back in shadow. Next phase: issue the learned model hourly
+(training rows at several issue hours), so every day is learned and the frames follow every run.
+
+Git history note: two `commit --amend` races between the parallel tracks rewrote one commit
+each; the tree is right and nothing is lost, but `0a8b54a` carries a one-file test fix that
+belongs to track A and `aa95bce` is track B's fix committed separately.
+
 ## Where things stand
 
 All three features are written and committed: the haze map and forecast, alerts, and the
