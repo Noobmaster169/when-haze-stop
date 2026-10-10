@@ -58,7 +58,7 @@ export function hazeRouter(deps: HazeRouteDeps): Router {
       res.status(400).json({ error: "a place search needs at least two characters in q" });
       return;
     }
-    const body: PlaceList = { places: await findPlaces(deps.pool, deps.geocoder, query.data) };
+    const body: PlaceList = { places: await findPlaces(deps.pool, deps.geocoder, query.data, { remote: req.query.remote === "1" }) };
     res.json(body);
   });
 

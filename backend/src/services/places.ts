@@ -4,6 +4,7 @@ import { distanceKm } from "../haze/grid";
 import { childLogger } from "../lib/logger";
 import { stations } from "../repositories";
 import type { Geocoder } from "../sources";
+import { matchTier, normalise, searchGazetteer } from "../sources/gazetteer";
 
 /** A name to a place on the map, with the DOE station that speaks for it. */
 
@@ -32,23 +33,50 @@ export function nearestStation(all: Station[], lat: number, lon: number): Place[
   return best;
 }
 
-/**
- * Stations whose own name matches come first: someone typing "Klang" means the
- * Klang the readings are for, before any other place the geocoder knows by
- * that name.
- */
-export async function findPlaces(db: Queryable, geocoder: Geocoder, query: string): Promise<Place[]> {
-  const all = await stations.list(db);
-  const wanted = query.trim().toLowerCase();
-  const own: Place[] = all
-    .filter((station) => station.name.toLowerCase().includes(wanted))
-    .map((station) => ({ name: station.name, region: station.state, country: "Malaysia", lat: station.lat, lon: station.lon, nearest: { id: station.id, name: station.name, km: 0 } }));
+const RESULTS = 8;
+/** A gazetteer or geocoder place this close to one already listed under the same name is the same place. */
+const SAME_PLACE_KM = 15;
 
-  const found = await geocoded(geocoder, query);
-  const elsewhere: Place[] = found
-    .filter((place) => !own.some((station) => station.name.toLowerCase() === place.name.toLowerCase()))
-    .map((place) => ({ ...place, nearest: nearestStation(all, place.lat, place.lon) }));
-  return [...own, ...elsewhere].slice(0, 8);
+interface Ranked {
+  place: Place;
+  tier: number;
+  /** Stations rank above towns of equal match, then the bigger place. */
+  weight: number;
+}
+
+function isListed(listed: Ranked[], name: string, lat: number, lon: number): boolean {
+  const key = normalise(name);
+  return listed.some((item) => normalise(item.place.name) === key && distanceKm(lat, lon, item.place.lat, item.place.lon) < SAME_PLACE_KM);
+}
+
+/**
+ * Our stations and the gazetteer answer from memory, at once. The geocoder
+ * is someone else's service and takes seconds, so it is asked only with
+ * `remote`, which the search box does when memory found little.
+ */
+export async function findPlaces(db: Queryable, geocoder: Geocoder, query: string, options: { remote: boolean } = { remote: false }): Promise<Place[]> {
+  const all = await stations.list(db);
+  const wanted = normalise(query);
+  const ranked: Ranked[] = [];
+  for (const station of all) {
+    const tier = matchTier(normalise(station.name), wanted);
+    if (tier === 0) continue;
+    const place: Place = { name: station.name, kind: "station", region: station.state, country: "Malaysia", lat: station.lat, lon: station.lon, nearest: { id: station.id, name: station.name, km: 0 } };
+    ranked.push({ place, tier, weight: Number.MAX_SAFE_INTEGER });
+  }
+  for (const found of searchGazetteer(query, RESULTS * 2)) {
+    if (isListed(ranked, found.name, found.lat, found.lon)) continue;
+    const place: Place = { name: found.name, kind: found.kind, region: found.region, country: found.country, lat: found.lat, lon: found.lon, nearest: nearestStation(all, found.lat, found.lon) };
+    ranked.push({ place, tier: matchTier(normalise(found.name), wanted), weight: found.population });
+  }
+  ranked.sort((a, b) => b.tier - a.tier || b.weight - a.weight);
+  const local = ranked.slice(0, RESULTS);
+  if (!options.remote) return local.map((item) => item.place);
+
+  const remote = (await geocoded(geocoder, query))
+    .filter((found) => !isListed(local, found.name, found.lat, found.lon))
+    .map((found): Place => ({ ...found, kind: "place", nearest: nearestStation(all, found.lat, found.lon) }));
+  return [...local.map((item) => item.place), ...remote].slice(0, RESULTS + 4);
 }
 
 export interface ResolvedStation {
@@ -68,7 +96,8 @@ export async function resolveStation(db: Queryable, geocoder: Geocoder, text: st
   const exact = all.find((station) => station.id.toLowerCase() === wanted || station.name.toLowerCase() === wanted);
   if (exact) return { station: exact, via: null };
 
-  const [place] = await geocoded(geocoder, text);
+  // The gazetteer answers at once; the geocoder only for what it does not know.
+  const [place] = searchGazetteer(text, 1).length > 0 ? searchGazetteer(text, 1) : await geocoded(geocoder, text);
   if (place) {
     const nearest = nearestStation(all, place.lat, place.lon);
     const station = all.find((item) => item.id === nearest?.id);

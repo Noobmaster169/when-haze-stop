@@ -26,6 +26,7 @@ export async function getGuidelines(): Promise<GuidelineList> {
   return get(GuidelineList, "/haze/guidelines");
 }
 
-export async function findPlaces(query: string): Promise<PlaceList> {
-  return get(PlaceList, `/haze/places?q=${encodeURIComponent(query)}`);
+/** Stations and the bundled gazetteer answer at once; `remote` also asks the geocoder, which takes seconds. */
+export async function findPlaces(query: string, remote = false): Promise<PlaceList> {
+  return get(PlaceList, `/haze/places?q=${encodeURIComponent(query)}${remote ? "&remote=1" : ""}`);
 }

@@ -107,8 +107,13 @@ export type LeadScore = z.infer<typeof LeadScore>;
 export const Accuracy = z.object({ since: z.string().nullable(), leads: z.array(LeadScore) });
 export type Accuracy = z.infer<typeof Accuracy>;
 
+/** What a search result is: one of our stations, a gazetteer state, district or town, or something only the geocoder knew. */
+export const PlaceKind = z.enum(["station", "state", "district", "town", "place"]);
+export type PlaceKind = z.infer<typeof PlaceKind>;
+
 export const Place = z.object({
   name: z.string(),
+  kind: PlaceKind,
   region: z.string(),
   country: z.string(),
   lat: z.number(),

@@ -92,7 +92,7 @@ export default async function SourcesPage({ searchParams }: PageProps<"/sources"
                   <h2 id="where" className="font-display text-[22px] leading-7 text-ink">
                     Where it comes from
                   </h2>
-                  <p className="mt-1 mb-4 max-w-[62ch] text-body text-ink-secondary">Every source is public and needs no key. The last two are not fetched on a schedule.</p>
+                  <p className="mt-1 mb-4 max-w-[62ch] text-body text-ink-secondary">Every source is public and needs no key. The last three are not fetched on a schedule.</p>
                   <WhereTable sources={report.sources} />
                 </section>
               </>

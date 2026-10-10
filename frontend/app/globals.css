@@ -200,3 +200,17 @@ body {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* The loading dots: each rises and brightens in turn. */
+@keyframes dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
