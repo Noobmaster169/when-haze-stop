@@ -1,9 +1,10 @@
+import { config, type ModelMode } from "../config";
 import type { Station, StationOutlook } from "../contracts";
 import type { Queryable } from "../db";
 import { firstHindcast, leadBucket } from "../haze/chance";
 import { addHours } from "../haze/grid";
-import { dayOutlooks, type ErrorsFor, type Hourly } from "../haze/outlook";
-import { forecasts, nea, readings, scores, stations } from "../repositories";
+import { dayOutlooks, type ErrorsFor, type Hourly, type ModelDay } from "../haze/outlook";
+import { forecasts, modelForecasts, nea, readings, scores, stations } from "../repositories";
 import { neaRegionOf } from "../sources/nea";
 
 /**
@@ -25,17 +26,29 @@ export async function loadErrors(db: Queryable): Promise<ErrorsFor> {
   };
 }
 
+/** A learned forecast older than this against the run is stale, and the hourly forecast speaks instead. */
+const LEARNED_STALE_HOURS = 24;
+
 export interface OutlookContext {
   asOf: Date;
   runId: number;
   errorsFor: ErrorsFor;
+  /** Whether the learned model's forecast is the outlook's for the days ahead: MODEL_MODE is live. */
+  learned: boolean;
 }
 
-/** Null before the model has run once. */
-export async function outlookContext(db: Queryable): Promise<OutlookContext | null> {
+/** Null before the model has run once. `mode` is the config's unless a test says otherwise. */
+export async function outlookContext(db: Queryable, mode: ModelMode = config.MODEL_MODE): Promise<OutlookContext | null> {
   const run = await forecasts.latest(db);
   if (!run) return null;
-  return { asOf: new Date(run.asOf), runId: run.id, errorsFor: await loadErrors(db) };
+  return { asOf: new Date(run.asOf), runId: run.id, errorsFor: await loadErrors(db), learned: mode === "live" };
+}
+
+/** The newest learned forecast for a station, empty where there is none or it is older than the run by a day. */
+async function learnedDays(db: Queryable, stationId: string, asOf: Date): Promise<Map<string, ModelDay>> {
+  const stored = await modelForecasts.latestFor(db, stationId);
+  if (!stored || stored.asOf < addHours(asOf, -LEARNED_STALE_HOURS)) return new Map();
+  return stored.days;
 }
 
 export async function outlookFor(db: Queryable, station: Station, context: OutlookContext, forecastApi?: number[] | null): Promise<StationOutlook> {
@@ -44,11 +57,12 @@ export async function outlookFor(db: Queryable, station: Station, context: Outlo
   const api = forecastApi === undefined ? await forecasts.stationForecast(db, runId, station.id) : forecastApi;
   const observed: Hourly[] = stored.map((reading) => ({ at: reading.observedAt, api: reading.api }));
   const ahead: Hourly[] = (api ?? []).map((value, index) => ({ at: addHours(asOf, index + 1), api: value }));
+  const modelDays = context.learned ? await learnedDays(db, station.id, asOf) : new Map<string, ModelDay>();
   return {
     station,
     readings: observed.map((reading) => ({ at: reading.at.toISOString(), api: reading.api })),
     forecast: ahead.map((value) => ({ at: value.at.toISOString(), api: Math.round(value.api) })),
-    days: dayOutlooks(asOf, observed, ahead, errorsFor),
+    days: dayOutlooks(asOf, observed, ahead, errorsFor, modelDays),
     pm25: await measuredPm25(db, station),
   };
 }
