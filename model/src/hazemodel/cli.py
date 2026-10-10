@@ -3,11 +3,11 @@ import pathlib
 
 import pandas as pd
 
+from hazemodel.features.air import HISTORY_DAYS
 from hazemodel.features.build import build_rows, write_parquet
 from hazemodel.region import region_from_env
 from hazemodel.store import connect, load_source_data
 
-HISTORY_DAYS = 30
 TARGET_LOOKAHEAD_DAYS = 3
 
 
@@ -23,5 +23,10 @@ def features_command(args) -> pathlib.Path:
             end + pd.Timedelta(days=TARGET_LOOKAHEAD_DAYS),
             args.hindcast_model,
         )
-    frame, _ = build_rows(data, region_from_env(), issues, with_targets=True)
-    return write_parquet(frame, pathlib.Path(args.out), args.start, args.end)
+    frame, decisions = build_rows(data, region_from_env(), issues, with_targets=True)
+    path = write_parquet(frame, pathlib.Path(args.out), args.start, args.end)
+    for name in ("sensors", "airports"):
+        target = path.with_name(f"{path.stem}-{name}.csv")
+        decisions[name].to_csv(target, index=False)
+        print(target)
+    return path

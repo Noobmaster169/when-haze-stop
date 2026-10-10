@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from hazemodel.features.air import air_features
+from hazemodel.features.air import HISTORY_DAYS, air_features
 from hazemodel.features.calendar import calendar_features
 from hazemodel.features.fires import fire_features, sector_of
 from hazemodel.features.physics import physics_features
@@ -23,7 +23,12 @@ def test_air_features_are_leak_free_and_complete(data):
     assert abs(row["level"] - stored["pm25_24h"].iloc[-1]) < 1e-6
     assert abs(row["d24"] - (row["level"] - row["lag24"])) < 1e-6
     assert 0 <= row["peak_hour"] <= 23
-    assert abs(row["hist_mean"] - stored["pm25_24h"].iloc[:-1].mean()) < 1e-6
+    window = series[
+        (series["instrument_id"] == "SGCENTRAL")
+        & (series["observed_at"] < ISSUES[1])
+        & (series["observed_at"] >= ISSUES[1] - pd.Timedelta(days=HISTORY_DAYS))
+    ]
+    assert abs(row["hist_mean"] - window["pm25_24h"].mean()) < 1e-6
     cut = series[series["observed_at"] <= ISSUES[-1]]
     pd.testing.assert_frame_equal(air, air_features(cut, table, ISSUES))
 

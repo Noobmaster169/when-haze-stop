@@ -6,6 +6,9 @@ from hazemodel.instruments import distance_km
 
 STALE_HOURS = 6
 NEAR_KM = (50, 150)
+# A bounded window so a training row late in a long parquet sees the same history as a live row; the live
+# service loads the same window.
+HISTORY_DAYS = 30
 
 
 def _at(series: pd.Series, when: pd.Timestamp, tolerance_h: int) -> float:
@@ -20,7 +23,7 @@ def _one(series: pd.Series, issue: pd.Timestamp) -> dict | None:
     if np.isnan(level):
         return None
     last24 = series[(series.index > issue - pd.Timedelta(hours=24)) & (series.index <= issue)]
-    history = series[series.index < issue]
+    history = series[(series.index < issue) & (series.index >= issue - pd.Timedelta(days=HISTORY_DAYS))]
     lag24, lag48, lag72 = (_at(series, issue - pd.Timedelta(hours=h), STALE_HOURS) for h in (24, 48, 72))
     three = _at(series, issue - pd.Timedelta(hours=3), STALE_HOURS)
     peak_at = last24.idxmax() if not last24.empty else issue
