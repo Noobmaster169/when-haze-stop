@@ -1,10 +1,11 @@
-import type { Simulation } from "../contracts";
+import type { ModelMode, Simulation } from "../contracts";
 import type { Queryable } from "../db";
 import { BAND_EDGES } from "../haze/api-index";
 import { arrivals, backtest, type ReadingGrid } from "../haze/backtest";
 import { MEMBERS } from "../haze/ensemble";
 import { addHours, hoursBetween, WEATHER_POINTS } from "../haze/grid";
 import { fires, forecasts, readings, stations, weather } from "../repositories";
+import { modelSkill } from "./model-skill";
 
 /**
  * Everything the Simulation page shows, worked out from the database on each
@@ -19,7 +20,7 @@ const DAY_LEAD = 6;
 const REPLAY_HOURS = 24;
 const REPLAYS = 4;
 
-export async function simulation(db: Queryable): Promise<Simulation> {
+export async function simulation(db: Queryable, mode: ModelMode): Promise<Simulation> {
   const oldest = await readings.oldestAt(db);
   const newest = await readings.newestAt(db);
   const all = oldest && newest ? await readings.between(db, oldest, newest) : [];
@@ -76,5 +77,6 @@ export async function simulation(db: Queryable): Promise<Simulation> {
       model: item.model,
       persistence: item.persistence,
     })),
+    model: await modelSkill(db, mode),
   };
 }
