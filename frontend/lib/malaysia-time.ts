@@ -41,3 +41,17 @@ export function malaysiaMidnights(from: number, to: number): number[] {
   for (let at = first; at < to; at += 86_400_000) marks.push(at);
   return marks;
 }
+
+/** "15:20". */
+export function malaysiaClock(at: number | string): string {
+  const date = shifted(at);
+  if (Number.isNaN(date.getTime())) return String(at);
+  return `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}`;
+}
+
+/** "2 Oct". */
+export function malaysiaDate(at: number | string): string {
+  const date = shifted(at);
+  if (Number.isNaN(date.getTime())) return String(at);
+  return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]}`;
+}

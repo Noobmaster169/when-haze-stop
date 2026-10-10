@@ -1,5 +1,4 @@
-import type { FetchDetail, SourceFetch, SourceStatus } from "@/lib/api/source-schemas";
-import { formatWhenShort } from "@/lib/when";
+import type { SourceFetch, SourceStatus } from "@/lib/api/source-schemas";
 
 /** Whether a source is being fetched as it should be, and how that reads on the page. */
 
@@ -7,6 +6,7 @@ export type SourceState = "fresh" | "late" | "failing" | "never" | "untracked";
 
 /** A cycle starts at 20 past and can take minutes, so a fetch is late only well after the next one was due. */
 const GRACE_MS = 30 * 60_000;
+const HOUR_MS = 3_600_000;
 
 export function sourceState(source: SourceStatus, now: Date): SourceState {
   if (!source.tracked) return "untracked";
@@ -15,53 +15,46 @@ export function sourceState(source: SourceStatus, now: Date): SourceState {
   if (!lastSuccess) return "never";
   if (source.everyHours === null) return "fresh";
   const age = now.getTime() - new Date(lastSuccess.finishedAt).getTime();
-  return age > 2 * source.everyHours * 3_600_000 + GRACE_MS ? "late" : "fresh";
+  return age > 2 * source.everyHours * HOUR_MS + GRACE_MS ? "late" : "fresh";
 }
 
-export const STATE_TONE: Record<SourceState, { label: string; chip: string }> = {
-  fresh: { label: "Up to date", chip: "border-match-line bg-match-tint text-match" },
-  late: { label: "Late", chip: "border-differ-line bg-differ-tint text-differ" },
-  failing: { label: "Last fetch failed", chip: "border-fault-line bg-fault-tint text-fault" },
-  never: { label: "Not fetched yet", chip: "border-hairline-strong bg-sunken text-ink-tertiary" },
-  untracked: { label: "Not scheduled", chip: "border-hairline-strong bg-sunken text-ink-tertiary" },
-};
+const WORST_FIRST: SourceState[] = ["failing", "late", "never", "fresh", "untracked"];
 
-const LABELS: Record<string, string> = {
-  stations: "stations",
-  states: "states",
-  daysBack: "days asked",
-  requests: "requests",
-  emptyAnswers: "empty answers",
-  received: "readings received",
-  added: "new readings",
-  newestReading: "newest reading",
-  detections: "detections",
-  cellDays: "fire cell-days",
-  firstDay: "first day",
-  lastDay: "last day",
-  points: "grid points",
-  hours: "hours",
-  from: "from",
-  to: "to",
-};
-
-const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
-
-const ORDER = Object.keys(LABELS);
-
-/** Where a key sits in reading order. Postgres jsonb stores keys shortest first, so the stored order means nothing. */
-function rank(key: string): number {
-  const at = ORDER.indexOf(key);
-  return at < 0 ? ORDER.length : at;
+/** A dataset is as healthy as its least healthy fetch. */
+export function worstState(sources: readonly SourceStatus[], now: Date): SourceState {
+  const states = sources.map((source) => sourceState(source, now));
+  return WORST_FIRST.find((state) => states.includes(state)) ?? "never";
 }
 
-/** A fetch's detail as label and value pairs in reading order, times in the page's one zone (UTC). */
-export function describeDetail(detail: FetchDetail): { label: string; value: string }[] {
-  const entries = Object.entries(detail).sort(([a], [b]) => rank(a) - rank(b));
-  return entries.map(([key, value]) => ({
-    label: LABELS[key] ?? key,
-    value: typeof value === "number" ? value.toLocaleString("en-GB") : ISO_TIME.test(value) ? formatWhenShort(value) : value,
-  }));
+export const STATE_TONE: Record<SourceState, { label: string; chip: string; dot: string; icon: "check" | "alert" | "clock" }> = {
+  fresh: { label: "Up to date", chip: "border-match-line bg-match-tint text-match", dot: "bg-match", icon: "check" },
+  late: { label: "Late", chip: "border-differ-line bg-differ-tint text-differ", dot: "bg-differ", icon: "clock" },
+  failing: { label: "Last fetch failed", chip: "border-fault-line bg-fault-tint text-fault", dot: "bg-fault", icon: "alert" },
+  never: { label: "Not fetched yet", chip: "border-hairline-strong bg-sunken text-ink-tertiary", dot: "bg-ink-faint", icon: "clock" },
+  untracked: { label: "Not scheduled", chip: "border-hairline-strong bg-sunken text-ink-tertiary", dot: "bg-ink-faint", icon: "clock" },
+};
+
+/** The newest attempt, good or failed. */
+export function lastAttempt(source: SourceStatus): SourceFetch | null {
+  const { lastSuccess, lastFailure } = source;
+  if (!lastSuccess || !lastFailure) return lastSuccess ?? lastFailure;
+  return lastFailure.startedAt > lastSuccess.startedAt ? lastFailure : lastSuccess;
+}
+
+/** The jobs process wakes at this minute of every hour (backend/src/jobs/main.ts). */
+const CYCLE_MINUTE = 20;
+
+/**
+ * When the next fetch should start: the first cycle at 20 past that is a full
+ * interval on from the last attempt. Null for a source with no schedule or no
+ * attempt yet.
+ */
+export function nextFetch(source: SourceStatus): number | null {
+  const last = lastAttempt(source);
+  if (!last || source.everyHours === null) return null;
+  const earliest = new Date(last.startedAt).getTime() + (source.everyHours - 1) * HOUR_MS;
+  const onMark = Math.floor(earliest / HOUR_MS) * HOUR_MS + CYCLE_MINUTE * 60_000;
+  return onMark > earliest ? onMark : onMark + HOUR_MS;
 }
 
 /** "4.2 s" or "3 min 10 s". */

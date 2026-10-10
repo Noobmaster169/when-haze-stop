@@ -33,8 +33,17 @@ export const SourceStatus = z.object({
   lastSuccess: SourceFetch.nullable(),
   lastFailure: SourceFetch.nullable(),
   day: z.object({ ok: z.number().int(), failed: z.number().int() }),
+  marks: z.array(z.object({ at: z.string(), ok: z.boolean() })),
 });
 export type SourceStatus = z.infer<typeof SourceStatus>;
 
-export const SourceReport = z.object({ sources: z.array(SourceStatus), recent: z.array(SourceFetch) });
+export const SourceReport = z.object({ sources: z.array(SourceStatus) });
 export type SourceReport = z.infer<typeof SourceReport>;
+
+export const SourceFetchPage = z.object({
+  fetches: z.array(SourceFetch),
+  page: z.number().int(),
+  pageSize: z.number().int(),
+  total: z.number().int(),
+});
+export type SourceFetchPage = z.infer<typeof SourceFetchPage>;
