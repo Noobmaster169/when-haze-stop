@@ -17,7 +17,7 @@ import { buildVerdict } from "./verdict";
  * report and what would make the Committee meet again.
  */
 
-export const DECIDE_PROMPT = "v3";
+export const DECIDE_PROMPT = "v4";
 
 export async function decision(session: Session): Promise<Verdict> {
   const rows = matrix(session);

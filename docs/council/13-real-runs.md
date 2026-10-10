@@ -108,7 +108,45 @@ while any plan clears both bars; the decision says when that happened. This is t
 research describes (Foreign Affairs or Force Command may block a plan on a hard constraint),
 made by the ratings rather than by one voice.
 
-## Run 4
+## Run 4, 10 October 2026, 21:58 to 22:57 MYT (run id 8)
 
-Started 21:58 MYT (run id 8), the first run with the money budget (RM 8 million) and the
-plain-English prompts; recorded here when read.
+The first run with the money budget (RM 8 million) and the plain-English prompts, and with no cap
+on model calls: 141 calls, 59 minutes, three rounds of questioning because the leading plan kept
+changing.
+
+The verdict, as the page shows it:
+
+> Malaysia sends firefighters to two Johor fires and aircraft to Kalimantan today, and asks
+> Jakarta for ground crews in Jambi.
+>
+> **Do now:** Today, 60 Bomba firefighters to the fire near Senggarang and 40 near Pekan Serkat,
+> in Johor. Three helicopters and one water plane to Seruyan, Kalimantan, already agreed.
+>
+> **Ask Indonesia for:** Ask Jakarta to let our small crews from day five, and 150 Bomba pump
+> firefighters from day seven, work the peat fires near Muaro Jambi and Simpang. Most of the
+> benefit rests on that yes.
+>
+> **Tell Indonesia:** Our daily satellite readings of where each fire's edge sits near Muaro
+> Jambi and Simpang, passed to Indonesia's disaster agency. Their officers direct our visiting
+> teams; Malaysia pays.
+
+| | Clears | Worst wind | Cost |
+| --- | --- | --- | --- |
+| The committee's plan (Health's, revised) | 12.5% of what any plan could clear | 8.8% | RM 7.9 million of RM 8 million |
+| Best plan worked out by computer, within the same budget | about 7% | | |
+
+What changed: the budget made the trade-offs real. Inside RM 8 million the computer's greedy
+plan can no longer buy everything, and the committee's plan (ground crews for Jambi's worst peat
+fires, Bomba in Johor, Kalimantan aircraft as a fallback) beat it by a wide margin. The text is
+plain: places named, the gain called small, the cost stated. The minority report names a real
+operational doubt: the record shows no water near the Muaro Jambi fire (the sea is 62 km away),
+and pump crews cannot work peat without it. The before and after maps were drawn.
+
+Still to fix: two plan codes slipped into the reasoning ("P12", "P28"). The decide prompt is
+tightened again (v4) to forbid codes in every field people read.
+
+## Run 5
+
+Queued through `POST /council/runs` at 22:57 MYT (run id 20), as the page's button does, and
+executed by the compose `council` worker: the first run with the closing round, the source
+breakdown and the feasibility and diplomacy bar. Recorded here when read.
