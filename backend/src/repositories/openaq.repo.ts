@@ -74,3 +74,11 @@ export async function between(db: Queryable, after: Date, until: Date): Promise<
   }
   return [...sensors.values()];
 }
+
+/** Every sensor ever stored, reference and low-cost alike, oldest id first. */
+export async function sensors(db: Queryable): Promise<StoredSensor[]> {
+  const { rows } = await db.query<{ sensor_id: string; name: string; provider: string; reference: boolean; lat: number; lon: number }>(
+    "select sensor_id, name, provider, reference, lat, lon from openaq_sensors order by sensor_id",
+  );
+  return rows.map((row) => ({ sensorId: Number(row.sensor_id), name: row.name, provider: row.provider, reference: row.reference, lat: row.lat, lon: row.lon }));
+}
