@@ -29,4 +29,5 @@ Status: design done (`spec.md`), tested on a prototype council (`11`), and built
 | `10-open-questions.md` | What is not settled, and what to ask the engine's owner |
 | `11-prototype-council.md` | A real five-seat council run through the proxy: what worked, what failed, what changed |
 | `12-build.md` | What is built, where it lives, how to run it |
+| `13-real-runs.md` | Full council runs on real data, read in full, and what each changed |
 | `spec.md` | The design in one document, for review before building |
