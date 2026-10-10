@@ -161,8 +161,10 @@ training on it. What that leaves to do:
   proxy (up to 20 per channel per cycle). Without the Claude token no statement is read and
   alerts fall back to the forecast. Push needs `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` in
   `.env` (see `.env.example`).
-- **The model service is asked every cycle in compose.** `MODEL_MODE` defaults to `shadow` there and `off` for a host process. In shadow the cycle logs "a step of the cycle failed" with `what: model` until `model/` (plan A) is built and an artifact promoted; everything else runs. The Simulation page's last chapter shows the shadow rule's state. Set `MODEL_MODE=live` only when it says the rule has passed.
+- **The model service is checked every cycle in compose and asked once a day, for the 00:00 UTC issue.** `MODEL_MODE` defaults to `shadow` there and `off` for a host process. In shadow the cycle logs "a step of the cycle failed" with `what: model` until `model/` (plan A) is built and an artifact promoted; everything else runs. The Simulation page's last chapter shows the shadow rule's state. Set `MODEL_MODE=live` only when it says the rule has passed.
 - **Three tables are append-only by contract**: `weather_forecasts`, `smoke_hindcasts`, `model_forecasts`. A method change is a new version string, never an update.
+- **Promoting a new model version restarts the shadow-day count**: the Simulation page scores the newest version alone, so it needs its own 14 days.
+- **`weather_forecasts` grows about 13 MB a day**, append-only by contract, so watch the disk the compose volume sits on.
 - **The commit author** on the first commit was set to `Henson Zein <hello@upshot.cards>` because
   no git identity was configured where it was made. Amend before pushing if that is wrong.
 
