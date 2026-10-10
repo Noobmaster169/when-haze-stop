@@ -1,0 +1,40 @@
+# Local infrastructure for `pnpm dev` and the integration tests.
+#
+#   docker compose -f compose.local.yaml up -d
+#   pnpm db:migrate
+#
+# Everything binds to loopback. Postgres is published on 5433 so it cannot
+# collide with one already on 5432. The integration suite creates and uses
+# `haze_test` in this instance.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: localdev
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # The llm-proxy (../proxy), the one door to the models. Published on host
+  # loopback 4001 for `pnpm dev`, which sets LLM_PROXY_URL=http://127.0.0.1:4001
+  # (4000 is often another project's proxy). The login is
+  # CLAUDE_CODE_OAUTH_TOKEN, which compose reads from backend/.env; without it
+  # the proxy still starts and every Claude call is refused as "not logged in".
+  # Rebuild after changing proxy/:
+  #   docker compose -f compose.local.yaml up -d --build llm-proxy
+  llm-proxy:
+    build: ../proxy
+    ports:
+      - "127.0.0.1:4001:4000"
+    environment:
+      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:-}
+
+volumes:
+  pgdata:
