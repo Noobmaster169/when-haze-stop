@@ -57,3 +57,12 @@ describe("a day in the strip", () => {
     expect(dayPeak({ day: "2026-10-11", observedPeak: null, forecastPeak: 173, low: 150, high: 196, chance: {} })).toBe(173);
   });
 });
+
+describe("the demo replay", () => {
+  it("replays the evening of 8 October in the order the alerts would have gone out", async () => {
+    const { REPLAY, RULE } = await import("./demo/replay");
+    expect([RULE.at, ...REPLAY.map((alert) => alert.at)]).toEqual(["8 Oct, 19:09", "8 Oct, 20:20", "8 Oct, 21:20"]);
+    // Worded exactly as the live forecast alert is, so the demo shows the product and not a mock-up of it.
+    expect(REPLAY[0].message).toBe("Seremban: schools may close tomorrow. 76% chance of API above 180, the Education Ministry's closing line.");
+  });
+});

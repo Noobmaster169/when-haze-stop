@@ -467,6 +467,13 @@ said.
      badge (KPM, JAS, NADMA, KKM, State, Ruler), a one-line English summary, a status pill (In
      force, Coming, Replaced, Ended), the areas, the outlets that reported it with a link, and the
      original wording on demand.
+- "Play a demo alert" replays the evening of 8 October 2026 in Seremban for a demo: the
+  ministry's 180 rule at 19:09, the forecast alert the job would have sent at 20:20 (76% chance of
+  passing 180, from the stored run), the official closure it would have sent at 21:20 (first
+  reported 20:14), and the outcome (a peak of 189 on the 9th). Each alert drops under the island
+  marked "Replay, 8 Oct" and, where allowed, shows as a notification on the device. The values are
+  recorded, not invented (`components/alerts/demo/replay.ts`), and nothing is written or sent to
+  anyone else.
 - A new alert hangs under the island as one line on screens 900px and wider; below that the
   island's Alerts icon carries a dot. Closing it marks it seen, remembered in the browser.
 - There is no login. The browser makes an id on first use (`components/alerts/session.ts`).

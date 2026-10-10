@@ -9,6 +9,7 @@ import { AreaList } from "@/lib/api/alert-schemas";
 import { parsedFetcher } from "@/lib/poll";
 
 import { AreaCardView } from "./area-card";
+import { ReplayButton } from "./demo/replay-button";
 import { NotifyToggle } from "./notify-toggle";
 import { useSessionId } from "./session";
 import { useFollows } from "./use-follows";
@@ -35,6 +36,7 @@ export function MyAreas() {
         </h2>
         <span className="grow" />
         <NotifyToggle />
+        <ReplayButton />
       </div>
 
       <div className="relative z-10 mt-3 max-w-[420px]">
