@@ -120,6 +120,20 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  # The Suppression Council's worker: takes runs queued by the page's "Convene the council"
+  # button and executes them, one at a time. A run takes 20 to 30 minutes of model calls.
+  council:
+    build: ./backend
+    environment:
+      <<: *backend-env
+    command: ["node", "--import", "tsx", "src/jobs/council-worker.ts", "loop"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      llm-proxy:
+        condition: service_started
+    restart: unless-stopped
+
   frontend:
     build: ./frontend
     environment:
