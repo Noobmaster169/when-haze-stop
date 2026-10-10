@@ -32,7 +32,7 @@ const COVERAGE_HOURS = 72;
 export interface CycleOptions {
   /** The fire files are large and change a few times a day, so the loop skips them on most hours. */
   fires: boolean;
-  /** Whether to ask the model service after the run: MODEL_MODE is shadow or live. */
+  /** Whether to ask the model service before the run: MODEL_MODE is shadow or live. */
   model: boolean;
 }
 
@@ -53,9 +53,10 @@ export async function runCycle(deps: IngestDeps, now: Date, options: CycleOption
     log.warn("no readings stored, so there is no hour to forecast from");
     return;
   }
-  await attempt("forecast", () => runForecast(deps.pool, asOf, "live"));
+  // The model is asked first, so the run that follows can carry the day's issue into its frames.
   const model = deps.model;
   if (options.model && model) await attempt("model", () => runModelForecast(deps.pool, model, asOf));
+  await attempt("forecast", () => runForecast(deps.pool, asOf, "live"));
   await attempt("alerts", () => evaluateAlerts(deps.pool, deps.push ?? null, now));
 }
 

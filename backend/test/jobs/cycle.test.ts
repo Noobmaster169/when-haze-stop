@@ -1,16 +1,36 @@
 import request from "supertest";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { Accuracy, AlertFeed, Simulation, AreaList, GuidelineList, HazeMap, PlaceList, PushKey, StatementPage, StationOutlook, Subscription, SubscriptionList } from "../../src/contracts";
 import { closePool, getPool } from "../../src/db";
 import { evaluateAlerts } from "../../src/jobs/alerts";
 import { FIELD_CELLS } from "../../src/haze/grid";
-import { type FakeDoeClient, FakeGeocoder } from "../../src/sources/__fakes__/fake.sources";
+import { runCycle } from "../../src/jobs/cycle";
+import { FakeModelClient } from "../../src/sources/__fakes__/fake.model";
+import { type FakeDoeClient, FakeFiresClient, FakeGeocoder, FakeMetarClient, FakeNeaClient, FakeWeatherClient } from "../../src/sources/__fakes__/fake.sources";
 import { testApp } from "../app";
 import { recordedCycle } from "../fixtures/cycle";
 import { LAST_HOUR, PLACES, STATIONS } from "../fixtures/recorded";
+import { steadyWind } from "../fixtures/steady-wind";
 
 afterAll(closePool);
+
+/**
+ * The run for the recorded hour is stored by the first cycle and never made
+ * again, so nothing in the database can say whether the model was asked before
+ * or after it. The real run is kept and the order of the two steps is noted here.
+ */
+const steps = vi.hoisted(() => ({ order: [] as string[] }));
+vi.mock("../../src/jobs/forecast", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/jobs/forecast")>();
+  return {
+    ...actual,
+    runForecast: async (...args: Parameters<typeof actual.runForecast>) => {
+      steps.order.push("forecast");
+      return actual.runForecast(...args);
+    },
+  };
+});
 
 const SESSION = "test-session-0001";
 
@@ -128,6 +148,22 @@ describe("one cycle, then what the api serves", () => {
     expect(other.places[0].nearest).toMatchObject({ id: "CA19B", name: "Petaling Jaya" });
     await request(app).get("/haze/places?q=k").expect(400);
   });
+
+  it("asks the model service before the run, so the run can carry the day's issue into its frames", async () => {
+    const asking = Object.assign(new FakeModelClient([]), {
+      predict: async (): Promise<[]> => {
+        steps.order.push("model");
+        return [];
+      },
+    });
+    steps.order.length = 0;
+    await runCycle(
+      { pool: getPool(), doe, fires: new FakeFiresClient([]), weather: new FakeWeatherClient(steadyWind(new Date("2026-10-06T00:00:00Z"), 200, 3, 3)), metar: new FakeMetarClient([]), nea: new FakeNeaClient([]), model: asking },
+      new Date(LAST_HOUR.getTime() + 20 * 60_000),
+      { fires: false, model: true },
+    );
+    expect(steps.order).toEqual(["model", "forecast"]);
+  }, 120_000);
 
   it("lists the official lines and reports accuracy even before any forecast has been checked", async () => {
     const lines = GuidelineList.parse((await request(app).get("/haze/guidelines").expect(200)).body);

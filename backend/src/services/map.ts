@@ -2,6 +2,7 @@ import { config, type ModelMode } from "../config";
 import type { Airport, HazeMap } from "../contracts";
 import type { Queryable } from "../db";
 import { addHours, DOMAIN, FIELD, WEATHER } from "../haze/grid";
+import { localDay } from "../haze/outlook";
 import { HORIZON_HOURS } from "../haze/run";
 import { fires, forecasts, metar, stations, weather } from "../repositories";
 import type { ModelClient } from "../sources/model";
@@ -49,6 +50,8 @@ export async function hazeMap(db: Queryable, mode: ModelMode = config.MODEL_MODE
   const stored = await forecasts.timeline(db, addHours(asOf, -24 * HISTORY_DAYS), addHours(asOf, HORIZON_HOURS));
   const winds = await weather.windAt(db, stored.map((frame) => frame.validAt));
   const fireFrom = addHours(asOf, -24 * (HISTORY_DAYS + FIRE_DAYS)).toISOString().slice(0, 10);
+  // The run corrects its frames from the Malaysian day after its own; today's stay the hourly forecast's.
+  const learnedFrom = (await forecasts.learnedVersion(db, run.id)) ? stored.find((frame) => localDay(frame.validAt) > localDay(asOf)) : undefined;
 
   return {
     run,
@@ -60,6 +63,6 @@ export async function hazeMap(db: Queryable, mode: ModelMode = config.MODEL_MODE
     fires: await fires.strongestByDay(db, fireFrom, FIRE_LIMIT),
     airports: await airportsBetween(db, addHours(asOf, -24 * HISTORY_DAYS), null),
     source: await forecastSource(db, mode, model, asOf),
-    learnedFrom: null,
+    learnedFrom: learnedFrom?.validAt.toISOString() ?? null,
   };
 }
