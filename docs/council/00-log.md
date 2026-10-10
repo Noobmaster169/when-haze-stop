@@ -14,3 +14,17 @@
   over the Klang Valley it causes, using the engine's own functions read-only. The ranking by
   influence differs sharply from ranking by fire power or by distance. This became the backbone of
   the decision model.
+- Research came back (`research/01` to `05`). Headlines: the accepted Malaysian package is one
+  CL-415MP, three helicopters and 52 people, accepted on 18 September 2026 for Kalimantan only;
+  water from the air does not put out peat; KL's smoke in the south-west monsoon is Riau and Jambi;
+  debate helps only when agents differ in information and tools and the dispute is settled by
+  evidence; PEATMAP (CC BY 4.0) gives a usable peat fraction grid, and no open map gives depth.
+- Measured from this week's FIRMS file (NOAA-20): a detection averages 6 to 8 MW; 63% of Borneo
+  detections are at night against 12% on the peninsula, the smoulder signal.
+- Spike 2 (`01b-spike-plans.md`): on a 14-day horizon with analogue wind, realistic plans differ by
+  two orders of magnitude. The accepted package in Kalimantan removes at most about 0.15% of KL's
+  achievable improvement; domestic Bomba plus a request to redirect help to the Jambi peat belt is
+  best in all four wind windows (3 to 13%). This produced the three-track verdict (act, ask,
+  share) and made the analogue horizon a requirement.
+- Wrote `02` decision model, `03` package, `07` tools and skills, `10` open questions, and the
+  consolidated `spec.md`.

@@ -64,9 +64,29 @@ What a proposer writes and what the validator and engine read:
 }
 ```
 
-A flat object, as the structured-output rule requires. `asset` is one of the package's asset
+Each assignment may also carry `"needsConsent": "sumatra" | "ground_crews" | null`; the validator
+fills it in from the consent table and the engine scores such a line only from the day the plan
+says the request could be granted (default: day 4 for the aircraft, day 7 for a ground task
+force). A flat object, as the structured-output rule requires. `asset` is one of the package's asset
 kinds; the validator checks totals per day against the package, range from staging, water within
 reach for the scooper, and consent for the province.
+
+## The verdict has three tracks
+
+Spike 2 (`01b-spike-plans.md`) showed that the accepted package, aimed anywhere in Kalimantan,
+removes at most about 0.15% of KL's achievable improvement, while domestic fires and a request to
+redirect help to the Jambi peat belt remove 3 to 13%. A verdict that only assigns the accepted
+package would be honest and useless. So the Chair's decision brief always has three parts:
+
+1. **Act now**: what Malaysia does today with what it controls: the accepted package's best use
+   inside its mandate, and Bomba on Malaysian fires.
+2. **Ask**: the requests to Indonesia that the engine shows are worth making, each with its
+   scored value if granted, the expected lag, and Foreign Affairs' judgement of its chances.
+3. **Share**: the targeting picture Malaysia hands Indonesia's agency so Indonesia's own effort
+   (64 aircraft and 54,394 personnel on 20 September) lands on the complexes that reach KL. Scored
+   only as a labelled scenario, never as a Malaysian asset.
+
+The engine scores tracks 1 and 2; the page shows track 3 as a scenario with its label.
 
 ## What the Chair is told to weigh
 

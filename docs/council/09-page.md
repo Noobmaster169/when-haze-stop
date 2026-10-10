@@ -90,14 +90,18 @@ replay with fades in place of bursts and travel.
 
 Reached at the end of the replay, or directly from "Verdict". Concise, in reading order:
 
-1. **The answer, in one sentence.** "Put out the three complexes on the West and Central
-   Kalimantan border first, and the two Johor fires on day one, with 70% of the crews on the
-   first complex."
+1. **The answer, in three lines**, one per track (`05-protocol.md`):
+   - Act now: "Bomba takes the two Johor fires today; the CL-415 and helicopters hold the young
+     fires on the West Kalimantan border, which matter to Sarawak more than to KL."
+   - Ask: "Request Indonesia's agreement to move the package and a 150-strong ground task force to
+     the Jambi peat belt (Muaro Jambi): worth 3 to 13 times the Kalimantan deployment for KL."
+   - Share: "Give BNPB this ranking: the Jambi belt complexes cause about half of KL's coming smoke."
+   The example is spike 2's shape; the words are the Chair's.
 2. **Before and after.** The map of the target area at the moment the benefit peaks, without and
    with the plan, side by side with a slider, using the map's own colours and index. The struck
    complexes are numbered in the order they are attacked.
-3. **The strike list.** One row per complex: order, place, peat or not, what is sent, from when
-   to when, and the share of KL's coming smoke it removes.
+3. **The strike list.** One row per complex: order, place, peat share, what is sent, from when
+   to when, whether it waits on a request, and the share of KL's coming smoke it removes.
 4. **Why this plan.** Three to five sentences of reasoning, then one small chart: the chosen plan
    against "biggest fires first", "nearest fires first" and the ceiling (every fire out), in ug/m3
    removed and hours above API 100 avoided, central with the optimistic to pessimistic range.

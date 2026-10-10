@@ -1,6 +1,7 @@
 # Who sits at the table
 
-Ten seats, named by office and never by the person who holds it. The council's words are
+Eleven seats (a Chair and ten members) plus a Red Cell, named by office and never by the person who
+holds it. The council's words are
 simulated; putting them in a real minister's mouth would invent what a real person said, which
 the project's real-data rule forbids. The page says "role-played by AI" under the council.
 
@@ -29,7 +30,7 @@ voice is the least of them:
 | **Force Command**, NADMA operations | Use the deployed force safely and well | The force: crews, hours, staging, rotation | `check_feasibility`, `get_logistics` | Scattered "show" sorties; anyone over-committing crews |
 | **Air Operations**, APMM and TUDM | Aircraft: what can fly where, how often | Scoop-water sources within range, sortie rates (2015 Palembang precedent), clearance lead times | `get_logistics`, `check_feasibility` | Targets far from scoopable water, whatever their smoke value |
 | **Domestic Fire**, Bomba (JBPM) | Fires on Malaysian soil | Peninsular fires, Bomba peat teams, response times | `get_complexes` filtered to Malaysia, `check_feasibility` | The assumption that the answer is all in Indonesia |
-| **Foreign Affairs**, Wisma Putra | Indonesian consent, ASEAN framing, no appearance of interference | Where help has been accepted (the September 2026 acceptance), sensitivities (concession ownership, 2019 rebuttal) | `get_consent` | High-value targets that are politically unworkable; may veto only by citing a hard constraint |
+| **Foreign Affairs**, Wisma Putra | Indonesian consent, ASEAN framing, no appearance of interference | Help was accepted for Kalimantan only (18 September 2026); procedures still being aligned on 7 October; Sumatra or ground crews need a new request; the 2015 refusal then acceptance, the 2019 refusal, the 2023 denial; sensitivities (Malaysian-owned concessions) | `get_consent` | High-value targets that are politically unworkable; may veto only by citing a hard constraint |
 | **Health**, KKM | Fewer people breathing unhealthy air, protect the vulnerable | Population per target station area, the school and health lines | `get_target_air`, `get_guidelines` | Air Quality's mean-PM2.5 framing (exposure is people times hours over a line) |
 | **Treasury**, MOF | Value for money | Cost per flight hour, per crew-day | `get_costs` | Marginal sorties with little benefit |
 | **Sarawak**, State Disaster Management Committee | Sarawak's air, which took the worst API this year | Sarawak stations and forecast | `get_target_air` for Sarawak | A KL-only objective; it is the authentic dissenter the research recommends over an assigned devil's advocate |

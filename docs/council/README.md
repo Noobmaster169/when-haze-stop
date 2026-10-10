@@ -8,7 +8,7 @@ A council of agents who play Malaysian ministers and experts argue the question 
 data. Their candidate plans go through the smoke model, and the plan that holds up best becomes
 the verdict. The page replays the whole meeting.
 
-Status: research and design. No product code has been written yet. The smoke model itself is
+Status: research and design done (`spec.md`). No product code has been written yet. The smoke model itself is
 being reworked by a teammate, so everything here reaches it through one seam
 (`06-engine-seam.md`) and changes nothing inside `backend/src/haze/`.
 
@@ -18,6 +18,7 @@ being reworked by a teammate, so everything here reaches it through one seam
 | --- | --- |
 | `00-log.md` | What was done, in order, with dates. Read last to see where work stopped |
 | `01-spike-attribution.md` | The measured result that shaped the design: which fires reach KL this week |
+| `01b-spike-plans.md` | Realistic plans scored on a 14-day horizon: the strategy matters by two orders of magnitude |
 | `research/` | The research, one file per topic, every claim cited |
 | `02-decision-model.md` | How a hotspot is judged: influence, persistence, re-ignition, effort, access |
 | `03-assistance-package.md` | What Malaysia can send, as stated assumptions with sources |
