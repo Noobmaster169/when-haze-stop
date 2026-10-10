@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ForecastSource } from "@/lib/api/haze-schemas";
 
-import { captionFor } from "./forecast-caption";
+import { captionFor } from "./forecast-words";
 
 const at = (iso: string): number => Date.parse(iso);
 

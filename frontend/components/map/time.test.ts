@@ -21,7 +21,7 @@ const BY_DAY = new Map([
 
 function mapWith(part: Partial<MapData>): MapData {
   const grid = { lon0: 96, lat0: -6, nx: 1, ny: 1, step: 1 };
-  return { grid, windGrid: grid, asOf: at("2026-10-10T14:00:00Z"), times: [], fields: [], windTimes: [], winds: [], stations: [], fires: [], firesByDay: new Map(), airports: [], monitors: [], dayStart: null, ...part };
+  return { grid, windGrid: grid, asOf: at("2026-10-10T14:00:00Z"), times: [], fields: [], windTimes: [], winds: [], stations: [], fires: [], firesByDay: new Map(), airports: [], monitors: [], dayStart: null, source: null, learnedFrom: null, ...part };
 }
 
 describe("the fires at a moment of the timeline", () => {

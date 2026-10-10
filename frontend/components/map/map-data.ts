@@ -1,4 +1,4 @@
-import type { AirMonitor, Airport, DatedFireCell, FieldGrid, FireCell, HazeDay, HazeMap, Station, VisibilityReport } from "@/lib/api/haze-schemas";
+import type { AirMonitor, Airport, DatedFireCell, FieldGrid, FireCell, ForecastSource, HazeDay, HazeMap, Station, VisibilityReport } from "@/lib/api/haze-schemas";
 
 import { bracket, decodeBytes, sampleField, sampleWind } from "./field";
 
@@ -22,6 +22,10 @@ export interface MapData {
   monitors: AirMonitor[];
   /** The first instant of the past day the monitors' hours count from, or null on the live map. */
   dayStart: number | null;
+  /** Whose forecast the frames past `asOf` are. Null on a past day, which has no forecast. */
+  source: ForecastSource | null;
+  /** The first frame corrected to the learned forecast, or null where none was. */
+  learnedFrom: number | null;
 }
 
 /** An airport with its report times parsed once, so the layer can find the report for a moment without parsing dates each frame. */
@@ -45,6 +49,8 @@ export function unpackMap(map: HazeMap): MapData | null {
     airports: map.airports.map(unpackAirport),
     monitors: [],
     dayStart: null,
+    source: map.source,
+    learnedFrom: map.learnedFrom === null ? null : Date.parse(map.learnedFrom),
   };
 }
 
@@ -98,6 +104,8 @@ export function unpackDay(day: HazeDay): MapData {
     airports: day.airports.map(unpackAirport),
     monitors: day.monitors,
     dayStart,
+    source: null,
+    learnedFrom: null,
   };
 }
 

@@ -5,11 +5,15 @@ import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icons";
 import { malaysiaDay, malaysiaMidnights, malaysiaWhen } from "@/lib/malaysia-time";
 
+import { forecastMoments } from "./forecast-moments";
+import { JumpChips } from "./jump-chips";
+
 /**
  * The strip under the map: where in the week the map is, with the readings
  * behind the Now mark and the forecast ahead of it. The line is drawn here and
  * a transparent native range sits over it, so keyboard and screen readers get
- * a real slider.
+ * a real slider. The chips beside it jump to now, tonight and the afternoons
+ * ahead.
  */
 
 interface Props {
@@ -75,6 +79,10 @@ export function Timeline({ from, to, now, at, playing, caption, rolls = false, o
   const toggle = (): void => {
     if (!playing && at >= to) onSeek(from);
     onPlaying(!playing);
+  };
+  const jump = (moment: number): void => {
+    onPlaying(false);
+    onSeek(moment);
   };
 
   return (
@@ -147,17 +155,7 @@ export function Timeline({ from, to, now, at, playing, caption, rolls = false, o
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            onPlaying(false);
-            onSeek(now);
-          }}
-          disabled={at === now || caption !== undefined}
-          className="h-8 shrink-0 rounded-md border border-hairline-strong px-3 text-small font-medium text-ink-secondary hover:bg-active hover:text-ink disabled:cursor-default disabled:text-ink-faint disabled:hover:bg-transparent"
-        >
-          Now
-        </button>
+        <JumpChips moments={forecastMoments(now, to)} at={at} disabled={caption !== undefined} onJump={jump} />
       </div>
     </div>
   );

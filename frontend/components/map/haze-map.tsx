@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Place } from "@/lib/api/haze-schemas";
 
+import { ForecastCaption } from "./forecast-caption";
 import { REGION } from "./geo";
 import { HistoryStrip } from "./history-strip";
 import { LocateCard } from "./locate-card";
@@ -178,6 +179,7 @@ export function HazeMapView({ initialStation }: { initialStation: string | null 
           {monitor && data?.dayStart != null ? <MonitorPanel monitor={monitor} dayStart={data.dayStart} at={at} onClose={() => setMonitorId(null)} /> : null}
           {!station && !monitor && probe && data && hasField ? <PointPanel data={data} basemap={basemap} probe={probe} at={at} onStation={openStation} onClose={() => setProbe(null)} /> : null}
         </div>
+        {data ? <ForecastCaption data={data} at={at} /> : null}
         <HistoryStrip days={days} day={day} onChoose={chooseDay} />
         {past && liveData ? (
           <Timeline from={past.from} to={past.to} now={liveData.asOf} at={at} playing={playing} caption={hasField ? "Past day" : "Past day, as measured"} rolls onSeek={seek} onRelease={release} onPlaying={setPlaying} />
