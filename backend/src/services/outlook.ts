@@ -2,6 +2,7 @@ import { config, type ModelMode } from "../config";
 import type { ForecastSource, Station, StationOutlook } from "../contracts";
 import type { Queryable } from "../db";
 import { apiToPm25, pm25ToApi } from "../haze/api-index";
+import { blendWithSeries } from "../haze/blend";
 import { firstHindcast, leadBucket } from "../haze/chance";
 import { addHours } from "../haze/grid";
 import { dayOutlooks, type ErrorsFor, type Hourly, localDay, type ModelDay } from "../haze/outlook";
@@ -59,17 +60,27 @@ async function learnedDays(db: Queryable, stationId: string, asOf: Date): Promis
   return stored.days;
 }
 
+interface Line {
+  api: number[];
+  physics: number[] | null;
+  /** The days past today the line was smoothed onto: the model's band blended with the hourly line's peak for the day. */
+  days: Map<string, ModelDay>;
+}
+
 /**
  * The hourly forecast in API, or, where the learned model has days for the
- * station, the hourly line bent to the model's peaks at the simulation's
- * timing. Without learned days the stored values pass through untouched, so
- * shadow mode shows exactly what it did before the model.
+ * station, each day's band blended with the hourly line's own peak and the
+ * line smoothed onto those days at the simulation's timing. Without learned
+ * days the stored values pass through untouched, so shadow mode shows exactly
+ * what it did before the model.
  */
-async function hourlyLine(db: Queryable, station: Station, context: OutlookContext, api: number[], modelDays: ReadonlyMap<string, ModelDay>): Promise<{ api: number[]; physics: number[] | null }> {
-  if (modelDays.size === 0) return { api, physics: null };
+async function hourlyLine(db: Queryable, station: Station, context: OutlookContext, api: number[], modelDays: ReadonlyMap<string, ModelDay>): Promise<Line> {
+  if (modelDays.size === 0) return { api, physics: null, days: new Map() };
   const physics = await forecasts.stationPhysics(db, context.runId, station.id);
-  const line = reshapeToLearned({ asOf: context.asOf, hourly: api.map(apiToPm25), physics, learned: modelDays });
-  return { api: line.map(pm25ToApi), physics };
+  const hourly = api.map(apiToPm25);
+  const days = blendWithSeries(context.asOf, hourly, modelDays);
+  const line = reshapeToLearned({ asOf: context.asOf, hourly, physics, learned: days });
+  return { api: line.map(pm25ToApi), physics, days };
 }
 
 /** With learned days, an hour on a later day the issue does not reach is not shown: there is no forecast for it. */
@@ -87,7 +98,7 @@ export async function outlookFor(db: Queryable, station: Station, context: Outlo
   const modelDays = context.learned ? await learnedDays(db, station.id, asOf) : new Map<string, ModelDay>();
   const line = await hourlyLine(db, station, context, api ?? [], modelDays);
   const ahead: Hourly[] = line.api.map((value, index) => ({ at: addHours(asOf, index + 1), api: value })).filter((value) => withinIssue(value.at, asOf, modelDays));
-  const days = dayOutlooks(asOf, observed, ahead, errorsFor, modelDays);
+  const days = dayOutlooks(asOf, observed, ahead, errorsFor, line.days);
   return {
     station,
     readings: observed.map((reading) => ({ at: reading.at.toISOString(), api: reading.api })),

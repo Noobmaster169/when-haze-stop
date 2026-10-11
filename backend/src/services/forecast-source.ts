@@ -63,8 +63,9 @@ export async function forecastSource(db: Queryable, mode: ModelMode, model: Mode
   if (!issue) return hourlySource();
   const [skill, report] = await Promise.all([modelSkill(db, mode, issue.modelVersion), publishedReport(model)]);
   const backtest = report?.version === issue.modelVersion ? report.hazyMae.d1 : null;
+  // Past today the forecast shown is the model's band averaged with the simulation's peak, so the kind says so.
   return {
-    kind: "learned",
+    kind: "blend",
     modelVersion: issue.modelVersion,
     issuedAt: issue.asOf.toISOString(),
     trial: !skill.passed,

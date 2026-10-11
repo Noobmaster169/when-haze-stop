@@ -58,9 +58,10 @@ function fromLearned(day: ModelDay): Expected {
 }
 
 /**
- * `modelDays` is the learned model's forecast by Malaysian day, used for the
- * days after today where it has one. Today stays with the readings and the
- * hourly forecast: a day half over is best described by what it has read.
+ * `modelDays` is the blended forecast by Malaysian day, the learned model's
+ * band averaged with the simulation's peak, used for the days after today
+ * where it has one. Today stays with the readings and the hourly forecast: a
+ * day half over is best described by what it has read.
  */
 export function dayOutlooks(asOf: Date, readings: Hourly[], forecast: Hourly[], errorsFor: ErrorsFor, modelDays: ReadonlyMap<string, ModelDay> = new Map()): DayOutlook[] {
   const latest = readings.at(-1)?.api ?? null;
@@ -91,7 +92,7 @@ export function dayOutlooks(asOf: Date, readings: Hourly[], forecast: Hourly[], 
       low: expected ? Math.round(expected.low) : null,
       high: expected ? Math.round(expected.high) : null,
       chance,
-      source: learned ? "learned" : "hourly",
+      source: learned ? "blend" : "hourly",
       why: null,
     });
   }

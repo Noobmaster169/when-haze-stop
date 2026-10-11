@@ -1,10 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { closePool, getPool } from "../../src/db";
-import { pm25ToApi } from "../../src/haze/api-index";
+import { apiToPm25, pm25ToApi } from "../../src/haze/api-index";
+import { blendDay } from "../../src/haze/blend";
 import { runModelForecast } from "../../src/jobs/model-forecast";
 import { addHours } from "../../src/haze/grid";
 import { localDay } from "../../src/haze/outlook";
+import { PROVEN_HOURS } from "../../src/haze/reshape";
 import { LITTLE_SMOKE } from "../../src/haze/why";
 import { forecasts, modelForecasts, stations } from "../../src/repositories";
 import { LEARNED_STALE_HOURS, outlookContext, outlookFor } from "../../src/services/outlook";
@@ -34,45 +36,52 @@ describe("the station outlook under each model mode", () => {
     return outlookFor(pool, station, context);
   }
 
-  it("shows the learned forecast only in live mode", async () => {
+  it("shows the blend of the model and the hourly line's peak only in live mode", async () => {
     const live = await seremban("live");
     const shadow = await seremban("shadow");
     const stored = await modelForecasts.latestFor(pool, "CA24N");
     const tomorrow = stored?.days.get("2026-10-11");
-    expect(tomorrow).toBeDefined();
-    expect(live.days[1].forecastPeak).toBe(Math.round(pm25ToApi(tomorrow?.p50 ?? 0)));
+    if (!tomorrow) throw new Error("no learned row for Seremban tomorrow");
+    const hourly = shadow.forecast.filter((value) => localDay(new Date(value.at)) === "2026-10-11").map((value) => apiToPm25(value.api));
+    const blended = blendDay(tomorrow, Math.max(...hourly));
+    expect(live.days[1]).toMatchObject({ source: "blend", forecastPeak: Math.round(pm25ToApi(blended.p50)), low: Math.round(pm25ToApi(blended.p10)), high: Math.round(pm25ToApi(blended.p90)) });
+    expect(live.days[1].forecastPeak).not.toBe(Math.round(pm25ToApi(tomorrow.p50)));
     expect(shadow.days[1].forecastPeak).not.toBe(live.days[1].forecastPeak);
     expect(shadow.days[1]).toEqual((await seremban("off")).days[1]);
+    expect(live.source.kind).toBe("blend");
   });
 
-  it("bends the hourly line so each learned day peaks at the day row's forecast", async () => {
+  it("keeps the first twelve hours as stored and peaks each blended day at the day row's forecast", async () => {
     const live = await seremban("live");
-    const learned = live.days.filter((day) => day.source === "learned");
-    expect(learned.length).toBeGreaterThanOrEqual(2);
+    const shadow = await seremban("shadow");
+    expect(live.forecast.slice(0, PROVEN_HOURS)).toEqual(shadow.forecast.slice(0, PROVEN_HOURS));
+    const blended = live.days.filter((day) => day.source === "blend");
+    expect(blended.length).toBeGreaterThanOrEqual(2);
     expect(live.days[0].source).toBe("hourly");
-    for (const day of learned) {
+    for (const day of blended) {
       const line = live.forecast.filter((value) => localDay(new Date(value.at)) === day.day).map((value) => value.api);
       expect(line.length).toBeGreaterThan(0);
       expect(Math.abs(Math.max(...line) - (day.forecastPeak ?? Number.NaN))).toBeLessThanOrEqual(1);
     }
+    expect(live.days.slice(1).every((day) => day.source === "blend" || day.forecastPeak === null)).toBe(true);
   });
 
-  it("ends the line with the last learned day and leaves the day after without a forecast", async () => {
+  it("ends the line with the last blended day and leaves the day after without a forecast", async () => {
     const live = await seremban("live");
-    const learnedDays = live.days.filter((day) => day.source === "learned").map((day) => day.day);
+    const learnedDays = live.days.filter((day) => day.source === "blend").map((day) => day.day);
     const last = learnedDays.at(-1) ?? "";
     expect(live.forecast.every((value) => localDay(new Date(value.at)) <= last)).toBe(true);
     expect(live.forecast.some((value) => localDay(new Date(value.at)) === last)).toBe(true);
     // The recorded issue reaches every day the outlook shows; a day past it, had there been one, would carry no forecast.
     const beyond = live.days.filter((day) => day.day > last);
     for (const day of beyond) expect(day).toMatchObject({ forecastPeak: null, low: null, high: null, why: null });
-    expect(live.days.slice(1).every((day) => day.source === "learned" || day.forecastPeak === null)).toBe(true);
+    expect(live.days.slice(1).every((day) => day.source === "blend" || day.forecastPeak === null)).toBe(true);
   });
 
-  it("explains each learned day from the simulation, and says so when no run has stored its smoke yet", async () => {
+  it("explains each blended day from the simulation, and says so when no run has stored its smoke yet", async () => {
     const live = await seremban("live");
     // Nothing has stored `physics` for the recorded run, so the simulation has nothing to say about the day's shape.
-    for (const day of live.days) expect(day.why).toBe(day.source === "learned" ? LITTLE_SMOKE : null);
+    for (const day of live.days) expect(day.why).toBe(day.source === "blend" ? LITTLE_SMOKE : null);
   });
 
   it("shows the stored hourly forecast untouched outside live mode", async () => {

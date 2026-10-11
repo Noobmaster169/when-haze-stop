@@ -2,14 +2,15 @@ import { addHours } from "./grid";
 import { localDay, type ModelDay } from "./outlook";
 
 /**
- * The hourly line bent to the learned model's day peaks, rules 1 to 4 of the
- * one-forecast design. Pure, in ug/m3.
+ * The hourly line joined to the blended days, the smoothing of section 3.1
+ * of the one-forecast design. Pure, in ug/m3.
  *
- * The learned model knows how much; the smoke simulation knows when. So on a
- * day the model has a row for, the line's maximum is the model's median and
- * the hours inside the day follow the simulation's timing, scaled so the dip
- * never passes the model's 10th percentile. Today stays the hourly forecast,
- * which is proven at the next twelve hours.
+ * The hourly forecast owns its first twelve hours, where it is proven. Each
+ * blended day peaks at its median, at the simulation's hour when the smoke
+ * varies over the day and at 09:00 Malaysian time otherwise, and follows the
+ * simulation's shape after the peak. Between the proven hours and the first
+ * peak, and between each day's last hour and the next peak, the line runs
+ * straight: a 24 hour mean cannot step, so the line never does.
  */
 
 export interface ReshapeInput {
@@ -18,26 +19,34 @@ export interface ReshapeInput {
   hourly: number[];
   /** Calibrated smoke PM2.5 per hour, same indices, or null for a run before migration 009. */
   physics: number[] | null;
+  /** The blended band of each Malaysian day after today, by day. */
   learned: ReadonlyMap<string, ModelDay>;
 }
 
-/** The line moves from one source's level to the next over at most this many hours. */
-export const RAMP_HOURS = 3;
+/** The hourly forecast is clearly better than no change this far ahead, so these hours are its own. */
+export const PROVEN_HOURS = 12;
+/** 09:00 Malaysian time, when a 24 hour mean typically peaks after an overnight build-up. */
+export const DEFAULT_PEAK_HOUR_UTC = 1;
+/** Below this much variation over a day the simulation has no timing to offer. */
+export const SMOKE_VARIES_UGM3 = 1;
 
-interface DaySlice {
+export interface DaySlice {
   day: string;
   first: number;
   last: number;
+  /** The UTC hour of the day at index `first`. */
+  firstUtcHour: number;
 }
 
 /** The index ranges of `hours` hourly values from asOf + 1, one per Malaysian day, in order. */
-function daySlices(asOf: Date, hours: number): DaySlice[] {
+export function daySlices(asOf: Date, hours: number): DaySlice[] {
   const slices: DaySlice[] = [];
   for (let index = 0; index < hours; index++) {
-    const day = localDay(addHours(asOf, index + 1));
+    const at = addHours(asOf, index + 1);
+    const day = localDay(at);
     const current = slices.at(-1);
     if (current && current.day === day) current.last = index;
-    else slices.push({ day, first: index, last: index });
+    else slices.push({ day, first: index, last: index, firstUtcHour: at.getUTCHours() });
   }
   return slices;
 }
@@ -48,48 +57,63 @@ function argmax(values: number[]): number {
   return best;
 }
 
-/** Rule 2: the day's hours at the simulation's timing, peaking at p50 and dipping no lower than p10. Returns the peak's index. */
-function shapeDay(out: number[], slice: DaySlice, physics: number[] | null, row: ModelDay): number {
-  const smoke: number[] = [];
-  for (let index = slice.first; index <= slice.last; index++) smoke.push(physics?.[index] ?? 0);
-  const peak = Math.max(...smoke);
-  const low = Math.min(...smoke);
-  const ratio = peak > low ? Math.min(1, Math.max(0, (row.p50 - row.p10) / (peak - low))) : 0;
-  smoke.forEach((value, offset) => {
+function varies(dayPhysics: number[]): boolean {
+  return Math.max(...dayPhysics) - Math.min(...dayPhysics) >= SMOKE_VARIES_UGM3;
+}
+
+/** The series index of the day's peak: the simulation's hour when its smoke varies, else 09:00 Malaysian time, else the day's first hour. */
+export function peakHourOf(dayPhysics: number[], slice: DaySlice): number {
+  if (varies(dayPhysics)) return slice.first + argmax(dayPhysics);
+  const nine = slice.first + ((DEFAULT_PEAK_HOUR_UTC - slice.firstUtcHour + 24) % 24);
+  return nine <= slice.last ? nine : slice.first;
+}
+
+/** Rule 2 over the day: the median less the simulation's distance below its own peak, scaled to stop at p10; flat at the median when the smoke does not vary. */
+function shapeDay(out: number[], slice: DaySlice, dayPhysics: number[], row: ModelDay): void {
+  const peak = Math.max(...dayPhysics);
+  const low = Math.min(...dayPhysics);
+  const ratio = varies(dayPhysics) ? Math.min(1, Math.max(0, (row.p50 - row.p10) / (peak - low))) : 0;
+  dayPhysics.forEach((value, offset) => {
     out[slice.first + offset] = row.p50 - (peak - value) * ratio;
   });
-  return slice.first + argmax(smoke);
+}
+
+/** Fills the indices strictly between `from` and `to` on the straight line between their values. */
+function straight(out: number[], from: number, fromValue: number, to: number): void {
+  for (let index = from + 1; index < to; index++) out[index] = fromValue + ((out[to] - fromValue) * (index - from)) / (to - from);
 }
 
 /**
- * Rule 3: a linear run from the hour before the day to the shaped value, over
- * the first RAMP_HOURS, ending early at the day's peak hour so the peak is
- * never moved. On a learned day the ramp starts no higher than the median,
- * because rule 1 says the median is the day's maximum even when today ends
- * above it.
+ * The hourly series smoothed onto the blended days. An empty `learned` map
+ * returns `hourly` as it was. A day after today with no row keeps its hourly
+ * values; whether to show them is the caller's call.
  */
-function ramp(out: number[], slice: DaySlice, peakAt: number, cap: number | null): void {
-  if (slice.first === 0) return;
-  const hours = Math.min(RAMP_HOURS, peakAt - slice.first, out.length - 1 - slice.first);
-  if (hours <= 0) return;
-  const from = cap === null ? out[slice.first - 1] : Math.min(out[slice.first - 1], cap);
-  const to = out[slice.first + hours];
-  for (let offset = 0; offset < hours; offset++) out[slice.first + offset] = from + ((to - from) * (offset + 1)) / (hours + 1);
-}
-
-/** The hourly series with every learned day after today bent to the model's peak. An empty `learned` map returns `hourly` as it was. */
 export function reshapeToLearned(input: ReshapeInput): number[] {
   const { asOf, hourly, physics, learned } = input;
   const out = [...hourly];
-  if (learned.size === 0) return out;
+  if (learned.size === 0 || hourly.length === 0) return out;
   const today = localDay(asOf);
-  let previousLearned = false;
-  for (const slice of daySlices(asOf, hourly.length)) {
-    if (slice.day === today) continue;
-    const row = learned.get(slice.day) ?? null;
-    const peakAt = row ? shapeDay(out, slice, physics, row) : slice.first + argmax(hourly.slice(slice.first, slice.last + 1));
-    if ((row !== null) !== previousLearned) ramp(out, slice, peakAt, row?.p50 ?? null);
-    previousLearned = row !== null;
+  const slices = daySlices(asOf, hourly.length);
+  const todaySlice = slices.find((slice) => slice.day === today);
+  // Where the proven hours end: the twelfth, or today's last when today is shorter, or before the series when today is over.
+  let from = Math.min(PROVEN_HOURS - 1, todaySlice?.last ?? -1, hourly.length - 1);
+  let fromValue = from >= 0 ? out[from] : hourly[0];
+  for (const slice of slices) {
+    if (slice.day <= today) continue;
+    const row = learned.get(slice.day);
+    if (!row) {
+      from = slice.last;
+      fromValue = out[from];
+      continue;
+    }
+    const dayPhysics = Array.from({ length: slice.last - slice.first + 1 }, (_, offset) => physics?.[slice.first + offset] ?? 0);
+    shapeDay(out, slice, dayPhysics, row);
+    const peakAt = peakHourOf(dayPhysics, slice);
+    straight(out, from, fromValue, peakAt);
+    // The straight run may come down from a higher day; the median is this day's maximum.
+    for (let index = slice.first; index < peakAt; index++) out[index] = Math.min(out[index], row.p50);
+    from = slice.last;
+    fromValue = out[from];
   }
   return out;
 }

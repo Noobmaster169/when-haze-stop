@@ -31,7 +31,7 @@ interface Peak {
 function peaksOf(asOf: Date, line: number[], physics: number[] | null, days: DayOutlook[]): Map<string, Peak> {
   const peaks = new Map<string, Peak>();
   for (const day of days) {
-    if (day.source !== "learned") continue;
+    if (day.source !== "blend") continue;
     let best = -1;
     const physicsDay: number[] = [];
     line.forEach((value, index) => {
@@ -44,7 +44,7 @@ function peaksOf(asOf: Date, line: number[], physics: number[] | null, days: Day
   return peaks;
 }
 
-/** The days with `why` filled in for every learned day. Days on the hourly forecast keep null: the hourly forecast's reason is the readings themselves. */
+/** The days with `why` filled in for every blended day. Days on the hourly forecast keep null: the hourly forecast's reason is the readings themselves. */
 export async function withWhy(db: Queryable, station: Station, asOf: Date, line: number[], physics: number[] | null, days: DayOutlook[]): Promise<DayOutlook[]> {
   const peaks = peaksOf(asOf, line, physics, days);
   if (peaks.size === 0) return days;
