@@ -32,6 +32,15 @@ assistant, the Model page and, from run 64 on, the map's future frames. The chat
 not exercised against a real model call here; prompt `v5.md` and `haze-decision` version 5 are
 what it reads.
 
+Revised the same evening after a day live (design 3.1, commits 5a11671 to c7827f2): past today
+the forecast is the model and the simulation averaged, the line and the frames are smoothed from
+hour 12 to the first day's peak hour instead of stepping at midnight, a day beyond the issue has
+no forecast (the step fallback had written an "easing" headline nothing supported), and the map
+correction solves for exact values at every instrument (the plain spread overshot Jerantut by 7
+ug/m3). The ledger scores the blend beside the model, the hourly run and no change, so whether the
+average beats the model alone is read there, not assumed. Measured at Cheras after the rebuild:
+152 at 14:00 Sunday, 127 at 20:00, 151 by 02:00 Monday, 154 at the 09:00 peak, 144 flat Tuesday.
+
 Decisions to revisit: today's line stays the hourly forecast even when the issue's day +1 is
 today (between midnight and 08:00 Malaysian time the freshest learned day is unused); and the
 model is live on trial rather than back in shadow. Next phase: issue the learned model hourly

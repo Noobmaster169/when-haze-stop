@@ -438,9 +438,15 @@ and the newest learned issue is under 30 hours old:
   every scored forecast.
 - In `shadow` or `off` nothing above applies and every forecast is labelled `hourly`.
 
-A day the issue does not cover (the fourth day after midnight Malaysian time, until the 08:00
-issue) keeps the hourly value and is labelled so. Hourly issue of the learned model, which removes
-that gap, is the next phase.
+Revised the same evening (design section 3.1): past today each day is the equal-weight average,
+in ug/m3, of the learned median and the simulation's own forecast for the day (at a station the
+hourly line's day peak, elsewhere the uncorrected frames sampled at the instrument), with the
+model's band width around it; the day's `source` is `blend` and the ledger scores the blend
+beside the model and both baselines. The hourly forecast owns the first 12 hours; from there the
+line and the frames run straight in ug/m3 to the first day's peak hour (the simulation's, or
+09:00 Malaysian time when its smoke is flat) and between days likewise, so no frame steps at
+midnight. A day the issue does not reach has no forecast, not the decayed hourly line. Hourly
+issue of the learned model is the next phase.
 
 ### 4.2 The model
 
