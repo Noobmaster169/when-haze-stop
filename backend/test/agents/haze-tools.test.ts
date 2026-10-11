@@ -76,6 +76,22 @@ describe("the assistant's haze tools, over one recorded cycle", () => {
     expect(outcome.text).toContain("only about as accurate beyond a day");
   });
 
+  it("says the days ahead are the model and the simulation averaged, with the model's record", () => {
+    const source: ForecastSource = {
+      kind: "blend",
+      modelVersion: ISSUE_VERSION,
+      issuedAt: ISSUE_AT.toISOString(),
+      trial: true,
+      record: { checkedDays: 3, gain: null, backtest: { model: 11.98, persistence: 13.6, v2: 14.2 } },
+    };
+    expect(sourceChip(source)).toBe("Model and simulation, averaged");
+    const line = describeSource(source);
+    expect(line).toContain(`the learned model ${ISSUE_VERSION}'s forecast, issued Sat 10 Oct, 08:00 (on trial until its live record passes) and the smoke simulation's, averaged`);
+    expect(line).toContain("the first twelve hours are the hourly forecast");
+    expect(line).toContain("In its backtest on hazy days it was 12% closer than assuming no change");
+    expect(line).toContain("Checked on 3 live days so far.");
+  });
+
   it("names the learned model and its record when the days ahead are its forecast", () => {
     const source: ForecastSource = {
       kind: "learned",

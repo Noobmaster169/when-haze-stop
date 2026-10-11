@@ -1,6 +1,6 @@
 ---
 name: haze-decision
-version: 5
+version: 6
 when: The person asks whether something should go ahead or is safe in haze, such as school, outdoor work, sport, an event, travel, a flight, or going outside with a health condition.
 ---
 How to turn readings and a forecast into a recommendation.
@@ -37,7 +37,7 @@ Which line matters:
 
 1. The recommendation in one sentence: go ahead, go ahead with a fallback, or do not go ahead as planned.
 2. The numbers behind it: the reading or forecast peak, the chance of passing the line, the line and whose rule it is.
-3. One sentence on trust. Up to about 12 hours ahead the hourly forecast has been clearly closer than assuming no change. When the answer leans on a day ahead or more, say it is the learned model's forecast and give its record from the source line of the `get_forecast` result: how much closer than no change it was on hazy days in its backtest, and how many live days it has been checked on. When that line says the days ahead are the hourly forecast, say it has been no better than no change beyond a day, so decide again closer to the time.
+3. One sentence on trust. Up to about 12 hours ahead the hourly forecast has been clearly closer than assuming no change. When the answer leans on a day ahead or more, say it is the forecast, an average of the learned model and the smoke simulation, and give the model's record from the source line of the `get_forecast` result: how much closer than no change it was on hazy days in its backtest, and how many live days it has been checked on. When that line says the days ahead are the hourly forecast, say it has been no better than no change beyond a day, so decide again closer to the time.
 4. What to do: one practical step.
 
 The decision is the person's. Give a clear recommendation and the basis for it, and do not claim certainty the forecast does not have.

@@ -19,12 +19,13 @@ const HOURLY_RECORD =
 
 /** The chip under the answer: whose forecast the days ahead are. */
 export function sourceChip(source: ForecastSource): string {
+  if (source.kind === "blend") return "Model and simulation, averaged";
   return source.kind === "learned" ? `Learned model ${source.modelVersion}` : "Hourly forecast";
 }
 
 /** The source line of the result: whose forecast the days ahead are and its record, so the answer can say how far to trust it. */
 export function describeSource(source: ForecastSource): string {
-  if (source.kind !== "learned") return `Source: every day and hour is the hourly forecast. ${HOURLY_RECORD}`;
+  if (source.kind === "hourly") return `Source: every day and hour is the hourly forecast. ${HOURLY_RECORD}`;
   const { record } = source;
   const issued = source.issuedAt ? `, issued ${when(source.issuedAt)}` : "";
   const trial = source.trial ? " (on trial until its live record passes)" : "";
@@ -32,7 +33,10 @@ export function describeSource(source: ForecastSource): string {
     ? `In its backtest on hazy days it was ${percent(1 - record.backtest.model / record.backtest.persistence)} closer than assuming no change (error ${record.backtest.model.toFixed(1)} against ${record.backtest.persistence.toFixed(1)} ug/m3 a day ahead).`
     : "Its backtest figure is not available right now.";
   const live = record.gain === null ? `Checked on ${record.checkedDays} live days so far.` : `Checked on ${record.checkedDays} live days so far, where it was ${percent(record.gain)} closer than the hourly forecast.`;
-  return `Source: the days after today are the learned model ${source.modelVersion}'s forecast${issued}${trial}; today and the hours between are the hourly forecast, shaped by the smoke simulation. ${backtest} ${live}`;
+  if (source.kind === "learned") {
+    return `Source: the days after today are the learned model ${source.modelVersion}'s forecast${issued}${trial}; today and the hours between are the hourly forecast, shaped by the smoke simulation. ${backtest} ${live}`;
+  }
+  return `Source: the days after today are the learned model ${source.modelVersion}'s forecast${issued}${trial} and the smoke simulation's, averaged; the first twelve hours are the hourly forecast, and the line runs straight between. The model's record: ${backtest} ${live}`;
 }
 
 export const getForecast: ChatTool<Input> = {
