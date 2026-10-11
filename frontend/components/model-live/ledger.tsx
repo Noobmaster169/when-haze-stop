@@ -3,7 +3,7 @@ import { formatWhenShort } from "@/lib/when";
 
 /** Every scored learned forecast once its day has passed, newest issue first. This is the table the shadow rule reads. */
 
-const HEAD = ["Issued", "Station", "Day", "Ahead", "Forecast", "Band", "Observed", "Miss", "Hourly miss", "No change miss"] as const;
+const HEAD = ["Issued", "Station", "Day", "Ahead", "Forecast", "Band", "Observed", "Model miss", "Blend miss", "Hourly miss", "No change miss"] as const;
 const TEXT_COLUMNS = 3;
 
 function cell(value: number | null, lowest: number): string {
@@ -15,7 +15,7 @@ function Miss({ value, lowest }: { value: number | null; lowest: number }) {
 }
 
 function LedgerRow({ row }: { row: ModelLedgerRow }) {
-  const lowest = Math.min(...[row.miss, row.v2Miss, row.persistenceMiss].filter((value): value is number => value !== null));
+  const lowest = Math.min(...[row.miss, row.blendMiss, row.v2Miss, row.persistenceMiss].filter((value): value is number => value !== null));
   return (
     <tr className="border-t border-hairline-faint align-top">
       <td className="py-2 pr-4 whitespace-nowrap text-ink-secondary">{formatWhenShort(row.asOf)}</td>
@@ -28,6 +28,7 @@ function LedgerRow({ row }: { row: ModelLedgerRow }) {
       </td>
       <td className="py-2 pl-4 text-right font-mono text-mono text-ink">{row.observed}</td>
       <Miss value={row.miss} lowest={lowest} />
+      <Miss value={row.blendMiss} lowest={lowest} />
       <Miss value={row.v2Miss} lowest={lowest} />
       <Miss value={row.persistenceMiss} lowest={lowest} />
     </tr>
@@ -57,7 +58,7 @@ export function Ledger({ ledger }: { ledger: ModelLedgerRow[] }) {
         </table>
       </div>
       <p className="mt-2 text-caption text-ink-tertiary">
-        Forecast and band are the learned median and its 10th to 90th percentile in API; observed is the day&apos;s peak reading. Misses are in API points, the lowest of the three in ink. DOE stations alone: Singapore publishes PSI, whose bands differ from DOE&apos;s index.
+        Forecast and band are the learned median and its 10th to 90th percentile in API; observed is the day&apos;s peak reading. Misses are in API points, the lowest of the four in ink; the blend is what the panel shows, the model and the hourly run averaged. DOE stations alone: Singapore publishes PSI, whose bands differ from DOE&apos;s index.
       </p>
     </div>
   );

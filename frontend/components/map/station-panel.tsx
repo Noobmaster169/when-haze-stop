@@ -90,7 +90,7 @@ const LINK = "text-accent underline-offset-2 hover:underline";
 
 /** Whose forecast the days are, and where its record is. The hourly wording is the one the panel always had, so a shadow run reads as before. */
 function SourceLine({ source }: { source: ForecastSource }) {
-  if (source.kind !== "learned") {
+  if (source.kind === "hourly") {
     return (
       <p className="mt-1 text-caption text-ink-tertiary">
         Ranges cover 8 in 10 past forecasts. Hourly forecast.{" "}
@@ -104,7 +104,9 @@ function SourceLine({ source }: { source: ForecastSource }) {
   const issued = source.issuedAt ? `, issued ${issuedWhen(source.issuedAt)}` : "";
   return (
     <p className="mt-1 text-caption text-ink-tertiary">
-      Forecast by the learned model{version}{issued}. Hourly shape from the smoke simulation. {checkedLine(source.record.checkedDays)}{" "}
+      {source.kind === "blend" ? "Forecast: the learned model" : "Forecast by the learned model"}{version}{issued}
+      {source.kind === "blend" ? " and the smoke simulation, averaged, with the simulation's hourly timing. " : ". Hourly shape from the smoke simulation. "}
+      {checkedLine(source.record.checkedDays)}{" "}
       <Link href="/model" className={LINK}>
         How good is this?
       </Link>

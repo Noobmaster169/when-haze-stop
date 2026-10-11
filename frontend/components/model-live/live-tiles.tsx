@@ -29,7 +29,7 @@ function liveTile(skill: ModelSkill, nextCheckAt: string | null) {
 function statusWords(source: ForecastSource, skill: ModelSkill): string {
   if (skill.mode === "off") return "Off";
   if (skill.mode === "shadow") return "In shadow";
-  if (source.kind !== "learned") return "Live, hourly showing";
+  if (source.kind === "hourly") return "Live, hourly showing";
   return source.trial ? "Live, on trial" : "Live";
 }
 

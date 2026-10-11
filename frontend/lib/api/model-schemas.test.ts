@@ -18,7 +18,7 @@ describe("the live record's schema", () => {
   });
 
   it("parses a ledger row with every miss", () => {
-    const row = { asOf: "2026-10-08T05:00:00.000Z", stationId: "CA24N", stationName: "Seremban", day: "2026-10-09", leadDays: 1, forecast: 168, low: 127, high: 198, observed: 71, miss: 97, persistenceMiss: null, v2Miss: 12.5 };
+    const row = { asOf: "2026-10-08T05:00:00.000Z", stationId: "CA24N", stationName: "Seremban", day: "2026-10-09", leadDays: 1, forecast: 168, low: 127, high: 198, observed: 71, miss: 97, blendMiss: 42.3, persistenceMiss: null, v2Miss: 12.5 };
     expect(ModelLive.safeParse({ ...MINIMAL, ledger: [row] }).success).toBe(true);
   });
 

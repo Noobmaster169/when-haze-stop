@@ -31,15 +31,20 @@ export function backtestGain(source: ForecastSource): number | null {
   return Math.round(100 * (1 - backtest.model / backtest.persistence));
 }
 
+/** "the learned model and the smoke simulation, averaged", or the learned model alone. */
+export function whose(source: ForecastSource): string {
+  return source.kind === "blend" ? "the learned model and the smoke simulation, averaged" : "the learned model";
+}
+
 /** Empty at or before the newest reading, where nothing is forecast. */
 export function captionFor(atMs: number, asOfMs: number, source: ForecastSource | null, learnedFromMs: number | null): string {
   if (atMs <= asOfMs) return "";
   const when = `Forecast for ${momentWhen(atMs)}`;
-  if (!source || source.kind !== "learned" || learnedFromMs === null || atMs < learnedFromMs) {
+  if (!source || source.kind === "hourly" || learnedFromMs === null || atMs < learnedFromMs) {
     return `${when} by the hourly forecast, level with no change beyond a day.`;
   }
   const issued = source.issuedAt ? `, issued ${issuedWhen(source.issuedAt)}` : "";
   const gain = backtestGain(source);
-  const record = gain === null ? "" : ` In the ${BACKTEST_MONTHS} month backtest it was ${gain}% closer than no change on hazy days.`;
-  return `${when} by the learned model${source.trial ? " (trial)" : ""}${issued}. ${checkedLine(source.record.checkedDays)}${record}`;
+  const record = gain === null ? "" : ` In the ${BACKTEST_MONTHS} month backtest the model was ${gain}% closer than no change on hazy days.`;
+  return `${when} by ${whose(source)}${source.trial ? " (trial)" : ""}${issued}. ${checkedLine(source.record.checkedDays)}${record}`;
 }

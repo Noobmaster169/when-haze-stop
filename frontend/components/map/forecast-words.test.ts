@@ -23,14 +23,14 @@ const monday = at("2026-10-12T06:00:00Z");
 describe("the caption under the map", () => {
   it("names the learned model, its trial, its issue and its record for a moment it covers", () => {
     expect(captionFor(monday, asOf, learned, learnedFrom)).toBe(
-      "Forecast for Mon 12 Oct 14:00 by the learned model (trial), issued Sun 08:00. Checked on 0 days so far. In the 15 month backtest it was 12% closer than no change on hazy days.",
+      "Forecast for Mon 12 Oct 14:00 by the learned model (trial), issued Sun 08:00. Checked on 0 days so far. In the 15 month backtest the model was 12% closer than no change on hazy days.",
     );
   });
 
   it("drops the trial once the shadow rule has passed, and counts one day in the singular", () => {
     const proven = { ...learned, trial: false, record: { ...learned.record, checkedDays: 1 } };
     expect(captionFor(monday, asOf, proven, learnedFrom)).toBe(
-      "Forecast for Mon 12 Oct 14:00 by the learned model, issued Sun 08:00. Checked on 1 day so far. In the 15 month backtest it was 12% closer than no change on hazy days.",
+      "Forecast for Mon 12 Oct 14:00 by the learned model, issued Sun 08:00. Checked on 1 day so far. In the 15 month backtest the model was 12% closer than no change on hazy days.",
     );
   });
 
@@ -55,5 +55,12 @@ describe("the caption under the map", () => {
   it("is empty at and before the newest reading", () => {
     expect(captionFor(asOf, asOf, learned, learnedFrom)).toBe("");
     expect(captionFor(asOf - 1, asOf, learned, learnedFrom)).toBe("");
+  });
+
+  it("says the model and the simulation are averaged when the forecast is the blend", () => {
+    const blend: ForecastSource = { ...learned, kind: "blend" };
+    expect(captionFor(monday, asOf, blend, learnedFrom)).toBe(
+      "Forecast for Mon 12 Oct 14:00 by the learned model and the smoke simulation, averaged (trial), issued Sun 08:00. Checked on 0 days so far. In the 15 month backtest the model was 12% closer than no change on hazy days.",
+    );
   });
 });
