@@ -3,8 +3,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ModelLive } from "../../src/contracts";
 import { closePool, getPool } from "../../src/db";
-import { pm25ToApi } from "../../src/haze/api-index";
-import { modelForecasts, readings } from "../../src/repositories";
+import { apiToPm25, pm25ToApi } from "../../src/haze/api-index";
+import { blendDay } from "../../src/haze/blend";
+import { GRID_KEY } from "../../src/haze/grid";
+import { MODEL_VERSION } from "../../src/haze/run";
+import { modelForecasts, modelScores, readings } from "../../src/repositories";
 import { modelLive } from "../../src/services/model-live";
 import { testApp } from "../app";
 import { recordedCycle } from "../fixtures/cycle";
@@ -64,6 +67,13 @@ describe("the learned model's live record", () => {
     const row = live.ledger.find((entry) => entry.asOf === asOf.toISOString() && entry.stationId === "CA24N");
     expect(row).toMatchObject({ stationName: "Seremban", day: "2026-10-09", leadDays: 1, observed: peak, forecast: Math.round(pm25ToApi(90)), low: Math.round(pm25ToApi(60)), high: Math.round(pm25ToApi(120)), persistenceMiss: null });
     expect(row?.miss).toBeCloseTo(Math.abs(pm25ToApi(90) - peak), 1);
+    // The blend is scored beside the model wherever the hourly run's peak for the day is there, and is null exactly when that peak is.
+    for (const entry of live.ledger) expect(entry.blendMiss === null).toBe(entry.v2Miss === null);
+    const scored = (await modelScores.scorable(pool, newest.modelVersion, MODEL_VERSION, GRID_KEY)).find((entry) => entry.asOf.getTime() === asOf.getTime() && entry.instrumentId === "CA24N");
+    if (!scored || scored.v2 === null) throw new Error("the backfilled hourly run at the issue time is missing");
+    expect(row?.v2Miss).toBeCloseTo(Math.abs(scored.v2 - peak), 1);
+    expect(row?.blendMiss).toBeCloseTo(Math.abs(pm25ToApi(blendDay({ p10: 60, p50: 90, p90: 120 }, apiToPm25(scored.v2)).p50) - peak), 1);
+    expect(row?.blendMiss).toBeCloseTo(Math.abs(pm25ToApi((90 + apiToPm25(scored.v2)) / 2) - peak), 1);
     const order = live.ledger.map((entry) => entry.asOf);
     expect(order).toEqual([...order].sort((a, b) => b.localeCompare(a)));
     // The issue's own days are still to come, so none of them is in the ledger.

@@ -1,7 +1,8 @@
 import type { ModelMode } from "../config";
 import type { ModelLedgerRow, ModelLive, Station, StationOutlook } from "../contracts";
 import type { Queryable } from "../db";
-import { pm25ToApi } from "../haze/api-index";
+import { apiToPm25, pm25ToApi } from "../haze/api-index";
+import { blendDay } from "../haze/blend";
 import { addHours, GRID_KEY } from "../haze/grid";
 import { localDay } from "../haze/outlook";
 import { MODEL_VERSION } from "../haze/run";
@@ -41,6 +42,8 @@ function ledgerRow(row: ScoreRow, observed: number, byId: Map<string, Station>):
     high: Math.round(pm25ToApi(row.p90)),
     observed,
     miss: round2(Math.abs(pm25ToApi(row.p50) - observed)),
+    // The blend shown to a person: the model's median averaged with the hourly run's peak for the day, scored like the rest.
+    blendMiss: row.v2 === null ? null : round2(Math.abs(pm25ToApi(blendDay(row, apiToPm25(row.v2)).p50) - observed)),
     persistenceMiss: row.persistence === null ? null : round2(Math.abs(row.persistence - observed)),
     v2Miss: row.v2 === null ? null : round2(Math.abs(row.v2 - observed)),
   };
