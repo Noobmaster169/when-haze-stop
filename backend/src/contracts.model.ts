@@ -24,6 +24,8 @@ export const ModelLedgerRow = z.object({
   observed: z.number().int(),
   /** Absolute misses in API points; a baseline is null where it had no value. */
   miss: z.number(),
+  /** The miss of the blend shown to a person: the model and the hourly run averaged; null where the run had no value. */
+  blendMiss: z.number().nullable(),
   persistenceMiss: z.number().nullable(),
   v2Miss: z.number().nullable(),
 });

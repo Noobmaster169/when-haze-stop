@@ -99,6 +99,33 @@ simulation knows where smoke is and when, not how much. The learned model learne
 with the simulation as its second most useful input (`docs/MODEL.md` 6.1.9). So the amplitude is
 the model's and the timing is the simulation's.
 
+### 3.1 Revision of 11 October 2026, evening: the blend and the smoothing
+
+Two changes asked for after the first day live, replacing rules 1 to 4 above where they differ.
+
+**The blend.** Past today, a day's forecast is the equal-weight average, in ug/m3, of the
+learned model's median and the simulation's own forecast for that day: at a station, the day's
+peak of the hourly forecast line; at any other instrument, the day's peak of the uncorrected
+forecast frames sampled at the instrument. The band keeps the model's width and moves with the
+centre: low = p10 + (blend - p50), high = p90 + (blend - p50). Chances come from that band. The
+day's `source` is `blend`, the map and panel captions say "the learned model and the smoke
+simulation, averaged", and the ledger scores the blend beside the model and both baselines, so
+the choice is measured, not assumed. A day the issue does not reach has no forecast.
+
+**The smoothing.** The hourly forecast owns the first `PROVEN_HOURS` = 12 hours. From hour 12
+to the first blended day's peak hour, and from each day's last hour to the next day's peak
+hour, the line and the frames run straight in ug/m3 between the two values. A day's peak hour
+is the simulation's when its smoke series varies by 1 ug/m3 or more over the day, else 09:00
+Malaysian time, when the 24 hour mean typically peaks after an overnight build-up
+(`docs/FORECAST.md` 5.4). Inside a day after its peak hour the shape is rule 2's with the
+blended peak. The peak is never moved and never exceeded. The map's frames follow the same
+per-instrument series, including today's frames after hour 12, so the field and the panel agree
+to the frame's resolution at every hour.
+
+Why: a 24 hour mean can move by at most a twenty-fourth of the hourly change an hour, so a step
+between two forecasts at midnight showed something no air can do, and a day drawn flat at its
+peak overstated what a peak forecast says.
+
 ## 4. What a person sees
 
 ### 4.1 The map

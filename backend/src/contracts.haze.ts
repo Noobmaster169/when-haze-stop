@@ -90,8 +90,8 @@ export const Airport = z.object({
 });
 export type Airport = z.infer<typeof Airport>;
 
-/** Whose forecast a number is: the learned model's, or the hourly forecast from the station's own slope. */
-export const ForecastSourceKind = z.enum(["learned", "hourly"]);
+/** Whose forecast a number is: the learned model and the simulation averaged, the learned model alone, or the hourly forecast from the station's own slope. */
+export const ForecastSourceKind = z.enum(["blend", "learned", "hourly"]);
 export type ForecastSourceKind = z.infer<typeof ForecastSourceKind>;
 
 export const ForecastRecord = z.object({

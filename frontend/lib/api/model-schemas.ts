@@ -16,6 +16,8 @@ export const ModelLedgerRow = z.object({
   high: z.number().int(),
   observed: z.number().int(),
   miss: z.number(),
+  /** The miss of the blend shown to a person: the model and the hourly run averaged; null where the run had no value. */
+  blendMiss: z.number().nullable(),
   persistenceMiss: z.number().nullable(),
   v2Miss: z.number().nullable(),
 });

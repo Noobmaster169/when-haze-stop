@@ -51,7 +51,7 @@ export type VisibilityReport = z.infer<typeof VisibilityReport>;
 export const Airport = z.object({ icao: z.string(), name: z.string(), lat: z.number(), lon: z.number(), reports: z.array(VisibilityReport) });
 export type Airport = z.infer<typeof Airport>;
 
-export const ForecastSourceKind = z.enum(["learned", "hourly"]);
+export const ForecastSourceKind = z.enum(["blend", "learned", "hourly"]);
 export type ForecastSourceKind = z.infer<typeof ForecastSourceKind>;
 
 export const ForecastRecord = z.object({
