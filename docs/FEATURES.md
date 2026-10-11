@@ -177,6 +177,11 @@ took out 34,553 of 99,947 cell-days (35%) and left 96.2% of the fire power. On t
 newest three days that was 1,473 dots before and 1,033 after. The cost is real small fires that
 only one pass saw, under cloud for the rest of the day.
 
+On the map only, a dot with no other burning cell within 25 km on the same day is not drawn
+(`haze/fire-strays.ts`, applied in `services/map.ts`). Haze comes from fire complexes; a lone cell is
+a small burn or heat the screens missed. From 1 to 11 October 2026 it took the map's Malaysian dots
+from 115 to 39 and its Indonesian ones from 7,933 to 7,569. The model still burns every screened cell.
+
 `fire_cells.frp_mw` stays what was fetched. `burning_mw` is what is left after the screens, zero
 for a cell-day that was all taken out, and every read uses it. Nothing is deleted when a rule
 changes: bump `SCREEN_VERSION` in `haze/burning.ts` and `haze:history` works the burning part out

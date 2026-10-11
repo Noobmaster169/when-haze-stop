@@ -1,6 +1,8 @@
 import { config, type ModelMode } from "../config";
 import type { Airport, HazeMap } from "../contracts";
 import type { Queryable } from "../db";
+import { type DayPoint, withoutStrays } from "../haze/fire-strays";
+import type { FireCellDay } from "../haze/fires";
 import { addHours, DOMAIN, FIELD, WEATHER } from "../haze/grid";
 import { localDay } from "../haze/outlook";
 import { HORIZON_HOURS } from "../haze/run";
@@ -37,6 +39,11 @@ export async function airportsBetween(db: Queryable, from: Date, until: Date | n
   }));
 }
 
+/** A stored cell's centre, which is where its dot is drawn. */
+function centres(cells: FireCellDay[]): DayPoint[] {
+  return cells.map((cell) => ({ day: cell.day, lat: cell.lat10 / 10 + 0.05, lon: cell.lon10 / 10 + 0.05 }));
+}
+
 export async function hazeMap(db: Queryable, mode: ModelMode = config.MODEL_MODE, model: ModelClient | null = null): Promise<HazeMap> {
   const run = await forecasts.latest(db);
   const grid = { lon0: DOMAIN.lon0, lat0: DOMAIN.lat0, nx: FIELD.nx, ny: FIELD.ny, step: FIELD.step };
@@ -60,7 +67,7 @@ export async function hazeMap(db: Queryable, mode: ModelMode = config.MODEL_MODE
     stations: all,
     frames: stored.map((frame) => ({ validAt: frame.validAt.toISOString(), observed: frame.validAt <= asOf, field: frame.field.toString("base64") })),
     wind: winds.map((hour) => ({ validAt: hour.validAt.toISOString(), uv: packWind(hour.u, hour.v) })),
-    fires: await fires.strongestByDay(db, fireFrom, FIRE_LIMIT),
+    fires: withoutStrays(await fires.strongestByDay(db, fireFrom, FIRE_LIMIT), centres(await fires.since(db, fireFrom))),
     airports: await airportsBetween(db, addHours(asOf, -24 * HISTORY_DAYS), null),
     source: await forecastSource(db, mode, model, asOf),
     learnedFrom: learnedFrom?.validAt.toISOString() ?? null,
