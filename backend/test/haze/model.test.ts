@@ -3,16 +3,16 @@ import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import { apiToPm25, pm25ToApi } from "../../src/haze/api-index";
-import { FIRST_FIT, toPm25 } from "../../src/haze/calibrate";
-import { ensembleMean } from "../../src/haze/ensemble";
+import { blendWithSeries } from "../../src/haze/blend";
+import { FIRST_FIT } from "../../src/haze/calibrate";
 import { sampleAt } from "../../src/haze/field";
 import { chanceAbove, firstHindcast } from "../../src/haze/chance";
 import { emissionsFor, type FireCellDay } from "../../src/haze/fires";
-import { addHours, cellsWithin, DOMAIN, FIELD, FIELD_CELLS, hoursBetween } from "../../src/haze/grid";
-import { type LearnedInstrument, learnedTargets, shaped } from "../../src/haze/learned-frames";
+import { addHours, DOMAIN, FIELD, FIELD_CELLS, hoursBetween } from "../../src/haze/grid";
+import type { LearnedInstrument } from "../../src/haze/learned-frames";
 import { localDay, type ModelDay } from "../../src/haze/outlook";
-import { HORIZON_HOURS, runModel, type RunInput, type RunStation } from "../../src/haze/run";
-import { REACH_KM, smokeFrom } from "../../src/haze/smoke";
+import { PROVEN_HOURS, reshapeToLearned } from "../../src/haze/reshape";
+import { runModel, type RunInput, type RunStation } from "../../src/haze/run";
 import { spearman } from "../../src/haze/stats";
 import { CENTRAL, simulate } from "../../src/haze/transport";
 import { parseMetars } from "../../src/sources/metar";
@@ -160,68 +160,74 @@ describe("a run on the learned forecast", () => {
   const cellOf = (at: { lat: number; lon: number }): number => Math.floor((at.lat - DOMAIN.lat0) / FIELD.step) * FIELD.nx + Math.floor((at.lon - DOMAIN.lon0) / FIELD.step);
   const apiAt = (frame: Uint8Array, at: { lat: number; lon: number }): number => frame[cellOf(at)] * 2;
 
+  const now = hoursBetween(START, LAST_HOUR);
+  const aheadOf = (frame: { validAt: Date }): number => hoursBetween(START, frame.validAt) - now;
+  const instrumentOf = (id: string): LearnedInstrument => {
+    const found = instruments.find((instrument) => instrument.id === id);
+    if (!found) throw new Error(`no instrument ${id}`);
+    return found;
+  };
+  const targetOf = (id: string): Float32Array => {
+    const found = learned.targets.find((target) => target.instrumentId === id);
+    if (!found) throw new Error(`no target series for ${id}`);
+    return found.series;
+  };
+
   it("covers the five placed instruments and names the issue", () => {
     expect(instruments.map((instrument) => instrument.id).sort()).toEqual(["CA19B", "CA24N", "SGCENTRAL", "WMKK", "openaq:12488751"]);
+    expect(learned.targets.map((target) => target.instrumentId).sort()).toEqual(instruments.map((instrument) => instrument.id).sort());
     expect(learned.learnedVersion).toBe(ISSUE_VERSION);
+    expect(plain.targets).toEqual([]);
   });
 
-  it("reads back rule 2 at every instrument in every frame past today, to the frame's resolution", () => {
-    // The run's own calibrated smoke at any place, rebuilt here from the same pure pieces so the targets are independent.
-    const smoke = smokeFrom(ensembleMean(emissionsFor(FIRE_CELLS, START, LAST_HOUR, HOURS), RUN_INPUT.weather), HOURS);
-    const physicsAt = (lat: number, lon: number, hour: number): number => toPm25(learned.calibration, smoke.near(cellsWithin(lat, lon, REACH_KM), hour));
-    const now = hoursBetween(START, LAST_HOUR);
-    const seremban = learned.forecasts.find((forecast) => forecast.stationId === "CA24N");
-    expect(physicsAt(positions.get("CA24N")?.lat ?? NaN, positions.get("CA24N")?.lon ?? NaN, now + 1)).toBeCloseTo(seremban?.physics[0] ?? NaN, 4);
-    const later = learned.frames.filter((frame) => localDay(frame.validAt) > localDay(LAST_HOUR));
-    expect(later.length).toBeGreaterThan(20);
+  it("gives a station the very series the panel draws: its hourly line blended into the learned days and smoothed with its stored smoke", () => {
+    for (const id of ["CA24N", "CA19B"]) {
+      const forecast = learned.forecasts.find((item) => item.stationId === id);
+      if (!forecast) throw new Error(`no forecast for ${id}`);
+      const hourly = Array.from(forecast.api, apiToPm25);
+      const days = blendWithSeries(LAST_HOUR, hourly, instrumentOf(id).days);
+      const expected = reshapeToLearned({ asOf: LAST_HOUR, hourly, physics: Array.from(forecast.physics), learned: days });
+      const series = targetOf(id);
+      expect(series).toHaveLength(expected.length);
+      expected.forEach((value, index) => expect(series[index]).toBeCloseTo(value, 3));
+      expect(Array.from(series.slice(0, PROVEN_HOURS))).toEqual(Array.from(Float32Array.from(hourly.slice(0, PROVEN_HOURS))));
+      expect(Array.from(series.slice(PROVEN_HOURS))).not.toEqual(Array.from(Float32Array.from(hourly.slice(PROVEN_HOURS))));
+    }
+  });
+
+  it("pulls every frame past the proven hours to each instrument's own smoothed series, to the frame's resolution", () => {
     let checked = 0;
-    for (const frame of later) {
-      const hour = hoursBetween(START, frame.validAt);
+    for (const frame of learned.frames) {
+      const ahead = aheadOf(frame);
+      if (ahead <= PROVEN_HOURS) continue;
       const pm25 = Float32Array.from(frame.field, (byte) => apiToPm25(byte * 2));
-      for (const target of learnedTargets(START, hour, instruments, physicsAt, now + HORIZON_HOURS)) {
-        expect(Math.abs(pm25ToApi(sampleAt(pm25, target.lat, target.lon)) - pm25ToApi(target.pm25))).toBeLessThanOrEqual(2);
+      for (const instrument of instruments) {
+        const lastDay = [...instrument.days.keys()].sort().at(-1) ?? "";
+        if (localDay(frame.validAt) > lastDay) continue;
+        const target = targetOf(instrument.id)[ahead - 1];
+        expect(Math.abs(pm25ToApi(sampleAt(pm25, instrument.lat, instrument.lon)) - pm25ToApi(target))).toBeLessThanOrEqual(2);
         checked += 1;
       }
     }
-    expect(checked).toBe(later.length * 5);
+    expect(checked).toBeGreaterThanOrEqual(100);
   });
 
-  it("shows rule 2 at Seremban in a frame on the next Malaysian day, to the frame's resolution", () => {
-    const at = new Date("2026-10-11T06:00:00Z");
-    const frame = learned.frames.find((item) => item.validAt.getTime() === at.getTime());
-    const physics = learned.forecasts.find((forecast) => forecast.stationId === "CA24N")?.physics;
-    const row = instruments.find((instrument) => instrument.id === "CA24N")?.days.get("2026-10-11");
-    if (!frame || !physics || !row) throw new Error("the run has no frame, physics or row for 11 October");
-    // The physics series starts the hour after the run; the day's hours are those of 11 October Malaysian time.
-    const index = (hour: Date): number => hoursBetween(LAST_HOUR, hour) - 1;
-    const series: number[] = [];
-    for (let hour = addHours(LAST_HOUR, 1); index(hour) < physics.length; hour = addHours(hour, 1)) {
-      if (localDay(hour) === "2026-10-11") series.push(physics[index(hour)]);
-    }
-    expect(series).toHaveLength(24);
-    const expected = pm25ToApi(shaped(row, series, physics[index(at)]));
-    expect(Math.abs(apiAt(frame.field, seremban) - expected)).toBeLessThanOrEqual(2);
-  });
-
-  it("pulls a place with no hourly forecast of its own, Singapore Central, to its learned value alone", () => {
+  it("pulls a place with no hourly forecast of its own, Singapore Central, from the smoke alone to its series", () => {
     const at = new Date("2026-10-11T06:00:00Z");
     const index = learned.frames.findIndex((item) => item.validAt.getTime() === at.getTime());
-    const central = instruments.find((instrument) => instrument.id === "SGCENTRAL");
-    const row = central?.days.get("2026-10-11");
-    if (index < 0 || !central || !row) throw new Error("the run has no frame or row for Singapore Central on 11 October");
-    // No DOE station is near, so the hourly run leaves the field there to the smoke alone, far below the learned median.
-    expect(Math.abs(apiAt(plain.frames[index].field, central) - pm25ToApi(row.p50))).toBeGreaterThan(20);
-    expect(Math.abs(apiAt(learned.frames[index].field, central) - pm25ToApi(row.p50))).toBeLessThanOrEqual(2);
+    const central = instrumentOf("SGCENTRAL");
+    const target = targetOf("SGCENTRAL")[aheadOf({ validAt: at }) - 1];
+    // No DOE station is near, so the hourly run leaves the field there to the smoke alone, far below the blend.
+    expect(Math.abs(apiAt(plain.frames[index].field, central) - pm25ToApi(target))).toBeGreaterThan(20);
+    expect(Math.abs(apiAt(learned.frames[index].field, central) - pm25ToApi(target))).toBeLessThanOrEqual(2);
   });
 
-  it("leaves every frame of today and before exactly as the hourly run drew it", () => {
-    const today = localDay(LAST_HOUR);
+  it("leaves every frame up to twelve hours after the run exactly as the hourly run drew it", () => {
     for (const [at, frame] of learned.frames.entries()) {
-      const same = localDay(frame.validAt) <= today;
       expect(frame.validAt).toEqual(plain.frames[at].validAt);
-      if (same) expect(frame.field).toEqual(plain.frames[at].field);
+      if (aheadOf(frame) <= PROVEN_HOURS) expect(frame.field).toEqual(plain.frames[at].field);
     }
-    expect(learned.frames.some((frame) => localDay(frame.validAt) > today)).toBe(true);
+    expect(learned.frames.some((frame) => aheadOf(frame) > PROVEN_HOURS)).toBe(true);
     expect(learned.forecasts.map((forecast) => forecast.api)).toEqual(plain.forecasts.map((forecast) => forecast.api));
   });
 });

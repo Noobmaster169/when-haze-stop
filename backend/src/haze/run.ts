@@ -1,10 +1,10 @@
 import { apiToPm25 } from "./api-index";
 import { calibrate, type Pair, toPm25 } from "./calibrate";
 import { ensembleMean } from "./ensemble";
-import { type Anchor, encode, forecastPm25, modelled, observedFrame, spreadErrors, stationWeight } from "./field";
+import { type Anchor, bilinearWeights, encode, forecastCell, forecastPm25, modelled, observedFrame, spreadErrors, stationWeight } from "./field";
 import { emissionsFor, type FireCellDay } from "./fires";
-import { addHours, cellsWithin, hoursBetween } from "./grid";
-import { learnedCorrector, type LearnedInstrument } from "./learned-frames";
+import { addHours, cellCentre, cellsWithin, hoursBetween } from "./grid";
+import { type InstrumentSeries, learnedCorrection, type LearnedInstrument } from "./learned-frames";
 import { REACH_KM, smokeFrom } from "./smoke";
 import { carried, forecastStation, windowSlope } from "./station-forecast";
 import type { Weather } from "./transport";
@@ -49,6 +49,8 @@ export interface RunOutput {
   forecasts: { stationId: string; api: Float32Array; physics: Float32Array }[];
   /** The learned model the future frames were corrected to, null where none was given. */
   learnedVersion: string | null;
+  /** The smoothed series each instrument's frames past the proven hours were pulled to; empty without instruments. */
+  targets: InstrumentSeries[];
 }
 
 /** Names the method, so runs made by different methods are never scored or drawn together. */
@@ -109,15 +111,40 @@ export function runModel(input: RunInput): RunOutput {
   const slopes = spreadErrors(anchored.map(({ station, hour }) => ({ lat: station.lat, lon: station.lon, error: windowSlope(station.readings, hour) })));
   const modelNow = modelled(calibration, smoke.everywhere(now));
   const weight = stationWeight(anchored.map(({ station }) => station));
-  const instruments = (input.instruments ?? []).map((instrument) => ({ instrument, cells: cellsWithin(instrument.lat, instrument.lon, REACH_KM) })).filter((item) => item.cells.length > 0);
-  const cellsAt = new Map(instruments.map(({ instrument, cells }) => [`${instrument.lat},${instrument.lon}`, cells]));
-  const correct = learnedCorrector({
-    start,
-    asOf: input.asOf,
-    end,
-    instruments: instruments.map(({ instrument }) => instrument),
-    physicsAt: (lat, lon, hour) => modelAt(cellsAt.get(`${lat},${lon}`) ?? [], hour),
-  });
+  // The learned instruments: a station's hourly line is its own forecast; anywhere else the uncorrected frame sampled there is.
+  const reachOf = new Map((input.instruments ?? []).map((instrument) => [instrument.id, cellsWithin(instrument.lat, instrument.lon, REACH_KM)]));
+  const instruments = (input.instruments ?? []).filter((instrument) => (reachOf.get(instrument.id)?.length ?? 0) > 0);
+  const byStation = new Map(forecasts.map((forecast) => [forecast.stationId, forecast.api]));
+  const neighbours = new Map<number, number[]>();
+  const modelCell = (cell: number, hour: number): number => {
+    let cells = neighbours.get(cell);
+    if (!cells) {
+      const centre = cellCentre(cell);
+      cells = cellsWithin(centre.lat, centre.lon, REACH_KM);
+      neighbours.set(cell, cells);
+    }
+    return modelAt(cells, hour);
+  };
+  const sampledAt = (instrument: LearnedInstrument, ahead: number): number => {
+    const built = carried(ahead);
+    let value = 0;
+    for (const { cell, weight: share } of bilinearWeights(instrument.lat, instrument.lon)) {
+      value += share * forecastCell(modelNow[cell], errorsNow[cell], slopes[cell] * built, weight[cell], modelCell(cell, now + ahead));
+    }
+    return value;
+  };
+  const correction = instruments.length > 0
+    ? learnedCorrection({
+        asOf: input.asOf,
+        horizon: end - now,
+        instruments,
+        hourlyAt: (instrument, ahead) => {
+          const api = byStation.get(instrument.id);
+          return api ? apiToPm25(api[ahead - 1]) : sampledAt(instrument, ahead);
+        },
+        physicsAt: (instrument, ahead) => modelAt(reachOf.get(instrument.id) ?? [], now + ahead),
+      })
+    : null;
 
   const frames: RunFrame[] = [];
   // Frames sit on fixed three-hour marks so every run's frames line up into one history, plus one at `asOf` itself.
@@ -132,9 +159,9 @@ export function runModel(input: RunInput): RunOutput {
       const built = carried(hour - now);
       const trend = slopes.map((slope) => slope * built);
       const hourly = forecastPm25({ model: modelled(calibration, smoke.everywhere(hour)), modelAtAsOf: modelNow, errorsAtAsOf: errorsNow, trend, weight });
-      field = encode(instruments.length > 0 ? correct(hour, hourly) : hourly);
+      field = encode(correction ? correction.correct(hour - now, hourly) : hourly);
     }
     frames.push({ validAt: addHours(start, hour), observed: hour <= now, field });
   }
-  return { calibration, frames, forecasts, learnedVersion: instruments.length > 0 ? (input.learnedVersion ?? null) : null };
+  return { calibration, frames, forecasts, learnedVersion: correction ? (input.learnedVersion ?? null) : null, targets: correction?.targets ?? [] };
 }

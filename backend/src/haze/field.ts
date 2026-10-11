@@ -103,13 +103,16 @@ export interface ForecastFrameInput {
   weight: Float32Array;
 }
 
-/** A frame after `asOf` in PM2.5: the stations' forecast near them, fading to the model's own change far from them. */
+/** One cell of a frame after `asOf`: the stations' forecast where they are, fading to the model's own change far from them. */
+export function forecastCell(modelAtAsOf: number, errorsAtAsOf: number, trend: number, weight: number, model: number): number {
+  return modelAtAsOf + errorsAtAsOf + trend + (1 - weight) * (model - modelAtAsOf);
+}
+
+/** A frame after `asOf` in PM2.5, every cell through `forecastCell`. */
 export function forecastPm25(input: ForecastFrameInput): Float32Array {
   const { model, modelAtAsOf, errorsAtAsOf, trend, weight } = input;
   const pm25 = new Float32Array(model.length);
-  for (let cell = 0; cell < model.length; cell++) {
-    pm25[cell] = modelAtAsOf[cell] + errorsAtAsOf[cell] + trend[cell] + (1 - weight[cell]) * (model[cell] - modelAtAsOf[cell]);
-  }
+  for (let cell = 0; cell < model.length; cell++) pm25[cell] = forecastCell(modelAtAsOf[cell], errorsAtAsOf[cell], trend[cell], weight[cell], model[cell]);
   return pm25;
 }
 
