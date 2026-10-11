@@ -2,22 +2,18 @@
 
 import { Icon } from "@/components/ui/icons";
 
-import { ReplayCard } from "./replay-card";
-import { playReplay } from "./replay-player";
+import { startReplay } from "./replay-player";
 
-/** Plays the 8 October replay: alerts under the island, on this device, and as a timeline. */
-export function ReplayButton() {
+/** Starts the 8 October replay; the bar and the alerts it shows live in the app shell. */
+export function ReplayButton({ label = "See how alerts work" }: { label?: string }) {
   return (
-    <>
-      <button
-        type="button"
-        onClick={playReplay}
-        className="flex h-8 items-center gap-2 rounded-md bg-ink px-3 text-small font-medium text-ink-inverse transition-opacity duration-150 hover:opacity-90"
-      >
-        <Icon name="play" size={12} />
-        Play a demo alert
-      </button>
-      <ReplayCard />
-    </>
+    <button
+      type="button"
+      onClick={startReplay}
+      className="flex h-8 shrink-0 items-center gap-2 rounded-md border border-hairline-strong px-3 text-small font-medium text-ink-secondary transition-colors duration-150 hover:bg-active hover:text-ink"
+    >
+      <Icon name="play" size={12} />
+      {label}
+    </button>
   );
 }

@@ -643,25 +643,37 @@ said.
   browser's prompt, flies the map there and opens that spot's forecast; the answer stays in the
   browser (`components/map/my-location.ts`) and the map opens there on later visits. The alerts
   page then offers to follow the nearest station.
-- `/alerts` has two sections:
-  1. **My areas.** A search to follow an area (its nearest DOE station), then one card per area:
-     the reading now; a headline that is always tomorrow's forecast against the closing lines,
-     also on a calm day ("No action expected tomorrow"); one sentence; four days of peaks coloured
-     by band; and any official order in force there, linked to its source. An open alert gives
-     the card a coloured left edge. "Notify this device" turns on Web Push.
-  2. **Official statements.** In force (default) or all, five a page. Each row: date, issuer
+- `/alerts` leads with what to do first. A browser that follows nothing sees **Know before
+  schools close**: one sentence on what alerts say, the place search, the nearest-station
+  suggestion and a replay link. Once it follows an area:
+  1. **Latest alerts.** What was sent for the followed areas (`GET /alerts?session=`), active
+     first, then ended, newest first in each; eight shown, the rest on request. Each row: kind,
+     area, Malaysian time, the whole message, Active or Ended, and New while an active one is
+     unread. "Mark all read" when any is.
+  2. **My areas.** One card per area: the reading now; a headline that is always tomorrow's
+     forecast against the closing lines, also on a calm day ("No action expected tomorrow"); one
+     sentence; four days of peaks coloured by band; any official order in force there, linked to
+     its source; and "View on map". An open alert gives the card a coloured left edge. "Notify
+     this device" turns on Web Push; "Follow another area" sits under the cards.
+  3. **Official statements.** In force (default) or all, five a page. Each row: date, issuer
      badge (KPM, JAS, NADMA, KKM, State, Ruler), a one-line English summary, a status pill (In
      force, Coming, Replaced, Ended), the areas, the outlets that reported it with a link, and the
      original wording on demand.
-- "Play a demo alert" replays the evening of 8 October 2026 in Seremban for a demo: the
-  ministry's 180 rule at 19:09, the forecast alert the job would have sent at 20:20 (76% chance of
-  passing 180, from the stored run), the official closure it would have sent at 21:20 (first
-  reported 20:14), and the outcome (a peak of 189 on the 9th). Each alert drops under the island
-  marked "Replay, 8 Oct" and, where allowed, shows as a notification on the device. The values are
-  recorded, not invented (`components/alerts/demo/replay.ts`), and nothing is written or sent to
-  anyone else.
-- A new alert hangs under the island as one line on screens 900px and wider; below that the
-  island's Alerts icon carries a dot. Closing it marks it seen, remembered in the browser.
+- A new alert slides in from the right edge at the top right of every page
+  (`components/shell/alert-toasts.tsx`), left of the chat when it is open, and on a phone across
+  the width. It shows the whole message and "See area", which opens that area's card. Only
+  active, unread alerts slide in, newest on top, three at most, then "N more on the Alerts page".
+  They stay until closed, and closing one marks it read. The Alerts icon on the island carries a
+  dot while one is unread. What was read is kept in the browser (`components/alerts/seen.ts`).
+- "See how alerts work" replays the evening of 8 October 2026 in Seremban, step by step at the
+  presenter's pace (Next, Back, the arrow keys; Escape ends it). A dark bar at the bottom of the
+  page names the moment and says what happened; the alerts slide in at the top right, tagged
+  Replay, as a live one would: the ministry's 180 rule at 19:09, the forecast alert the job would
+  have sent at 20:20 (76% chance of passing 180, from the stored run), the official closure it
+  would have sent at 21:20 (first reported 20:14), and the outcome (a peak of 189 on the 9th).
+  Where notifications are already allowed, each alert also shows on the device; the replay never
+  asks. The values are recorded, not invented (`components/alerts/demo/replay.ts`), and nothing is
+  written or sent to anyone else.
 - There is no login. The browser makes an id on first use (`components/alerts/session.ts`).
 
 ### 5.2 Official statements
@@ -722,7 +734,7 @@ Fetched by the jobs process every cycle (`jobs/statements.ts`), from three chann
 
 ### 5.4 Delivery
 
-- In the app: the island line, polled every minute.
+- In the app: the toasts and the Latest alerts list, polled every minute.
 - On the device: Web Push. "Notify this device" registers `public/sw.js`, subscribes with the
   server's VAPID public key (`GET /alerts/push-key`) and stores the subscription with every area
   the session follows (`PUT /alerts/push`). After each alert pass the jobs process sends each newly
@@ -837,7 +849,7 @@ Change both together.
 | GET | `/haze/places?q=` | `PlaceList`: stations by name first, then geocoded places, each with its nearest station |
 | GET | `/haze/cities/:key` | `CityAir`: a city (only `kl`) blended from its stations, hour by hour with API, PM2.5, estimated visibility and optical depth; 404 for an unknown city |
 | GET | `/sources` | `SourceReport`: each source from `sources/catalog.ts` with its newest good and failed fetch and the last 24 hours' tally, and the 60 newest fetches |
-| GET | `/alerts?session=&after=` | `AlertFeed`: newest first; with a session only followed stations |
+| GET | `/alerts?session=&after=` | `AlertFeed`: newest first, ended ones too (`open` false); with a session only followed stations |
 | GET | `/alerts/areas?session=` | `AreaList`: one card per followed station with headline, day outlooks, open alert and orders in force |
 | GET | `/alerts/push-key` | `PushKey`: the VAPID public key, or null when push is off |
 | PUT | `/alerts/push` | Body `{ sessionId, push }`, a browser push subscription or null. 204 |

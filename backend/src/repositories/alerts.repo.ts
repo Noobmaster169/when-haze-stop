@@ -12,10 +12,11 @@ interface EventRow {
   kind: AlertKind;
   threshold: number;
   message: string;
+  open: boolean;
   created_at: Date;
 }
 
-const EVENT = "e.id, e.station_id, s.name as station_name, e.kind, e.threshold, e.message, e.created_at";
+const EVENT = "e.id, e.station_id, s.name as station_name, e.kind, e.threshold, e.message, e.open, e.created_at";
 
 function toEvent(row: EventRow): AlertEvent {
   return {
@@ -25,6 +26,7 @@ function toEvent(row: EventRow): AlertEvent {
     kind: row.kind,
     threshold: row.threshold,
     message: row.message,
+    open: row.open,
     createdAt: row.created_at.toISOString(),
   };
 }

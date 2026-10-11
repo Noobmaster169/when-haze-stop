@@ -21,45 +21,63 @@ import type { AlertKind } from "@/lib/api/alert-schemas";
 
 export interface ReplayAlert {
   kind: AlertKind;
-  /** When the app would have sent it, Malaysian time. */
-  at: string;
   /** The notification's title. */
   title: string;
   /** What the person is told, exactly as the live alert words it. */
   message: string;
-  source: { label: string; url: string };
+}
+
+/** One moment of the evening: when, what the presenter's bar says, and the alert sent then, if one was. */
+export interface ReplayStep {
+  at: string;
+  caption: string;
+  alert: ReplayAlert | null;
 }
 
 export const REPLAY_PLACE = "Seremban, Negeri Sembilan";
-export const REPLAY_DATE = "8 Oct";
+export const REPLAY_STATION = "Seremban";
 
-export const RULE = {
-  at: "8 Oct, 19:09",
-  text: "The Education Ministry rules that schools close wherever the API passes 180, from 9 October.",
-  source: { label: "Kementerian Pendidikan", url: "https://www.moe.gov.my/kenyataan-media-berhubung-kpm-junjung-titah-kdymm-" },
-};
-
-export const REPLAY: readonly ReplayAlert[] = [
+export const REPLAY_STEPS: readonly ReplayStep[] = [
   {
-    kind: "arriving",
-    at: "8 Oct, 20:20",
-    title: "Haze forecast",
-    message: "Seremban: schools may close tomorrow. 76% chance of API above 180, the Education Ministry's closing line.",
-    source: { label: "Forecast from the 20:00 readings: peak 192, likely 166 to 205", url: "/map?station=CA24N" },
+    at: "8 Oct, 19:09",
+    caption: "The Education Ministry rules that schools close wherever the API passes 180, from 9 October. This replay follows Seremban, as a parent there would.",
+    alert: null,
   },
   {
-    kind: "order",
-    at: "8 Oct, 21:20",
-    title: "Official order",
-    message: "Ministry of Education: All schools in Negeri Sembilan close on 9 October.",
-    source: {
-      label: "First reported by Kosmo Online at 20:14",
-      url: "https://news.google.com/rss/articles/CBMiiAFBVV95cUxQTjh6MDdZWkxpX1hQNnZjVDBTWXBGWjZsX0VGWDdJdXo0NmhLdmNhcWpxYjUyUjdNNjV6UERhN01SYWNPcnpwN1hySVBvMnNoQURVQ3hrRTVJSk5yekN3U3pZTEpxaWk5Sm03V0ZSZkpINzJ2WG1jdEctVWd2elpSalhwX1puR25j?oc=5",
+    at: "8 Oct, 20:20",
+    caption: "The forecast from the 20:00 readings puts Seremban's peak tomorrow at 192, likely 166 to 205: a 76% chance of passing 180. The hourly check sends this alert.",
+    alert: {
+      kind: "arriving",
+      title: "Haze forecast",
+      message: "Seremban: schools may close tomorrow. 76% chance of API above 180, the Education Ministry's closing line.",
     },
+  },
+  {
+    at: "8 Oct, 21:20",
+    caption: "Negeri Sembilan's closure was first reported by Kosmo Online at 20:14. The next hourly check reads it and sends the official order.",
+    alert: {
+      kind: "order",
+      title: "Official order",
+      message: "Ministry of Education: All schools in Negeri Sembilan close on 9 October.",
+    },
+  },
+  {
+    at: "9 Oct",
+    caption: "Seremban peaked at 189, above the closing line, and its schools were shut that day. The warning came the evening before, with the official word beside it.",
+    alert: null,
   },
 ];
 
-export const OUTCOME = {
-  at: "9 Oct",
-  text: "Seremban peaked at 189, above the closing line, and its schools were shut that day. The warning came the evening before, with the official word beside it.",
-};
+/** Step 0 is no replay; the steps run 1 to the last. */
+export const LAST_STEP = REPLAY_STEPS.length;
+
+export function clampStep(step: number): number {
+  return Math.min(LAST_STEP, Math.max(1, step));
+}
+
+/** The alerts sent up to a step, newest first, each with when it was sent: what the toasts show. */
+export function replayAlertsAt(step: number): { at: string; alert: ReplayAlert }[] {
+  return REPLAY_STEPS.slice(0, Math.max(0, step))
+    .flatMap((moment) => (moment.alert ? [{ at: moment.at, alert: moment.alert }] : []))
+    .reverse();
+}

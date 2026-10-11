@@ -27,6 +27,8 @@ export const AlertEvent = z.object({
   threshold: z.number().int(),
   /** One or two sentences: what happened and what it means. */
   message: z.string(),
+  /** True while its condition holds; an ended alert stays in the feed as history. */
+  open: z.boolean(),
   createdAt: z.string(),
 });
 export type AlertEvent = z.infer<typeof AlertEvent>;

@@ -15,6 +15,7 @@ export const AlertEvent = z.object({
   kind: AlertKind,
   threshold: z.number().int(),
   message: z.string(),
+  open: z.boolean(),
   createdAt: z.string(),
 });
 export type AlertEvent = z.infer<typeof AlertEvent>;
