@@ -1,32 +1,37 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
+import { ReplayBar } from "@/components/alerts/demo/replay-bar";
 import { Dock } from "@/components/dock/dock";
 import { DockProvider } from "@/components/dock/dock-state";
+import { DockToggle } from "@/components/dock/dock-toggle";
 
-import { activeFor } from "./nav";
-import { Rail } from "./rail";
+import { AlertToasts } from "./alert-toasts";
+import { TopControls } from "./top-controls";
 
 /**
- * Every screen is this: a rail, then the page, then the dock.
+ * Every screen is this: the page with the island floating over its top, new
+ * alerts at its top right, and the dock beside it when it is open.
+ * No banner: the island is the navigation and the page keeps the height.
  *
- * Mounted once by app/(app)/layout.tsx, so the rail and the chat survive
- * every navigation. A page renders its own `<TopBar>` and its content in a
- * column that fills the space between.
+ * Mounted once by app/(app)/layout.tsx, so the island and the chat survive
+ * every navigation.
  */
 export function AppShell({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
-  const [railOpen, setRailOpen] = useState(true);
   return (
     <DockProvider>
-      <div className="flex h-dvh overflow-hidden bg-canvas text-ink">
-        <div className="hidden md:flex">
-          <Rail open={railOpen} onToggle={() => setRailOpen((was) => !was)} active={activeFor(pathname)} />
+      {/* Relative so an absolutely placed child (an sr-only label, say) is clipped here instead of stretching the document past the viewport. */}
+      <div className="relative flex h-dvh flex-col overflow-hidden bg-canvas text-ink">
+        <div className="flex min-h-0 grow">
+          <div className="relative flex min-w-0 grow">
+            {children}
+            <TopControls toggle={<DockToggle />} />
+            <AlertToasts />
+            <ReplayBar />
+          </div>
+          <Dock />
         </div>
-        {children}
-        <Dock />
       </div>
     </DockProvider>
   );

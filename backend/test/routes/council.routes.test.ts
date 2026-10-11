@@ -1,0 +1,75 @@
+import request from "supertest";
+import { afterAll, beforeEach, describe, expect, it } from "vitest";
+
+import { CouncilEventPage, CouncilRun, CouncilRunList } from "../../src/contracts";
+import { closePool, getPool } from "../../src/db";
+import { council } from "../../src/repositories";
+import { testApp } from "../app";
+
+afterAll(closePool);
+
+// Tests never delete: a run left active by an earlier test is finished instead, so the one-active rule lets a new one queue.
+beforeEach(async () => {
+  await getPool().query("update council_runs set status = 'failed', error = 'closed by a test' where status in ('queued', 'running')");
+});
+
+describe("the council routes", () => {
+  it("queues a run for KL, and refuses a second while it waits", async () => {
+    const app = testApp();
+    const first = await request(app).post("/council/runs").send({ target: "klang-valley" });
+    expect(first.status).toBe(202);
+    expect(CouncilRun.parse(first.body).status).toBe("queued");
+    const second = await request(app).post("/council/runs").send({ target: "klang-valley" });
+    expect(second.status).toBe(409);
+  });
+
+  it("refuses an area the council cannot be asked about yet", async () => {
+    const response = await request(testApp()).post("/council/runs").send({ target: "johor-bahru" });
+    expect(response.status).toBe(400);
+  });
+
+  it("lists runs and serves a run's events after a sequence number", async () => {
+    const pool = getPool();
+    const run = (await council.queue(pool, "klang-valley", 8_000_000))!;
+    await council.appendEvent(pool, run.id, { seq: 0, kind: "stage", actor: "system", payload: { stage: "situation", title: "The situation", index: 1, of: 9 } });
+    await council.appendEvent(pool, run.id, { seq: 1, kind: "thinking", actor: "chair", payload: { agent: "chair", gist: "reading the fact sheet" } });
+    await council.appendEvent(pool, run.id, { seq: 2, kind: "not_a_kind", actor: "chair", payload: {} });
+
+    const list = CouncilRunList.parse((await request(testApp()).get("/council/runs")).body);
+    expect(list.runs[0].id).toBe(run.id);
+    const page = CouncilEventPage.parse((await request(testApp()).get(`/council/runs/${run.id}/events?after=0`)).body);
+    // The malformed event is left out rather than breaking the replay.
+    expect(page.events.map((event) => event.kind)).toEqual(["thinking"]);
+    expect(page.status).toBe("queued");
+  });
+
+  it("deletes a finished run and its events, and refuses one in session", async () => {
+    const pool = getPool();
+    const run = (await council.queue(pool, "klang-valley", 8_000_000))!;
+    await council.appendEvent(pool, run.id, { seq: 0, kind: "stage", actor: "system", payload: { stage: "situation", title: "The situation", index: 1, of: 9 } });
+    expect((await request(testApp()).delete(`/council/runs/${run.id}`)).status).toBe(409);
+    await council.fail(pool, run.id, "a test run");
+    expect((await request(testApp()).delete(`/council/runs/${run.id}`)).status).toBe(204);
+    expect(await council.find(pool, run.id)).toBeNull();
+    expect(await council.eventsAfter(pool, run.id, -1)).toEqual([]);
+    expect((await request(testApp()).delete(`/council/runs/${run.id}`)).status).toBe(404);
+  });
+
+  it("answers 404 for a run that does not exist", async () => {
+    expect((await request(testApp()).get("/council/runs/999999999")).status).toBe(404);
+  });
+});
+
+describe("a worker starting up", () => {
+  it("closes a run left running by a worker that died, so a new run can queue", async () => {
+    const pool = getPool();
+    const queued = (await council.queue(pool, "klang-valley", 8_000_000))!;
+    await council.claimNext(pool);
+    expect(await council.failAbandoned(pool, "the worker restarted")).toContain(queued.id);
+    const closed = await council.find(pool, queued.id);
+    expect(closed?.status).toBe("failed");
+    const events = await council.eventsAfter(pool, queued.id, -1);
+    expect(events.at(-1)?.kind).toBe("run_failed");
+    expect(await council.queue(pool, "klang-valley", 8_000_000)).not.toBeNull();
+  });
+});

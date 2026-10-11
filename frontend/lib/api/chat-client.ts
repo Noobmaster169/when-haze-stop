@@ -38,10 +38,10 @@ export async function createConversation(): Promise<Outcome<ChatConversation>> {
  * whose job is to pass it to the browser rather than to understand it. A frame
  * is parsed by the client that draws it.
  */
-export async function streamQuestion(id: string, content: string, signal?: AbortSignal): Promise<Response> {
+export async function streamQuestion(id: string, content: string, sessionId: string | undefined, signal?: AbortSignal): Promise<Response> {
   return request(`/chat/${id}/messages`, {
     method: "POST",
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, sessionId }),
     headers: { accept: "text/event-stream" },
     timeoutMs: TURN_TIMEOUT_MS,
     signal,

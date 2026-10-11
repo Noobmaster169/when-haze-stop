@@ -1,0 +1,59 @@
+from hazemodel.instruments import instruments
+from hazemodel.truth.reference import reference_series
+from hazemodel.truth.sensors import ACCEPT_CORRELATION, ACCEPT_HOURS, correct_sensors
+
+
+def test_every_sensor_gets_a_decision_against_a_reference(data):
+    series = reference_series(data)
+    table = instruments(data)
+    corrected, decisions = correct_sensors(series, table)
+    sensors = table[table["kind"] == "openaq"]["instrument_id"]
+    assert set(decisions["instrument_id"]) == set(sensors)
+    assert decisions["reference_id"].notna().all()
+    assert (decisions["distance_km"] >= 0).all()
+    accepted = decisions[decisions["accepted"]]
+    assert (accepted["correlation"] >= ACCEPT_CORRELATION).all()
+    assert (accepted["hours"] >= ACCEPT_HOURS).all()
+    assert set(corrected.columns) == set(series.columns)
+
+
+def test_an_accepted_sensor_moves_toward_its_reference(data):
+    series = reference_series(data)
+    table = instruments(data)
+    corrected, decisions = correct_sensors(series, table)
+    assert decisions["accepted"].any()
+    for _, row in decisions[decisions["accepted"]].iterrows():
+        raw = series[series["instrument_id"] == row["instrument_id"]].set_index("observed_at")["pm25_24h"]
+        fixed = corrected[corrected["instrument_id"] == row["instrument_id"]].set_index("observed_at")["pm25_24h"]
+        ref = series[series["instrument_id"] == row["reference_id"]].set_index("observed_at")["pm25_24h"]
+        shared = raw.index.intersection(ref.index)
+        before = (raw[shared] - ref[shared]).abs().mean()
+        after = (fixed[shared] - ref[shared]).abs().mean()
+        assert after <= before + 1e-6
+
+
+def test_a_short_overlap_is_not_accepted(data):
+    series = reference_series(data)
+    table = instruments(data)
+    _, full = correct_sensors(series, table)
+    sensor = full[full["accepted"]]["instrument_id"].iloc[0]
+    cut = series[(series["instrument_id"] != sensor) | (series.groupby("instrument_id").cumcount() < ACCEPT_HOURS - 1)]
+    _, decisions = correct_sensors(cut, table)
+    row = decisions.set_index("instrument_id").loc[sensor]
+    assert row["hours"] < ACCEPT_HOURS
+    assert not row["accepted"]
+
+
+def test_reference_is_chosen_among_those_sharing_hours(data):
+    series = reference_series(data)
+    table = instruments(data)
+    _, decisions = correct_sensors(series, table)
+    by_id = {key: group.set_index("observed_at")["pm25_24h"] for key, group in series.groupby("instrument_id")}
+    refs = table[table["reference"]]["instrument_id"]
+    for _, row in decisions.iterrows():
+        if row["instrument_id"] not in by_id:
+            continue  # no readings at all in the series: the nearest reference is the fallback
+        mine = by_id[row["instrument_id"]].index
+        overlaps = {r: len(mine.intersection(by_id[r].index)) for r in refs if r in by_id and r != row["instrument_id"]}
+        if any(n >= ACCEPT_HOURS for n in overlaps.values()):
+            assert overlaps[row["reference_id"]] >= ACCEPT_HOURS

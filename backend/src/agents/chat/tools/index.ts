@@ -1,6 +1,15 @@
 import { childLogger } from "../../../lib/logger";
 import { argsSignature } from "./args-signature";
+import { createAlert } from "./create-alert";
+import { getAirQuality } from "./get-air-quality";
+import { getFires } from "./get-fires";
+import { getForecast } from "./get-forecast";
+import { getGuidelines } from "./get-guidelines";
+import { getStatements } from "./get-statements";
 import { getTime } from "./get-time";
+import { getTrackRecord } from "./get-track-record";
+import { getVisibility } from "./get-visibility";
+import { getWind } from "./get-wind";
 import { loadSkill } from "./load-skill";
 import { type ChatTool, refused, type ToolContext, type ToolOutcome } from "./types";
 
@@ -14,7 +23,7 @@ export type { ChatTool, ToolContext, ToolOutcome } from "./types";
  * reach for them. Adding a tool is a file beside this one and a line here.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each tool has its own input type; the registry is keyed by name and the loop parses through the tool's own schema.
-const ALL: ChatTool<any>[] = [getTime, loadSkill];
+const ALL: ChatTool<any>[] = [getAirQuality, getForecast, getStatements, getGuidelines, getTrackRecord, getFires, getWind, getVisibility, createAlert, getTime, loadSkill];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- as above.
 export const TOOLS: ReadonlyMap<string, ChatTool<any>> = new Map(ALL.map((tool) => [tool.name, tool]));

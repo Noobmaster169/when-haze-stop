@@ -9,7 +9,20 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "type-check": "tsc --noEmit",
-    "db:migrate": "node --env-file-if-exists=.env db/migrate.mjs"
+    "db:migrate": "node --env-file-if-exists=.env db/migrate.mjs",
+    "db:seed": "node --env-file-if-exists=.env db/seed.mjs",
+    "db:export-seed": "node --env-file-if-exists=.env db/export-seed.mjs",
+    "haze:once": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts once",
+    "haze:backfill": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts backfill",
+    "haze:history": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts history",
+    "haze:loop": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts loop",
+    "haze:coverage": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts coverage",
+    "haze:dataset": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts dataset",
+    "haze:evaluate": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts evaluate",
+    "haze:hindcast": "node --env-file-if-exists=.env --import tsx src/jobs/main.ts hindcast",
+    "council:situation": "node --env-file-if-exists=.env --import tsx src/jobs/council-situation.ts",
+    "council:worker": "node --env-file-if-exists=.env --import tsx src/jobs/council-worker.ts loop",
+    "council:run": "node --env-file-if-exists=.env --import tsx src/jobs/council-worker.ts once"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",
@@ -17,6 +30,8 @@
     "pg": "^8.22.0",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
+    "unpdf": "^1.8.1",
+    "web-push": "^3.6.7",
     "zod": "^4.6.5"
   },
   "devDependencies": {
@@ -24,6 +39,7 @@
     "@types/node": "^24",
     "@types/pg": "^8.20.4",
     "@types/supertest": "^7.2.1",
+    "@types/web-push": "^3.6.4",
     "pino-pretty": "^13.1.3",
     "supertest": "^7.2.2",
     "tsx": "^4.23.12",

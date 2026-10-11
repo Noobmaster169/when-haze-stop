@@ -4,6 +4,9 @@ import { useCallback, useRef, useState } from "react";
 
 import { ChatConversation, type ChatProgress, type ChatToolCall, type ChatTurn } from "@/lib/api/chat-schemas";
 
+import { sessionId } from "@/components/alerts/session";
+import { refreshAlerts } from "@/components/alerts/use-follows";
+
 import { turnEvents } from "./turn-stream";
 
 /**
@@ -81,7 +84,7 @@ export function useChat(options: {
         const response = await fetch(`/api/chat/${conversation.current}/messages`, {
           method: "POST",
           headers: { "content-type": "application/json", accept: "text/event-stream" },
-          body: JSON.stringify({ content: question }),
+          body: JSON.stringify({ content: question, sessionId: sessionId() }),
           signal: controller.signal,
         });
         if (!response.ok || !response.body) throw new Error(await refusal(response));
@@ -99,6 +102,8 @@ export function useChat(options: {
             const { asked, turn, exhausted: ranOut } = event.answer;
             setTurns((was) => [...was.filter((item) => item.id !== mine.id), asked, turn]);
             setExhausted(ranOut);
+            // The assistant may have turned alerts on, and the pages that list them should say so at once.
+            if (turn.toolCalls.some((call) => call.tool === "create_alert" && call.ok)) await refreshAlerts();
           }
         }
       };

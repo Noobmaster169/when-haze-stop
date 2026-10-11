@@ -1,6 +1,6 @@
 import type { IconName } from "@/components/ui/icons";
 
-/** The rail's destinations, and the one place they are named. A new page is a line here. */
+/** The island's destinations, and the one place they are named. A new page is a line here. */
 export interface Destination {
   key: string;
   label: string;
@@ -8,7 +8,15 @@ export interface Destination {
   icon: IconName;
 }
 
-export const DESTINATIONS: Destination[] = [{ key: "home", label: "Home", href: "/", icon: "home" }];
+export const DESTINATIONS: Destination[] = [
+  { key: "map", label: "Map", href: "/map", icon: "map" },
+  { key: "city", label: "KL in 3D", href: "/city", icon: "city" },
+  { key: "alerts", label: "Alerts", href: "/alerts", icon: "bell" },
+  // The council replaced the Simulation page in the nav; the engine's backtest is still at /simulation, linked from the verdict.
+  { key: "council", label: "Council", href: "/council", icon: "chart" },
+  { key: "model", label: "Model", href: "/model", icon: "grid" },
+  { key: "sources", label: "Sources", href: "/sources", icon: "database" },
+];
 
 /** The destination a pathname sits under: the longest href that prefixes it. */
 export function activeFor(pathname: string): string | null {

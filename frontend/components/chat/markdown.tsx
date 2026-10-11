@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ComponentProps } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -22,11 +23,17 @@ const parts: ComponentProps<typeof ReactMarkdown>["components"] = {
     <pre className="overflow-x-auto rounded-md bg-sunken px-3 py-2 font-mono text-mono-sm text-ink-secondary [&_code]:bg-transparent [&_code]:p-0">{children}</pre>
   ),
   code: ({ children }) => <code className="rounded-xs bg-sunken px-1 font-mono text-mono-sm text-ink-secondary">{children}</code>,
-  a: ({ children, href }) => (
-    <a href={href} target="_blank" rel="noreferrer" className="text-accent underline-offset-2 hover:underline">
-      {children}
-    </a>
-  ),
+  // A link into the app, such as a station on the map, stays in this tab so the chat stays open beside it.
+  a: ({ children, href }) =>
+    href?.startsWith("/") ? (
+      <Link href={href} className="text-accent underline-offset-2 hover:underline">
+        {children}
+      </Link>
+    ) : (
+      <a href={href} target="_blank" rel="noreferrer" className="text-accent underline-offset-2 hover:underline">
+        {children}
+      </a>
+    ),
   table: ({ children }) => (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-small">{children}</table>

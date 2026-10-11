@@ -1,0 +1,215 @@
+# The whole app in one command, from the repository root:
+#
+#   cp .env.example .env        # paste the token from `claude setup-token`
+#   docker compose up -d --build
+#
+# Then open http://localhost:3000. The first data cycle fetches a week of DOE
+# readings and takes a few minutes; `docker compose logs -f jobs` shows it.
+#
+# The readings, the screened fires and the fixed heat sources of the months
+# before your first run come from backend/db/seed/, loaded by the migrate
+# service. The jobs service then fetches the wind for those months by itself.
+#
+# For host development (`pnpm dev`, `pnpm test`) start only the infrastructure:
+#
+#   docker compose up -d postgres llm-proxy
+#
+# Every published port binds to host loopback, because nothing here
+# authenticates anyone.
+
+name: when-haze-stop
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: localdev
+    # 5433 so it cannot collide with a Postgres already on 5432. The backend
+    # tests create and use `haze_test` in this instance.
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # The one door to the models: `claude -p` logged in by CLAUDE_CODE_OAUTH_TOKEN
+  # from .env. Without the token it still starts and every Claude call is
+  # refused as "not logged in"; the map and alerts do not need it.
+  llm-proxy:
+    build: ./proxy
+    environment:
+      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:-}
+    # 4001 on the host, because 4000 is often another project's proxy.
+    ports:
+      - "127.0.0.1:4001:4000"
+    restart: unless-stopped
+
+  # The learned forecast (model/): reads the stored history, serves a forecast
+  # of each instrument's peak PM2.5 for the next three days. Without a
+  # promoted artifact it answers 503 and the cycle logs it and goes on.
+  model:
+    build: ./model
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: postgres
+      PG_USER: postgres
+      PG_PASSWORD: localdev
+      MODEL_ARTIFACTS: /app/artifacts
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    # 4002 on the host; 4000 and 4001 are the proxies'.
+    ports:
+      - "127.0.0.1:4002:4002"
+    volumes:
+      - model-artifacts:/app/artifacts
+      # The committed reports, so GET /report can state the live version's backtest.
+      - ./model/reports:/app/reports:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  migrate:
+    build: ./backend
+    environment: &backend-env
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: postgres
+      PG_USER: postgres
+      PG_PASSWORD: localdev
+      LLM_PROXY_URL: http://llm-proxy:4000
+      LLM_MODEL_CHAT: ${LLM_MODEL_CHAT:-}
+      MODEL_URL: http://model:4002
+      # off, shadow or live. shadow asks the model each cycle and scores it on
+      # the Simulation page; live makes its forecast the outlook's. Set live by
+      # hand once the shadow rule on that page has passed.
+      MODEL_MODE: ${MODEL_MODE:-shadow}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Web Push, so alerts reach a device with the tab closed. Empty: in-app only.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@localhost}
+    # The seed is the data every teammate starts from: readings, screened fires
+    # and the fixed heat sources. It only adds, and loads a file once.
+    command: ["sh", "-c", "node db/migrate.mjs && node db/seed.mjs"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build: ./backend
+    environment:
+      <<: *backend-env
+      # The container's own interface, so the frontend container can reach it.
+      # Published to host loopback only.
+      HOST: 0.0.0.0
+      PORT: 8091
+    ports:
+      - "127.0.0.1:8091:8091"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      llm-proxy:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8091/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 6
+    restart: unless-stopped
+
+  # The hourly fetch, statement reading, model run and alert pass: one cycle
+  # now so the map has data, the history back to HISTORY_FROM (hours on a first
+  # start, a minute after that: it asks only for what is missing), then the loop,
+  # which backfills the stored week (it skips hours already run, so a restart
+  # costs little) and runs a cycle at 20 past every hour.
+  # The proxy reads the new official statements each cycle.
+  jobs:
+    build: ./backend
+    environment:
+      <<: *backend-env
+      # Optional. With it `history` replays the fire archive; without it the
+      # fires before the first run come from the seed.
+      FIRMS_MAP_KEY: ${FIRMS_MAP_KEY:-}
+      # Optional. With it the PM2.5 of OpenAQ's sensors is stored each hour and
+      # for the past; without it that one source is skipped.
+      OPENAQ_API_KEY: ${OPENAQ_API_KEY:-}
+      # The first day `history` fills back to, for fires, wind, airport
+      # visibility and measured PM2.5 alike.
+      HISTORY_FROM: ${HISTORY_FROM:-2025-01-01}
+    command:
+      - sh
+      - -c
+      - >-
+        node --import tsx src/jobs/main.ts once;
+        node --import tsx src/jobs/main.ts history;
+        exec node --import tsx src/jobs/main.ts loop
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      llm-proxy:
+        condition: service_started
+      model:
+        condition: service_started
+    restart: unless-stopped
+
+  # The Suppression Council's worker: takes runs queued by the page's "Convene the council"
+  # button and executes them, one at a time. A run takes 20 to 30 minutes of model calls.
+  council:
+    build: ./backend
+    environment:
+      <<: *backend-env
+    command: ["node", "--import", "tsx", "src/jobs/council-worker.ts", "loop"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      llm-proxy:
+        condition: service_started
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    environment:
+      BACKEND_URL: http://api:8091
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Retraining on request: features, train with backtest, promote by rule. It
+  # takes 15 to 40 minutes, so it sits behind the `train` profile and `up`
+  # never starts it; run it as
+  #   docker compose --profile train run --rm --user "$(id -u):$(id -g)" model-train
+  # (the user, so the reports land in the bind mount owned by you). It skips
+  # when a report is under a week old; append `--force` to retrain anyway.
+  # Shares the artifacts volume with the model service, which re-reads `live`
+  # on every /predict, so a promotion needs no restart.
+  model-train:
+    build: ./model
+    profiles: ["train"]
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: postgres
+      PG_USER: postgres
+      PG_PASSWORD: localdev
+      MODEL_ARTIFACTS: /app/artifacts
+    volumes:
+      - model-artifacts:/app/artifacts
+      - ./model/reports:/app/reports
+    entrypoint: ["hazemodel", "retrain", "--from", "2025-06-07"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  model-artifacts:

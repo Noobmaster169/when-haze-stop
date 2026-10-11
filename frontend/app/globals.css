@@ -1,11 +1,14 @@
 @import "tailwindcss";
 
 /*
- * A white ground with hairlines, ink at four weights, and five hues that mean
- * something. Nothing else in the frontend declares a colour; every screen is
- * built from these tokens. Rebrand here.
+ * Two schemes on one set of names: a white ground and a near-black one, each
+ * with hairlines, ink at four weights, amber for what is active, and five hues
+ * that mean something. lib/colour-scheme.ts picks one by setting
+ * <html data-theme>. Nothing else in the frontend declares a colour; every
+ * screen is built from these tokens. Rebrand here.
  */
 :root {
+  /* light by default; the dark values below replace these when <html data-theme="dark"> */
   color-scheme: light;
 
   /* surfaces */
@@ -48,9 +51,47 @@
   --signal-line: #bbd2f5;
 
   /* the accent: interactive and active states */
-  --accent: #175cd3;
-  --accent-tint: #eff4ff;
-  --accent-line: #bbd2f5;
+  --accent: #b45309;
+  --accent-tint: #fef3c7;
+  --accent-line: #e9b65c;
+
+  /* the map: a dark chart under a solid field, with white names and dark coasts drawn over it */
+  --map-sea: #dfe7f0;
+  --map-land: #f1efe9;
+  --map-coast: rgb(30 36 48 / 0.7);
+  --map-border: rgb(30 36 48 / 0.5);
+  --map-label: #111827;
+  --map-wind: #1f2937;
+  --map-fire: #d92d20;
+  --map-fire-core: #fff1d6;
+
+  /* the 3D city: a clear sky and the haze it greys toward, and the materials of the streets under it */
+  --city-zenith: #4f86c6;
+  --city-horizon: #cfe0f1;
+  --city-haze: #cfc6ad;
+  --city-night: #0e1522;
+  --city-glow: #e2a564;
+  --city-ground: #d6d3cb;
+  --city-building: #e9e6df;
+  --city-glass: #c9d3dc;
+  --city-park: #a7bf8c;
+  --city-water: #86a9c6;
+  --city-road: #bdb9b0;
+  --city-tower: #eeece6;
+
+  /* the index ramp, at API 0, 50, 100, 150, 200, 300 and 400. The legend, the field and the stations all read these. */
+  --api-0: #3fb15f;
+  --api-50: #e6cf45;
+  --api-100: #f2a33a;
+  --api-150: #e8553a;
+  --api-200: #c4246b;
+  --api-300: #7d2bb8;
+  --api-400: #4a1680;
+
+  /* the Model page's three series, one value for both schemes: what was read, the learned model, no change */
+  --series-real: #2a78d6;
+  --series-model: #d9552e;
+  --series-same: #1f8a5a;
 
   /* the one shadow in the product, and the focus ring */
   --shadow-overlay: 0 8px 24px -8px rgb(17 24 39 / 0.18), 0 1px 2px rgb(17 24 39 / 0.06);
@@ -62,6 +103,54 @@
   --r-md: 7px;
   --r-lg: 9px;
   --r-xl: 10px;
+}
+
+/* the dark scheme: a near-black ground so the haze carries the colour, light ink, amber for what is active */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --shell: #0f1115;
+  --canvas: #15181d;
+  --surface: #1b1e24;
+  --surface-sunken: #22262d;
+  --surface-active: #2a2f37;
+  --scrim: rgb(0 0 0 / 0.55);
+  --hairline: #2a2e36;
+  --hairline-strong: #3a404a;
+  --hairline-faint: #21252c;
+  --ink: #f3f4f6;
+  --ink-secondary: #c4c9d1;
+  --ink-tertiary: #9aa1ab;
+  --ink-faint: #6b727d;
+  --ink-inverse: #111317;
+  --verdict-match: #4ade80;
+  --verdict-match-tint: #11291b;
+  --verdict-match-line: #1f5235;
+  --verdict-differ: #f5b740;
+  --verdict-differ-tint: #2b2210;
+  --verdict-differ-mark: #3d2f12;
+  --verdict-differ-ink: #fcd38a;
+  --verdict-differ-line: #5c4517;
+  --verdict-review: #b69cf7;
+  --verdict-review-tint: #221a35;
+  --verdict-review-line: #41316a;
+  --verdict-fault: #f87171;
+  --verdict-fault-tint: #2e1616;
+  --verdict-fault-line: #5f2626;
+  --signal: #7aa7ff;
+  --signal-tint: #172036;
+  --signal-line: #2c3f66;
+  --accent: #f2b84b;
+  --accent-tint: #2d2412;
+  --accent-line: #6b5321;
+  --map-sea: #0d1420;
+  --map-land: #18202c;
+  --map-coast: rgb(10 12 18 / 0.85);
+  --map-border: rgb(10 12 18 / 0.7);
+  --map-label: #ffffff;
+  --map-wind: #ffffff;
+  --map-fire: #ff6a3d;
+  --map-fire-core: #ffe8c2;
+  --shadow-overlay: 0 10px 30px -10px rgb(0 0 0 / 0.6), 0 1px 2px rgb(0 0 0 / 0.4);
 }
 
 @theme inline {
@@ -102,6 +191,18 @@
   --color-accent-tint: var(--accent-tint);
   --color-accent-line: var(--accent-line);
 
+  --color-map-sea: var(--map-sea);
+  --color-api-0: var(--api-0);
+  --color-api-50: var(--api-50);
+  --color-api-100: var(--api-100);
+  --color-api-150: var(--api-150);
+  --color-api-200: var(--api-200);
+  --color-api-300: var(--api-300);
+  --color-api-400: var(--api-400);
+  --color-series-real: var(--series-real);
+  --color-series-model: var(--series-model);
+  --color-series-same: var(--series-same);
+
   --font-display: var(--font-newsreader), Georgia, serif;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -113,6 +214,9 @@
   --radius-xl: var(--r-xl);
 
   --shadow-overlay: var(--shadow-overlay);
+
+  /* the island's motion: quick to start, long to settle, the way iOS springs a panel open */
+  --ease-island: cubic-bezier(0.32, 0.72, 0, 1);
 
   /* the scale. Sizes are exact, not snapped to Tailwind's defaults. */
   --text-display: 30px;
@@ -167,5 +271,55 @@ body {
     transition-duration: 1ms !important;
     animation-duration: 1ms !important;
     animation-iteration-count: 1 !important;
+  }
+}
+
+/* The loading dots: each rises and brightens in turn. */
+@keyframes dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+/* A new alert sliding in from the right edge. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(calc(100% + 24px));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The replay's bar rising from the bottom of the page. */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* A line dropping in from above. */
+@keyframes island-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }

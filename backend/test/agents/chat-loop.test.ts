@@ -7,6 +7,7 @@ import { runTurn, type TurnInput } from "../../src/agents/chat";
 import type { ChatProgress, ChatToolCall } from "../../src/contracts";
 import { closePool, getPool } from "../../src/db";
 import { CallAbortedError } from "../../src/lib/errors";
+import { FakeGeocoder } from "../../src/sources/__fakes__/fake.sources";
 import { step } from "../app";
 
 afterAll(closePool);
@@ -19,7 +20,7 @@ function input(question: string, overrides: Partial<TurnInput> = {}): TurnInput 
 async function turn(llm: FakeLlmClient, question = "hello", extra: Partial<Parameters<typeof runTurn>[0]> = {}, overrides: Partial<TurnInput> = {}) {
   const pool = getPool();
   const conversation = await pool.query<{ id: string }>("insert into chat_conversations (id) values ($1) returning id", [randomUUID()]);
-  return runTurn({ llm, pool, tools: { pool }, ...extra }, input(question, { conversationId: conversation.rows[0].id, ...overrides }));
+  return runTurn({ llm, pool, tools: { pool, geocoder: new FakeGeocoder() }, ...extra }, input(question, { conversationId: conversation.rows[0].id, ...overrides }));
 }
 
 describe("the chat loop", () => {

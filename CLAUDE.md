@@ -1,34 +1,57 @@
-# Haze
+# When Haze Stop
 
-An AI application starter: a Next.js frontend with a chat dock on every page, an Express
-backend that runs the agent, and a proxy that puts the Claude subscription behind the
-Anthropic wire. Read this file fully before touching code.
+A haze map, forecast, alerts and assistant for Malaysia, built on an AI application starter: a
+Next.js frontend with a chat dock on every page, an Express backend that runs the agent, and a
+proxy that puts the Claude subscription behind the Anthropic wire. Read this file fully before
+touching code. What each feature does and how is in `docs/FEATURES.md`. Where the work stands and
+what to do next is in `docs/HANDOVER.md`.
 
-Three independent packages. Run commands inside a package, never at the root.
+Four independent packages. Run commands inside a package, never at the root. The one exception
+is `compose.yaml` at the root, which runs the whole stack with `docker compose up -d --build`.
 
 - `frontend/` Next.js 16. Read `frontend/AGENTS.md` before writing Next code.
 - `backend/` Express + Postgres. Owns the chat agent, its tools and its skills.
 - `proxy/` Python. Anthropic-wire gateway to `claude -p`, run as the `llm-proxy` container of
   the compose stack, logged in by `CLAUDE_CODE_OAUTH_TOKEN`.
+- `model/` Python. The learned forecast: truth, features, training, backtest and the `/predict`
+  service, run as the `model` container. Method and results in `docs/MODEL.md`.
 
 Setup, ports and the API are in `README.md`.
 
 ## Commands
 
 ```bash
-# local infra, from backend/ (postgres :5433, llm-proxy :4001)
-docker compose -f compose.local.yaml up -d
-docker compose -f compose.local.yaml up -d --build llm-proxy   # after changing proxy/
+# everything, from the root: postgres, llm-proxy, migrate, api, jobs, frontend
+docker compose up -d --build
+
+# only the local infra for host development (postgres :5433, llm-proxy :4001)
+docker compose up -d postgres llm-proxy
+docker compose up -d --build llm-proxy   # after changing proxy/
 
 # backend, inside backend/
 pnpm install && pnpm db:migrate
+pnpm db:seed                        # load the shared data in db/seed/ (only adds; compose does it for you)
+pnpm db:export-seed                 # write db/seed/ from this database, to commit for the team
 pnpm dev                            # api on :8091
 pnpm test                           # vitest; needs postgres up (uses database haze_test)
 pnpm type-check
+pnpm haze:once                      # fetch the sources, run the model, raise alerts
+pnpm haze:backfill                  # replay the model over the stored week
+pnpm haze:loop                      # haze:once now, then every hour
+pnpm haze:history                   # fires, wind, airport visibility and PM2.5 back to HISTORY_FROM (2025-01-01); name parts to run only those
+pnpm haze:coverage                  # what is stored of those four, month by month; writes nothing
+pnpm haze:dataset                   # the history as five CSV tables for training, into backend/dataset/
+pnpm haze:hindcast                  # replay the smoke model at 00:00 UTC of each stored day into smoke_hindcasts; name a first and last day to limit it
 
 # frontend, inside frontend/
 pnpm dev                            # :3000
 pnpm type-check && pnpm lint && pnpm test
+
+# model, inside model/
+python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+.venv/bin/pytest -q && .venv/bin/ruff check .
+.venv/bin/hazemodel features --from 2025-06-07 --to 2026-10-08   # training rows to model/data/
+.venv/bin/hazemodel serve                                         # :4002
 
 # proxy, inside proxy/
 python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
@@ -45,6 +68,10 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 - `agents/chat/tools/` is one file per tool plus `index.ts`, the registry.
 - `agents/chat/skills/<name>/SKILL.md` is one folder per skill, found on disk.
 - `repositories/` owns all SQL. Nothing else writes SQL.
+- `haze/` is the smoke model and every haze rule (thresholds, chances, alerts) as pure
+  functions: no database, no network. `sources/` is one client per outside data service, each
+  with a fake. `services/` holds the reads that routes, jobs and chat tools share. `jobs/` is the
+  hourly fetch, model run and alert pass, a separate process from the api.
 - `llm.ts` wraps the proxy. `agents/llm-client.ts` is the seam tests fake.
 - `frontend/lib/api-client.ts` is the only door from the frontend to the backend: a barrel
   over `frontend/lib/api/`, one file per resource plus `transport.ts`. The browser calls
@@ -69,16 +96,18 @@ description, split it.
 **Dependencies point inward.**
 
 ```
-routes                              (orchestration, allowed to import everything below)
-  -> repositories, llm              (adapters)
-  -> agents, contracts              (core)
+routes, jobs                        (orchestration, allowed to import everything below)
+  -> services                       (shared reads: compose repositories and haze)
+  -> repositories, sources, llm     (adapters)
+  -> agents, haze, contracts        (core)
 ```
 
 Adapters never import each other. Orchestration is thin: load, call, save.
 
 **Explicit seams.** Every external system sits behind one interface with one real
-implementation and one fake for tests. `LlmClient` is the first; fakes live next to the
-interface in `__fakes__/`. No test may reach the proxy.
+implementation and one fake for tests. `LlmClient` is the first; the data sources in `sources/`
+are the others. Fakes live next to the interface in `__fakes__/`. No test may reach the proxy or
+a data source.
 
 **No premature abstraction.** Two similar lines are fine. Three similar blocks earn a function.
 
@@ -104,6 +133,10 @@ interface in `__fakes__/`. No test may reach the proxy.
 
 - Never delete, truncate, drop or overwrite anything in any database unless the user asked or
   approved first.
+- Real data only. Nothing shown to a person is invented, and test fixtures are values recorded
+  from the sources (`backend/test/fixtures/`).
+- Readings, fires and runs are never trimmed: DOE serves one week and the stored history is the
+  only backtest. `weather_hours` is the one table a later fetch overwrites, by design.
 - Migrations are forward-only SQL in `backend/db/migrations/NNN_name.sql`, applied by
   `db/migrate.mjs`. Never edit an applied one.
 

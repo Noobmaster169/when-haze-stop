@@ -1,0 +1,101 @@
+import type { FetchDetail, SourceFetch } from "../contracts";
+import type { Queryable } from "../db";
+
+/** One row per fetch of an outside source. Insert only. */
+
+export interface NewSourceFetch {
+  source: string;
+  startedAt: Date;
+  finishedAt: Date;
+  ok: boolean;
+  detail: FetchDetail;
+  error: string | null;
+}
+
+interface FetchRow {
+  id: string;
+  source: string;
+  started_at: Date;
+  finished_at: Date;
+  ok: boolean;
+  detail: FetchDetail;
+  error: string | null;
+}
+
+const COLUMNS = "id, source, started_at, finished_at, ok, detail, error";
+
+function toFetch(row: FetchRow): SourceFetch {
+  return {
+    id: Number(row.id),
+    source: row.source,
+    startedAt: row.started_at.toISOString(),
+    finishedAt: row.finished_at.toISOString(),
+    ok: row.ok,
+    detail: row.detail,
+    error: row.error,
+  };
+}
+
+export async function insert(db: Queryable, fetch: NewSourceFetch): Promise<void> {
+  await db.query("insert into source_fetches (source, started_at, finished_at, ok, detail, error) values ($1, $2, $3, $4, $5, $6)", [
+    fetch.source,
+    fetch.startedAt,
+    fetch.finishedAt,
+    fetch.ok,
+    JSON.stringify(fetch.detail),
+    fetch.error,
+  ]);
+}
+
+/** Each source's newest success and newest failure. */
+export async function latest(db: Queryable): Promise<SourceFetch[]> {
+  const { rows } = await db.query<FetchRow>(
+    `select distinct on (source, ok) ${COLUMNS} from source_fetches order by source, ok, started_at desc`,
+  );
+  return rows.map(toFetch);
+}
+
+/** One source's fetches, newest first. */
+export async function page(db: Queryable, source: string, limit: number, offset: number): Promise<SourceFetch[]> {
+  const { rows } = await db.query<FetchRow>(
+    `select ${COLUMNS} from source_fetches where source = $1 order by started_at desc, id desc limit $2 offset $3`,
+    [source, limit, offset],
+  );
+  return rows.map(toFetch);
+}
+
+export async function count(db: Queryable, source: string): Promise<number> {
+  const { rows } = await db.query<{ total: string }>("select count(*) as total from source_fetches where source = $1", [source]);
+  return Number(rows[0]?.total ?? 0);
+}
+
+/** When each fetch since an instant started and whether it worked, oldest first. */
+export async function marksSince(db: Queryable, since: Date): Promise<{ source: string; at: Date; ok: boolean }[]> {
+  const { rows } = await db.query<{ source: string; started_at: Date; ok: boolean }>(
+    "select source, started_at, ok from source_fetches where started_at >= $1 order by started_at",
+    [since],
+  );
+  return rows.map((row) => ({ source: row.source, at: row.started_at, ok: row.ok }));
+}
+
+/** How many fetches of each source worked and failed since an instant. */
+export async function countsSince(db: Queryable, since: Date): Promise<Map<string, { ok: number; failed: number }>> {
+  const { rows } = await db.query<{ source: string; ok: string; failed: string }>(
+    `select source, count(*) filter (where ok) as ok, count(*) filter (where not ok) as failed
+       from source_fetches where started_at >= $1 group by source`,
+    [since],
+  );
+  return new Map(rows.map((row) => [row.source, { ok: Number(row.ok), failed: Number(row.failed) }]));
+}
+
+/** What every good fetch of one source brought back, so a job that was stopped half way can tell what it already has. */
+export async function succeeded(db: Queryable, source: string): Promise<FetchDetail[]> {
+  const { rows } = await db.query<{ detail: FetchDetail }>("select detail from source_fetches where source = $1 and ok", [source]);
+  return rows.map((row) => row.detail);
+}
+
+/** The same, for the good fetches that started in a window, both ends included. */
+export async function succeededBetween(db: Queryable, source: string, from: Date, to: Date): Promise<FetchDetail[]> {
+  const { rows } = await db.query<{ detail: FetchDetail }>("select detail from source_fetches where source = $1 and ok and started_at between $2 and $3", [source, from, to]);
+  return rows.map((row) => row.detail);
+}

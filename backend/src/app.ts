@@ -6,8 +6,15 @@ import type { HealthReport } from "./contracts";
 import { RetryableError, UpstreamError } from "./lib/errors";
 import { childLogger } from "./lib/logger";
 import { aiRouter } from "./routes/ai.routes";
+import { alertsRouter } from "./routes/alerts.routes";
 import { chatRouter } from "./routes/chat.routes";
+import { councilRouter } from "./routes/council.routes";
+import { hazeRouter } from "./routes/haze.routes";
 import { requestLog } from "./routes/request-log";
+import { sourcesRouter } from "./routes/sources.routes";
+import { statementsRouter } from "./routes/statements.routes";
+import type { Geocoder } from "./sources";
+import type { ModelClient } from "./sources/model";
 
 const log = childLogger({ module: "api" });
 
@@ -16,6 +23,10 @@ export interface AppDeps {
   pool: Pool;
   /** How the chat reaches a model. */
   llm: LlmClient;
+  /** Place names to coordinates, for the search box and the assistant. */
+  geocoder: Geocoder;
+  /** The model service, asked only for its published report. Null while MODEL_MODE is off. */
+  model: ModelClient | null;
   health: () => Promise<HealthReport>;
 }
 
@@ -38,7 +49,12 @@ export function createApp(deps: AppDeps): express.Express {
   });
 
   app.use("/ai", aiRouter());
-  app.use("/chat", chatRouter({ pool: deps.pool, llm: deps.llm }));
+  app.use("/chat", chatRouter({ pool: deps.pool, llm: deps.llm, geocoder: deps.geocoder }));
+  app.use("/council", councilRouter({ pool: deps.pool }));
+  app.use("/haze", hazeRouter({ pool: deps.pool, geocoder: deps.geocoder, model: deps.model }));
+  app.use("/alerts", alertsRouter({ pool: deps.pool }));
+  app.use("/sources", sourcesRouter({ pool: deps.pool }));
+  app.use("/statements", statementsRouter({ pool: deps.pool }));
 
   app.use(
     // Four parameters are what make Express treat this as an error handler.

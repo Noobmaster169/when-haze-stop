@@ -17,14 +17,16 @@ export const maxDuration = 300;
 export async function POST(request: Request, ctx: RouteContext<"/api/chat/[id]/messages">) {
   const { id } = await ctx.params;
   try {
-    const body = (await request.json()) as { content?: unknown };
+    const body = (await request.json()) as { content?: unknown; sessionId?: unknown };
     if (typeof body.content !== "string" || body.content.trim() === "") {
       return Response.json({ error: "A question needs content." }, { status: 400 });
     }
 
     // The browser's abort is the person pressing Stop, and it has to reach the
     // backend: that is how the turn is ended and stored with what it had.
-    const upstream = await streamQuestion(id, body.content, request.signal);
+    // The browser's own id rides along so the assistant can turn alerts on for it.
+    const session = typeof body.sessionId === "string" && body.sessionId.length >= 8 && body.sessionId.length <= 80 ? body.sessionId : undefined;
+    const upstream = await streamQuestion(id, body.content, session, request.signal);
     if (!upstream.ok || !upstream.body) {
       return Response.json({ error: `The backend refused the question with ${upstream.status}.` }, { status: 502 });
     }

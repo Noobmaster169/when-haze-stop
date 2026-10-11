@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 
-// The integration tests talk to the Postgres from compose.local.yaml, in its
+// The integration tests talk to the Postgres from the root compose.yaml, in its
 // own database so they never see or touch development rows.
 export const TEST_ENV = {
   NODE_ENV: "test",

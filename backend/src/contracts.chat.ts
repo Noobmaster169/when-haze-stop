@@ -17,6 +17,8 @@ export const ChatToolCall = z.object({
   ok: z.boolean(),
   /** One line for the page: a short rendering of the result, or the error where the call failed. */
   preview: z.string(),
+  /** Where the facts came from, for the chip under the answer: "DOE", "NASA FIRMS". Null for a tool that reads no data. */
+  source: z.string().nullable().default(null),
   durationMs: z.number().int(),
 });
 export type ChatToolCall = z.infer<typeof ChatToolCall>;
@@ -50,7 +52,11 @@ export type ChatThread = z.infer<typeof ChatThread>;
 export const ChatConversationList = z.object({ conversations: z.array(ChatConversation) });
 export type ChatConversationList = z.infer<typeof ChatConversationList>;
 
-export const NewMessage = z.object({ content: z.string().trim().min(1).max(20_000) });
+export const NewMessage = z.object({
+  content: z.string().trim().min(1).max(20_000),
+  /** The browser's own id, so the assistant can follow a station on its behalf. There is no login behind it. */
+  sessionId: z.string().min(8).max(80).optional(),
+});
 export type NewMessage = z.infer<typeof NewMessage>;
 
 /** `reading` the question, `looking` with tools, `writing` the answer. */

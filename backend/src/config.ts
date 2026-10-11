@@ -19,7 +19,7 @@ const Env = z.object({
   PG_USER: z.string().min(1),
   PG_PASSWORD: z.string().min(1),
 
-  // The llm-proxy service of the compose stack. 4001 is where compose.local.yaml
+  // The llm-proxy service of the compose stack. 4001 is where compose.yaml
   // publishes it on the host; inside compose it is http://llm-proxy:4000.
   LLM_PROXY_URL: z.url().default("http://127.0.0.1:4001"),
 
@@ -30,6 +30,38 @@ const Env = z.object({
   // under what the proxy serves at once (max_concurrency in proxy/proxy.yaml):
   // more only wait inside the proxy with their request timeout already running.
   LLM_MAX_CONCURRENCY: z.coerce.number().int().positive().default(4),
+  // The Suppression Council's own cap, in its worker process: its seats draft
+  // and critique in parallel waves, and the proxy serves eight at once.
+  COUNCIL_MAX_CONCURRENCY: z.coerce.number().int().positive().default(8),
+
+  // The model service of the compose stack (model/). 4002 is where
+  // compose.yaml publishes it on the host; inside compose it is
+  // http://model:4002.
+  MODEL_URL: z.url().default("http://127.0.0.1:4002"),
+  // off: never asked. shadow: asked each cycle, stored and scored, shown on
+  // the Simulation page only. live: its forecast is the outlook's, so alerts
+  // and the assistant follow it. Set live by hand, once the shadow rule on the
+  // Simulation page has passed (14 days, 10% better than the hourly forecast).
+  MODEL_MODE: z.enum(["off", "shadow", "live"]).default("off"),
+
+  // The NASA FIRMS archive key, read only by `pnpm haze:history`. Everything
+  // else runs without it.
+  FIRMS_MAP_KEY: optionalString,
+  // The OpenAQ key, free from https://explore.openaq.org/register. With it the
+  // PM2.5 of the region's other sensors is stored each hour and for the past;
+  // without it that one source is skipped.
+  OPENAQ_API_KEY: optionalString,
+  // The first UTC day `pnpm haze:history` fills back to, for every source.
+  HISTORY_FROM: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).default("2025-01-01"),
+
+  // Web Push, so an alert reaches a device with the tab closed. Make a pair
+  // with `npx web-push generate-vapid-keys`. Without them alerts still show in
+  // the app and no notification is sent.
+  VAPID_PUBLIC_KEY: optionalString,
+  VAPID_PRIVATE_KEY: optionalString,
+  // The contact the push services may write to. Safari refuses a localhost
+  // one, so set a real mailto: or https: address before relying on it there.
+  VAPID_SUBJECT: z.string().min(1).default("mailto:admin@localhost"),
 
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal", "silent"]).default("info"),
 
@@ -39,6 +71,7 @@ const Env = z.object({
 });
 
 export type Config = z.infer<typeof Env>;
+export type ModelMode = Config["MODEL_MODE"];
 
 function load(): Config {
   const parsed = Env.safeParse(process.env);
