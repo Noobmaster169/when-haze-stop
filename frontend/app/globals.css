@@ -288,7 +288,31 @@ body {
   }
 }
 
-/* An alert dropping out from under the island. */
+/* A new alert sliding in from the right edge. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(calc(100% + 24px));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The replay's bar rising from the bottom of the page. */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* A line dropping in from above. */
 @keyframes island-drop {
   from {
     opacity: 0;

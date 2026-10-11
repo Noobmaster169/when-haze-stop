@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { Icon } from "@/components/ui/icons";
 import type { AreaCard as Area } from "@/lib/api/alert-schemas";
 import { dayName } from "@/lib/malaysia-time";
@@ -9,7 +11,7 @@ import { DayStrip } from "./day-strip";
 export function AreaCardView({ area, onStop }: { area: Area; onStop(): void }) {
   const edge = area.alert ? `border-l-[3px] ${TONE[area.alert.kind].edge}` : "";
   return (
-    <article className={`rounded-lg border border-hairline bg-surface p-4 ${edge}`}>
+    <article id={`area-${area.stationId}`} className={`scroll-mt-20 rounded-lg border border-hairline bg-surface p-4 ${edge}`}>
       <header className="flex items-baseline gap-2">
         <h3 className="min-w-0 truncate text-title font-medium text-ink">{area.stationName}</h3>
         <span className="text-caption text-ink-tertiary">{area.state}</span>
@@ -43,6 +45,11 @@ export function AreaCardView({ area, onStop }: { area: Area; onStop(): void }) {
           ))}
         </ul>
       ) : null}
+
+      <Link href={`/map?station=${encodeURIComponent(area.stationId)}`} className="mt-3 inline-flex items-center gap-1 text-small text-ink-tertiary hover:text-accent">
+        View on map
+        <Icon name="right" size={12} />
+      </Link>
     </article>
   );
 }

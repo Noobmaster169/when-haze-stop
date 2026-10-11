@@ -3,10 +3,9 @@
 import Link from "next/link";
 
 import { TONE } from "@/components/alerts/alert-tone";
-import { useReplayLine } from "@/components/alerts/demo/replay-player";
 import { Icon } from "@/components/ui/icons";
 
-import { useUnseenAlert } from "./island-alert";
+import { useNewestAlertKind } from "./alert-toasts";
 import { DESTINATIONS } from "./nav";
 
 /**
@@ -15,12 +14,10 @@ import { DESTINATIONS } from "./nav";
  * reached by keyboard, it widens to name them all. Only keyboard focus holds
  * it open, so a click lands and the pill folds back around the new page.
  * Labels open on a grid track rather than a measured width, so the pill grows
- * to whatever the words need. Below 900px a new alert shows as a dot on the
- * Alerts icon, where wider screens hang its line under the pill.
+ * to whatever the words need. An unread alert puts a dot on the Alerts icon.
  */
 export function Island({ active }: { active: string | null }) {
-  const { alert: unseen } = useUnseenAlert();
-  const alert = useReplayLine() ?? unseen;
+  const alertKind = useNewestAlertKind();
   return (
     <nav
       aria-label="Primary"
@@ -40,8 +37,8 @@ export function Island({ active }: { active: string | null }) {
           >
             <span className="relative shrink-0">
               <Icon name={destination.icon} />
-              {destination.key === "alerts" && alert ? (
-                <span aria-label="New alert" className={`absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full ring-2 ring-ink min-[900px]:hidden ${TONE[alert.kind].dot}`} />
+              {destination.key === "alerts" && alertKind ? (
+                <span aria-label="New alert" className={`absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full ring-2 ring-ink ${TONE[alertKind].dot}`} />
               ) : null}
             </span>
             <span

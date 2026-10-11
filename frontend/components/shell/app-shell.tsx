@@ -2,15 +2,17 @@
 
 import type { ReactNode } from "react";
 
+import { ReplayBar } from "@/components/alerts/demo/replay-bar";
 import { Dock } from "@/components/dock/dock";
 import { DockProvider } from "@/components/dock/dock-state";
 import { DockToggle } from "@/components/dock/dock-toggle";
 
+import { AlertToasts } from "./alert-toasts";
 import { TopControls } from "./top-controls";
 
 /**
- * Every screen is this: the page with the island floating over its top, a
- * new alert hanging under the island, and the dock beside it when it is open.
+ * Every screen is this: the page with the island floating over its top, new
+ * alerts at its top right, and the dock beside it when it is open.
  * No banner: the island is the navigation and the page keeps the height.
  *
  * Mounted once by app/(app)/layout.tsx, so the island and the chat survive
@@ -25,6 +27,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="relative flex min-w-0 grow">
             {children}
             <TopControls toggle={<DockToggle />} />
+            <AlertToasts />
+            <ReplayBar />
           </div>
           <Dock />
         </div>

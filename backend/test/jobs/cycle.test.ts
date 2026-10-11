@@ -107,7 +107,7 @@ describe("one cycle, then what the api serves", () => {
     const feed = AlertFeed.parse((await request(app).get("/alerts").expect(200)).body);
     // Newest first. The test database is kept between runs, so older alerts may sit below it.
     const [newest] = feed.events.filter((event) => event.stationId === "CA24N");
-    expect(newest).toMatchObject({ kind: "order", message: "Ministry of Education: All education institutions in Negeri Sembilan close from 9 October." });
+    expect(newest).toMatchObject({ kind: "order", open: true, message: "Ministry of Education: All education institutions in Negeri Sembilan close from 9 October." });
     expect(await evaluateAlerts(getPool(), null, new Date(LAST_HOUR.getTime() + 20 * 60_000))).toBe(0);
   });
 

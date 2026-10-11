@@ -1,11 +1,12 @@
 import { unstable_rethrow } from "next/navigation";
 
-import { MyAreas } from "@/components/alerts/my-areas";
+import { AlertsHome } from "@/components/alerts/alerts-home";
+import { ReplayButton } from "@/components/alerts/demo/replay-button";
 import { StatementList } from "@/components/alerts/statement-list";
 import { getStatements } from "@/lib/api-client";
 import type { StatementPage } from "@/lib/api/statement-schemas";
 
-/** The places this browser follows, led by tomorrow's forecast, then what the government has said. */
+/** What was sent for the places this browser follows, each place's outlook, then what the government has said. */
 
 async function readStatements(all: boolean, page: number): Promise<StatementPage | null> {
   try {
@@ -28,10 +29,15 @@ export default async function AlertsPage({ searchParams }: PageProps<"/alerts">)
     <main className="flex min-w-0 grow flex-col">
       <div className="@container relative min-h-0 grow overflow-y-auto px-6 pt-20 pb-10 motion-safe:scroll-smooth md:px-10">
         <div className="max-w-[920px]">
-          <h1 className="font-display text-display text-ink">Alerts</h1>
-          <p className="mt-2 max-w-[62ch] text-body text-ink-secondary">What the forecast and the government say for the places you follow.</p>
+          <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+            <div className="min-w-0 grow">
+              <h1 className="font-display text-display text-ink">Alerts</h1>
+              <p className="mt-2 max-w-[62ch] text-body text-ink-secondary">What the forecast and the government say for the places you follow.</p>
+            </div>
+            <ReplayButton />
+          </div>
           <div className="mt-8 space-y-12">
-            <MyAreas />
+            <AlertsHome />
             <StatementList page={statements} query={{ all, page }} />
           </div>
         </div>
